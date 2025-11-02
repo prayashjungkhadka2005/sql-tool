@@ -23,6 +23,9 @@ export const metadata: Metadata = {
     maximumScale: 5,
     viewportFit: 'cover',
   },
+  verification: {
+    google: 'BHNtNhPfKfSpVEQ2gy1_NlDDTnbS8_ovvO24PXpou4Q',
+  },
   robots: {
     index: true,
     follow: true,
