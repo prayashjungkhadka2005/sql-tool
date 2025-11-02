@@ -38,14 +38,14 @@ export default function ThemeToggle() {
       
       <button
         onClick={toggleTheme}
-        className="p-2.5 sm:p-2.5 rounded-full backdrop-blur-md bg-white/60 dark:bg-warm-dark/60 border border-primary/20 hover:border-primary/40 hover:scale-110 hover:rotate-12 transition-all duration-300 shadow-lg group"
+        className="p-2 sm:p-2.5 rounded-full backdrop-blur-md bg-white/60 dark:bg-warm-dark/60 border border-primary/20 hover:border-primary/40 hover:scale-110 hover:rotate-12 transition-all duration-300 shadow-lg group"
         aria-label="Toggle dark mode"
       >
         {darkMode ? (
           // Sun icon for light mode - spins on hover!
           <svg
             xmlns="http://www.w3.org/2000/svg"
-            className="h-5 w-5 text-primary group-hover:animate-spin"
+            className="h-4 w-4 sm:h-5 sm:w-5 text-primary group-hover:animate-spin"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -61,7 +61,7 @@ export default function ThemeToggle() {
           // Moon icon for dark mode - bounces on hover!
           <svg
             xmlns="http://www.w3.org/2000/svg"
-            className="h-5 w-5 text-primary group-hover:scale-125 group-hover:-rotate-12 transition-all duration-300"
+            className="h-4 w-4 sm:h-5 sm:w-5 text-primary group-hover:scale-125 group-hover:-rotate-12 transition-all duration-300"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
