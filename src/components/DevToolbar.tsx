@@ -105,8 +105,8 @@ export default function DevToolbar() {
   return (
     <>
       {/* Full Width Bottom Toolbar */}
-      <div className="fixed bottom-0 left-0 right-0 z-[55] backdrop-blur-xl bg-white dark:bg-warm-dark border-t-2 border-primary/40 dark:border-secondary/50 shadow-[0_-4px_20px_rgba(0,0,0,0.15)] h-14 sm:h-16">
-        <div className="container mx-auto px-2 sm:px-6 h-full flex items-center">
+      <div className="fixed bottom-0 left-0 right-0 z-[55] backdrop-blur-xl bg-white dark:bg-warm-dark border-t-2 border-primary/40 dark:border-secondary/50 shadow-[0_-4px_20px_rgba(0,0,0,0.15)] h-14 sm:h-16" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+        <div className="container mx-auto px-2 sm:px-6 h-14 sm:h-16 flex items-center">
           <div className="flex items-center justify-between w-full">
             {/* Left: Branding */}
             <div className="flex items-center gap-1 sm:gap-2">

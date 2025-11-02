@@ -17,6 +17,12 @@ export const metadata: Metadata = {
   authors: [{ name: "Prayash Jung Khadka" }],
   creator: "Prayash Jung Khadka",
   publisher: "Prayash Jung Khadka",
+  viewport: {
+    width: 'device-width',
+    initialScale: 1,
+    maximumScale: 5,
+    viewportFit: 'cover',
+  },
   robots: {
     index: true,
     follow: true,

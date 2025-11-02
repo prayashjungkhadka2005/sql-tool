@@ -14,7 +14,7 @@ export default function Home() {
       <Navbar />
       <ThemeToggle />
       <DevToolbar />
-      <main>
+      <main className="pb-14 sm:pb-16">
         <Hero />
         <About />
         <Experience />
