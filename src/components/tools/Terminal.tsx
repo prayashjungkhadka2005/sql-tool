@@ -20,6 +20,12 @@ export default function Terminal({ terminalHeight, setTerminalHeight, onClose }:
   const [commandHistory, setCommandHistory] = useState<string[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
   const [isTyping, setIsTyping] = useState(false);
+  const [isDesktop, setIsDesktop] = useState(true);
+
+  // Detect if desktop (non-touch device)
+  useEffect(() => {
+    setIsDesktop(!('ontouchstart' in window || navigator.maxTouchPoints > 0));
+  }, []);
 
   // Cleanup interval on unmount
   useEffect(() => {
@@ -319,6 +325,7 @@ export default function Terminal({ terminalHeight, setTerminalHeight, onClose }:
           onChange={(e) => setTerminalInput(e.target.value)}
           onKeyDown={handleKeyDown}
           disabled={isTyping}
+          autoFocus={isDesktop}
         />
       </div>
     </div>

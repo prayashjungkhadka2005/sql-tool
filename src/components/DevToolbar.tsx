@@ -20,6 +20,12 @@ export default function DevToolbar() {
   const [terminalHeight, setTerminalHeight] = useState(300);
   const [searchQuery, setSearchQuery] = useState("");
   const [showSearch, setShowSearch] = useState(false);
+  const [isDesktop, setIsDesktop] = useState(true);
+
+  // Detect if desktop (non-touch device)
+  useEffect(() => {
+    setIsDesktop(!('ontouchstart' in window || navigator.maxTouchPoints > 0));
+  }, []);
 
   // Open/toggle tool
   const openTool = useCallback((toolId: string) => {
@@ -182,6 +188,7 @@ export default function DevToolbar() {
                 className="flex-1 bg-transparent text-foreground focus:outline-none text-sm"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                autoFocus={isDesktop}
               />
               <button
                 onClick={() => {
