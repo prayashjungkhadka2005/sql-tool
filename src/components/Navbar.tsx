@@ -50,8 +50,8 @@ export default function Navbar() {
       </div>
 
       {/* Modern Floating Navigation */}
-      <nav className="fixed top-4 left-1/2 -translate-x-1/2 z-40 w-full max-w-4xl px-4">
-        <div className="bg-background/70 dark:bg-warm-dark/70 backdrop-blur-xl rounded-full border border-primary/20 dark:border-secondary/30 shadow-lg px-6 py-3 transition-all duration-200">
+      <nav className="fixed top-4 left-1/2 -translate-x-1/2 z-40 w-full max-w-4xl px-2 sm:px-4">
+        <div className="bg-background/70 dark:bg-warm-dark/70 backdrop-blur-xl rounded-full border border-primary/20 dark:border-secondary/30 shadow-lg px-3 sm:px-6 py-2 sm:py-3 transition-all duration-200">
           <div className="flex items-center justify-between">
             {/* Desktop Navigation */}
             <ul className="hidden md:flex items-center gap-2 mx-auto">
@@ -71,13 +71,13 @@ export default function Navbar() {
               ))}
             </ul>
 
-            {/* Mobile Navigation */}
-            <ul className="flex md:hidden items-center gap-1 text-xs mx-auto">
+            {/* Mobile Navigation - Optimized for small screens */}
+            <ul className="flex md:hidden items-center gap-0.5 sm:gap-1 text-[10px] sm:text-xs mx-auto overflow-x-auto scrollbar-hide">
               {navItems.map((item) => (
-                <li key={item.name}>
+                <li key={item.name} className="flex-shrink-0">
                   <a
                     href={item.href}
-                    className={`px-3 py-1.5 font-medium transition-all duration-300 rounded-full ${
+                    className={`px-2 sm:px-3 py-1.5 font-medium transition-all duration-300 rounded-full whitespace-nowrap ${
                       activeSection === item.href.substring(1)
                         ? "text-white bg-gradient-to-r from-primary to-accent"
                         : "text-foreground/70 hover:text-foreground hover:bg-primary/10"

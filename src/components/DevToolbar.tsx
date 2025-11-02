@@ -99,28 +99,28 @@ export default function DevToolbar() {
   return (
     <>
       {/* Full Width Bottom Toolbar */}
-      <div className="fixed bottom-0 left-0 right-0 z-[55] backdrop-blur-xl bg-white dark:bg-warm-dark border-t-2 border-primary/40 dark:border-secondary/50 shadow-[0_-4px_20px_rgba(0,0,0,0.15)] h-16">
-        <div className="container mx-auto px-6 h-full flex items-center">
+      <div className="fixed bottom-0 left-0 right-0 z-[55] backdrop-blur-xl bg-white dark:bg-warm-dark border-t-2 border-primary/40 dark:border-secondary/50 shadow-[0_-4px_20px_rgba(0,0,0,0.15)] h-14 sm:h-16">
+        <div className="container mx-auto px-2 sm:px-6 h-full flex items-center">
           <div className="flex items-center justify-between w-full">
             {/* Left: Branding */}
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-bold text-foreground">
+            <div className="flex items-center gap-1 sm:gap-2">
+              <span className="text-xs sm:text-sm font-bold text-foreground">
                 <span className="text-primary">Dev</span> Tools
               </span>
-              <span className="text-xs text-foreground/50 hidden md:block">
+              <span className="text-[10px] sm:text-xs text-foreground/50 hidden lg:block">
                 Developer utilities by Prayash
               </span>
             </div>
 
             {/* Center/Right: Tool Buttons & Actions */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 sm:gap-2 overflow-x-auto scrollbar-hide">
               {/* Search Button */}
               <button
                 onClick={() => setShowSearch(!showSearch)}
-                className="p-2 hover:bg-primary/10 rounded-lg transition-all"
+                className="p-1.5 sm:p-2 hover:bg-primary/10 rounded-lg transition-all flex-shrink-0"
                 title="Search Tools (Ctrl+K)"
               >
-                <svg className="w-5 h-5 text-foreground/70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4 sm:w-5 sm:h-5 text-foreground/70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                 </svg>
               </button>
@@ -132,14 +132,14 @@ export default function DevToolbar() {
                   <button
                     key={tool.id}
                     onClick={() => openTool(tool.id)}
-                    className={`px-3 py-2 rounded-lg transition-all flex items-center gap-2 text-sm font-medium ${
+                    className={`px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg transition-all flex items-center gap-1 sm:gap-2 text-xs sm:text-sm font-medium flex-shrink-0 ${
                       activeTool === tool.id
                         ? "bg-gradient-to-r from-primary to-accent text-white shadow-md"
                         : "hover:bg-primary/10 text-foreground/70"
                     }`}
                     title={`${tool.title} (${tool.shortcut})`}
                   >
-                    <IconComponent className="text-lg" />
+                    <IconComponent className="text-base sm:text-lg" />
                     <span className="hidden sm:inline">{tool.name}</span>
                   </button>
                 );
@@ -169,7 +169,7 @@ export default function DevToolbar() {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 10 }}
-            className="fixed bottom-20 right-6 z-[65] backdrop-blur-xl bg-white/95 dark:bg-warm-dark/95 border border-primary/30 rounded-2xl shadow-2xl p-4 w-80"
+            className="fixed bottom-16 sm:bottom-20 right-2 sm:right-6 z-[65] backdrop-blur-xl bg-white/95 dark:bg-warm-dark/95 border border-primary/30 rounded-2xl shadow-2xl p-4 w-[calc(100vw-1rem)] sm:w-80 max-w-md"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center gap-2 mb-3">

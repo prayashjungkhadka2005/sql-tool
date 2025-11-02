@@ -30,7 +30,7 @@ export default function ThemeToggle() {
   };
 
   return (
-    <div className="fixed top-6 right-6 z-50 flex items-center gap-3 group/container">
+    <div className="fixed top-6 right-2 sm:right-6 z-50 flex items-center gap-3 group/container">
       {/* Fun label - appears on hover */}
       <span className="hidden md:block opacity-0 group-hover/container:opacity-100 transition-opacity duration-300 text-sm font-medium text-foreground/70 backdrop-blur-md bg-white/60 dark:bg-warm-dark/60 px-3 py-1.5 rounded-full border border-primary/20 shadow-md">
         {darkMode ? "Light it up! ☀️" : "Go dark! 🌙"}
@@ -38,7 +38,7 @@ export default function ThemeToggle() {
       
       <button
         onClick={toggleTheme}
-        className="p-2.5 rounded-full backdrop-blur-md bg-white/60 dark:bg-warm-dark/60 border border-primary/20 hover:border-primary/40 hover:scale-110 hover:rotate-12 transition-all duration-300 shadow-lg group"
+        className="p-2 sm:p-2.5 rounded-full backdrop-blur-md bg-white/60 dark:bg-warm-dark/60 border border-primary/20 hover:border-primary/40 hover:scale-110 hover:rotate-12 transition-all duration-300 shadow-lg group"
         aria-label="Toggle dark mode"
       >
         {darkMode ? (
