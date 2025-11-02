@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { DM_Sans } from "next/font/google";
 import "./globals.css";
+import "@/styles/sql-builder.css";
 
 const dmSans = DM_Sans({ 
   subsets: ["latin"],
@@ -11,9 +12,9 @@ const dmSans = DM_Sans({
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://prayash-portfolio.vercel.app'),
-  title: "Prayash Jung Khadka | Full-Stack Developer",
-  description: "Full-Stack Developer specializing in React, Next.js, Node.js, and TypeScript. Building scalable web applications with PostgreSQL, MongoDB, AWS, and modern tech stack.",
-  keywords: ["Full-Stack Developer", "JavaScript Developer", "React Developer", "Next.js Developer", "Node.js", "TypeScript", "Prayash Khadka", "Web Developer Nepal", "Backend Developer", "API Developer", "Upwork Developer"],
+  title: "SQL Query Builder | Visual SQL Learning Tool - Free",
+  description: "Free visual SQL query builder for developers. Build SELECT, INSERT, UPDATE, DELETE queries with real-time code generation. Export to CSV, JSON, SQL. Perfect for learning SQL syntax.",
+  keywords: ["SQL Query Builder", "SQL Generator", "Visual SQL", "SQL Learning Tool", "Database Query Builder", "SQL Tutorial", "Free SQL Tool", "Backend Developer Tools", "PostgreSQL", "MySQL", "Learn SQL", "SQL Syntax", "Prayash Khadka"],
   authors: [{ name: "Prayash Jung Khadka" }],
   creator: "Prayash Jung Khadka",
   publisher: "Prayash Jung Khadka",
@@ -52,24 +53,24 @@ export const metadata: Metadata = {
   },
   manifest: '/site.webmanifest',
   openGraph: {
-    title: "Prayash Jung Khadka | Full-Stack Developer",
-    description: "Full-Stack Developer specializing in React, Next.js, Node.js, and TypeScript. Building scalable web applications with PostgreSQL, MongoDB, AWS, and modern tech stack.",
+    title: "SQL Query Builder | Free Visual SQL Tool",
+    description: "Free visual SQL query builder. Build queries with real-time code generation, export results to CSV/JSON/SQL. Perfect for learning SQL syntax.",
     type: "website",
     locale: "en_US",
-    siteName: "Prayash Jung Khadka Portfolio",
+    siteName: "SQL Query Builder by Prayash",
     images: [
       {
         url: '/images/profile.jpg',
         width: 1200,
         height: 630,
-        alt: 'Prayash Jung Khadka - Full-Stack Developer',
+        alt: 'SQL Query Builder - Visual SQL Learning Tool',
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Prayash Jung Khadka | Full-Stack Developer",
-    description: "Building scalable web applications with modern technologies",
+    title: "SQL Query Builder | Free Visual SQL Tool",
+    description: "Build SQL queries visually with real-time code generation. Export to CSV, JSON, SQL. Free tool for developers.",
     creator: "@prayashjungkhadka",
     images: ['/images/profile.jpg'],
   },

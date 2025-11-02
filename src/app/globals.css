@@ -6,6 +6,7 @@
 :root {
   --background: #F0F5F9;        /* Warm lightest */
   --foreground: #1E2022;        /* Warm dark */
+  --foreground-rgb: 30 32 34;   /* Foreground as RGB for opacity */
   --primary: #52616B;           /* Warm medium */
   --secondary: #C9D6DF;         /* Warm light */
   --accent: #6B7F8B;            /* Slightly lighter warm */
@@ -19,6 +20,7 @@
 .dark {
   --background: #1E2022;        /* Warm dark base */
   --foreground: #F0F5F9;        /* Warm lightest for text */
+  --foreground-rgb: 240 245 249; /* Foreground as RGB for opacity */
   --primary: #8FA3AE;           /* Lighter warm blue-gray */
   --secondary: #3D4C56;         /* Darker warm medium */
   --accent: #A8B8C4;            /* Light warm for accents */
