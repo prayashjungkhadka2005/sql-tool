@@ -61,10 +61,10 @@ export default function Navbar() {
       {/* Scroll Progress Bar - On Top of Toolbar */}
       <div className="fixed bottom-14 sm:bottom-16 left-0 right-0 h-1 bg-transparent z-[70] pointer-events-none">
         <div
-          className="h-full bg-gradient-to-r from-primary via-accent to-primary shadow-lg"
+          className="h-full bg-gradient-to-r from-primary via-accent to-primary shadow-lg will-change-[width]"
           style={{ 
             width: `${scrollProgress}%`,
-            transition: 'width 0.1s ease-out'
+            transition: 'width 0.05s linear'
           }}
         />
       </div>
