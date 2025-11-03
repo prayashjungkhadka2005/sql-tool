@@ -39,12 +39,34 @@ export interface JoinClause {
   onRight: string;
 }
 
+export type AggregateFunction = "COUNT" | "SUM" | "AVG" | "MIN" | "MAX";
+
+export interface AggregateColumn {
+  id: string;
+  function: AggregateFunction;
+  column: string; // "*" for COUNT(*)
+  alias?: string; // Optional column alias
+}
+
+export interface HavingCondition {
+  id: string;
+  function: AggregateFunction;
+  column: string;
+  operator: OperatorType;
+  value: string;
+  conjunction: ConjunctionType;
+}
+
 export interface QueryState {
   queryType: QueryType;
   table: string;
   columns: string[];
+  aggregates: AggregateColumn[]; // NEW: Aggregate functions
+  distinct: boolean; // NEW: DISTINCT keyword
   whereConditions: WhereCondition[];
   joins: JoinClause[];
+  groupBy: string[]; // NEW: GROUP BY columns
+  having: HavingCondition[]; // NEW: HAVING conditions
   orderBy: OrderByClause[];
   limit: number | null;
   offset: number | null;

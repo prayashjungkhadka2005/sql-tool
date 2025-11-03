@@ -40,26 +40,143 @@ export default function QueryPreview({ queryState }: QueryPreviewProps) {
     // Apply WHERE filters
     data = applyWhere(data, queryState.whereConditions);
     
-    // Apply ORDER BY
+    // Handle aggregate queries with GROUP BY
+    if (queryState.aggregates && queryState.aggregates.length > 0) {
+      // Group data
+      const groups: Record<string, any[]> = {};
+      
+      data.forEach(row => {
+        // Create group key from groupBy columns
+        const groupKey = queryState.groupBy && queryState.groupBy.length > 0
+          ? queryState.groupBy.map(col => String(row[col] ?? '')).join('|||')
+          : 'all';
+        
+        if (!groups[groupKey]) {
+          groups[groupKey] = [];
+        }
+        groups[groupKey].push(row);
+      });
+      
+      // Calculate aggregates for each group
+      data = Object.entries(groups).map(([groupKey, rows]) => {
+        const result: any = {};
+        
+        // Add groupBy columns
+        if (queryState.groupBy && queryState.groupBy.length > 0) {
+          queryState.groupBy.forEach((col, idx) => {
+            const value = groupKey.split('|||')[idx];
+            result[col] = value === '' ? null : (isNaN(Number(value)) ? value : Number(value));
+          });
+        }
+        
+        // Calculate aggregates
+        queryState.aggregates!.forEach(agg => {
+          const columnName = agg.alias || `${agg.function}(${agg.column})`;
+          
+          switch (agg.function) {
+            case 'COUNT':
+              if (agg.column === '*') {
+                result[columnName] = rows.length;
+              } else {
+                result[columnName] = rows.filter(r => r[agg.column] != null).length;
+              }
+              break;
+            case 'SUM':
+              result[columnName] = rows.reduce((sum, r) => sum + (Number(r[agg.column]) || 0), 0);
+              break;
+            case 'AVG':
+              const values = rows.map(r => Number(r[agg.column]) || 0);
+              result[columnName] = values.length > 0 
+                ? values.reduce((a, b) => a + b, 0) / values.length 
+                : 0;
+              break;
+            case 'MIN':
+              const minValues = rows.map(r => Number(r[agg.column]) || 0);
+              result[columnName] = minValues.length > 0 ? Math.min(...minValues) : 0;
+              break;
+            case 'MAX':
+              const maxValues = rows.map(r => Number(r[agg.column]) || 0);
+              result[columnName] = maxValues.length > 0 ? Math.max(...maxValues) : 0;
+              break;
+          }
+        });
+        
+        // Add regular columns (non-aggregate, non-groupBy)
+        queryState.columns.forEach(col => {
+          if (queryState.groupBy && !queryState.groupBy.includes(col)) {
+            // For non-grouped columns, take first value (SQL would require aggregation)
+            result[col] = rows[0]?.[col];
+          } else if (!queryState.groupBy || queryState.groupBy.length === 0) {
+            result[col] = rows[0]?.[col];
+          }
+        });
+        
+        return result;
+      });
+      
+      // Apply HAVING filters
+      if (queryState.having && queryState.having.length > 0) {
+        data = data.filter(row => {
+          let result = true;
+          queryState.having!.forEach((condition, index) => {
+            const aggValue = row[condition.function + '(' + condition.column + ')'] || 
+                            row[queryState.aggregates!.find(a => a.function === condition.function && a.column === condition.column)?.alias || ''];
+            let conditionMet = false;
+            
+            switch (condition.operator) {
+              case '=':
+                conditionMet = Number(aggValue) === Number(condition.value);
+                break;
+              case '!=':
+                conditionMet = Number(aggValue) !== Number(condition.value);
+                break;
+              case '>':
+                conditionMet = Number(aggValue) > Number(condition.value);
+                break;
+              case '<':
+                conditionMet = Number(aggValue) < Number(condition.value);
+                break;
+              case '>=':
+                conditionMet = Number(aggValue) >= Number(condition.value);
+                break;
+              case '<=':
+                conditionMet = Number(aggValue) <= Number(condition.value);
+                break;
+            }
+            
+            if (index === 0) {
+              result = conditionMet;
+            } else if (condition.conjunction === 'AND') {
+              result = result && conditionMet;
+            } else if (condition.conjunction === 'OR') {
+              result = result || conditionMet;
+            }
+          });
+          return result;
+        });
+      }
+    } else {
+      // Non-aggregate query: just select columns
+      if (queryState.columns.length > 0) {
+        data = data.map(row => {
+          const filtered: any = {};
+          queryState.columns.forEach(col => {
+            if (col in row) {
+              filtered[col] = row[col];
+            }
+          });
+          return filtered;
+        });
+      }
+    }
+    
+    // Apply ORDER BY (after grouping for aggregate queries)
     data = applyOrderBy(data, queryState.orderBy);
     
     // Apply LIMIT and OFFSET (default to 20 rows for better UX)
     const defaultLimit = 20;
     const effectiveLimit = queryState.limit || (queryState.limit === null ? defaultLimit : null);
     data = applyPagination(data, effectiveLimit, queryState.offset);
-    
-    // Select only requested columns
-    if (queryState.columns.length > 0) {
-      data = data.map(row => {
-        const filtered: any = {};
-        queryState.columns.forEach(col => {
-          if (col in row) {
-            filtered[col] = row[col];
-          }
-        });
-        return filtered;
-      });
-    }
     
     return data;
   }, [queryState]);
@@ -140,7 +257,11 @@ export default function QueryPreview({ queryState }: QueryPreviewProps) {
     }
   };
 
-  const hasQuery = queryState.table && (queryState.queryType !== "SELECT" || queryState.columns.length > 0);
+  const hasQuery = queryState.table && (
+    queryState.queryType !== "SELECT" || 
+    queryState.columns.length > 0 || 
+    (queryState.aggregates && queryState.aggregates.length > 0)
+  );
 
   const [copied, setCopied] = useState(false);
 

@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { QueryState, WhereCondition, OrderByClause } from "../types";
+import { QueryState, WhereCondition, OrderByClause, AggregateColumn, HavingCondition } from "../types";
 
 /**
  * Custom hook for managing SQL query builder state
@@ -10,8 +10,12 @@ export function useQueryBuilder(initialState?: Partial<QueryState>) {
     queryType: "SELECT",
     table: "",
     columns: [],
+    aggregates: [],
+    distinct: false,
     whereConditions: [],
     joins: [],
+    groupBy: [],
+    having: [],
     orderBy: [],
     limit: null,
     offset: null,
@@ -61,14 +65,38 @@ export function useQueryBuilder(initialState?: Partial<QueryState>) {
     setQueryState(prev => ({ ...prev, offset }));
   }, []);
 
+  // Update aggregates
+  const updateAggregates = useCallback((aggregates: AggregateColumn[]) => {
+    setQueryState(prev => ({ ...prev, aggregates }));
+  }, []);
+
+  // Update GROUP BY
+  const updateGroupBy = useCallback((groupBy: string[]) => {
+    setQueryState(prev => ({ ...prev, groupBy }));
+  }, []);
+
+  // Update HAVING
+  const updateHaving = useCallback((having: HavingCondition[]) => {
+    setQueryState(prev => ({ ...prev, having }));
+  }, []);
+
+  // Update DISTINCT
+  const updateDistinct = useCallback((distinct: boolean) => {
+    setQueryState(prev => ({ ...prev, distinct }));
+  }, []);
+
   // Reset to initial state
   const reset = useCallback(() => {
     setQueryState({
       queryType: "SELECT",
       table: "",
       columns: [],
+      aggregates: [],
+      distinct: false,
       whereConditions: [],
       joins: [],
+      groupBy: [],
+      having: [],
       orderBy: [],
       limit: null,
       offset: null,
@@ -81,8 +109,12 @@ export function useQueryBuilder(initialState?: Partial<QueryState>) {
       queryType: "SELECT",
       table: "",
       columns: [],
+      aggregates: [],
+      distinct: false,
       whereConditions: [],
       joins: [],
+      groupBy: [],
+      having: [],
       orderBy: [],
       limit: null,
       offset: null,
@@ -96,7 +128,11 @@ export function useQueryBuilder(initialState?: Partial<QueryState>) {
     updateQueryType,
     updateTable,
     updateColumns,
+    updateAggregates,
+    updateDistinct,
     updateWhereConditions,
+    updateGroupBy,
+    updateHaving,
     updateOrderBy,
     updateLimit,
     updateOffset,

@@ -30,10 +30,34 @@ function generateSelectQuery(state: QueryState): string {
   const parts: string[] = [];
 
   // SELECT clause
-  const columns = state.columns.length > 0 
-    ? state.columns.join(", ") 
-    : "*";
-  parts.push(`SELECT ${columns}`);
+  let selectClause = "SELECT";
+  
+  // Add DISTINCT if enabled
+  if (state.distinct) {
+    selectClause += " DISTINCT";
+  }
+  
+  // Build column/aggregate list
+  const selectItems: string[] = [];
+  
+  // Add aggregate functions
+  if (state.aggregates.length > 0) {
+    state.aggregates.forEach(agg => {
+      const aggStr = agg.alias 
+        ? `${agg.function}(${agg.column}) AS ${agg.alias}`
+        : `${agg.function}(${agg.column})`;
+      selectItems.push(aggStr);
+    });
+  }
+  
+  // Add regular columns
+  if (state.columns.length > 0) {
+    selectItems.push(...state.columns);
+  }
+  
+  // If no columns or aggregates, use *
+  const columns = selectItems.length > 0 ? selectItems.join(", ") : "*";
+  parts.push(`${selectClause} ${columns}`);
 
   // FROM clause
   parts.push(`FROM ${state.table}`);
@@ -52,6 +76,27 @@ function generateSelectQuery(state: QueryState): string {
       }
     });
     parts.push(`WHERE ${whereParts.join("\n")}`);
+  }
+
+  // GROUP BY clause
+  if (state.groupBy.length > 0) {
+    parts.push(`GROUP BY ${state.groupBy.join(", ")}`);
+  }
+
+  // HAVING clause
+  if (state.having.length > 0) {
+    const havingParts: string[] = [];
+    state.having.forEach((condition, index) => {
+      const aggFunc = `${condition.function}(${condition.column})`;
+      const clause = `${aggFunc} ${condition.operator} ${condition.value}`;
+      
+      if (index === 0) {
+        havingParts.push(clause);
+      } else {
+        havingParts.push(`  ${condition.conjunction} ${clause}`);
+      }
+    });
+    parts.push(`HAVING ${havingParts.join("\n")}`);
   }
 
   // ORDER BY clause
@@ -116,19 +161,49 @@ export function explainQuery(state: QueryState): string {
 
   // Main action
   if (state.queryType === "SELECT") {
-    const columns = state.columns.length > 0 
-      ? state.columns.join(", ") 
-      : "all columns";
-    parts.push(`This query retrieves ${columns} from the "${state.table}" table.`);
+    // Handle aggregates
+    if (state.aggregates.length > 0) {
+      const aggDescriptions = state.aggregates.map(agg => {
+        const funcName = agg.function.toLowerCase();
+        const colName = agg.column === "*" ? "all rows" : `the ${agg.column} column`;
+        return `${funcName}s ${colName}`;
+      });
+      parts.push(`This query calculates: ${aggDescriptions.join(", ")}.`);
+      
+      if (state.columns.length > 0) {
+        parts.push(`It also selects: ${state.columns.join(", ")}.`);
+      }
+    } else {
+      const columns = state.columns.length > 0 
+        ? state.columns.join(", ") 
+        : "all columns";
+      const distinct = state.distinct ? "unique " : "";
+      parts.push(`This query retrieves ${distinct}${columns} from the "${state.table}" table.`);
+    }
   }
 
   // WHERE conditions
   if (state.whereConditions.length > 0) {
-    parts.push("\nIt filters results where:");
+    parts.push("\nIt filters rows where:");
     state.whereConditions.forEach((condition, index) => {
       const conjunction = index > 0 ? condition.conjunction.toLowerCase() : "";
       const operator = operatorToEnglish(condition.operator);
       parts.push(`  ${conjunction} ${condition.column} ${operator} ${condition.value || "(null)"}`.trim());
+    });
+  }
+
+  // GROUP BY
+  if (state.groupBy.length > 0) {
+    parts.push(`\nResults are grouped by: ${state.groupBy.join(", ")}.`);
+  }
+
+  // HAVING
+  if (state.having.length > 0) {
+    parts.push("\nGroups are filtered where:");
+    state.having.forEach((condition, index) => {
+      const conjunction = index > 0 ? condition.conjunction.toLowerCase() : "";
+      const aggFunc = `${condition.function}(${condition.column})`;
+      parts.push(`  ${conjunction} ${aggFunc} ${condition.operator} ${condition.value}`.trim());
     });
   }
 

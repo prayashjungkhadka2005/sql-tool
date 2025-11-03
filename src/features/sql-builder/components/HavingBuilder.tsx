@@ -1,65 +1,69 @@
-import { WhereCondition, OperatorType, SAMPLE_TABLES } from "@/features/sql-builder/types";
+import { HavingCondition, AggregateFunction, OperatorType, SAMPLE_TABLES } from "@/features/sql-builder/types";
 import { useMemo } from "react";
 import HelpTooltip from "./HelpTooltip";
 
-interface WhereClauseBuilderProps {
+interface HavingBuilderProps {
   table: string;
-  conditions: WhereCondition[];
-  onChange: (conditions: WhereCondition[]) => void;
+  having: HavingCondition[];
+  onChange: (having: HavingCondition[]) => void;
 }
 
-export default function WhereClauseBuilder({ table, conditions, onChange }: WhereClauseBuilderProps) {
+export default function HavingBuilder({ table, having, onChange }: HavingBuilderProps) {
   const tableSchema = useMemo(
     () => SAMPLE_TABLES.find(t => t.name === table),
     [table]
   );
 
-  const operators: OperatorType[] = ["=", "!=", ">", "<", ">=", "<=", "LIKE", "IN", "NOT IN", "IS NULL", "IS NOT NULL"];
+  if (!tableSchema) return null;
+
+  const numericColumns = tableSchema.columns.filter(
+    col => col.type === "INTEGER"
+  );
 
   const addCondition = () => {
-    const newCondition: WhereCondition = {
+    const newCondition: HavingCondition = {
       id: Date.now().toString(),
-      column: tableSchema?.columns[0]?.name || "",
-      operator: "=",
-      value: "",
+      function: "COUNT",
+      column: "*",
+      operator: ">",
+      value: "0",
       conjunction: "AND",
     };
-    onChange([...conditions, newCondition]);
+    onChange([...having, newCondition]);
   };
 
-  const updateCondition = (id: string, updates: Partial<WhereCondition>) => {
+  const updateCondition = (id: string, updates: Partial<HavingCondition>) => {
     onChange(
-      conditions.map(cond =>
-        cond.id === id ? { ...cond, ...updates } : cond
-      )
+      having.map((cond) => (cond.id === id ? { ...cond, ...updates } : cond))
     );
   };
 
   const removeCondition = (id: string) => {
-    onChange(conditions.filter(cond => cond.id !== id));
+    onChange(having.filter((cond) => cond.id !== id));
   };
 
-  if (!tableSchema) return null;
+  const functions: AggregateFunction[] = ["COUNT", "SUM", "AVG", "MIN", "MAX"];
+  const operators: OperatorType[] = ["=", "!=", ">", "<", ">=", "<="];
 
   return (
     <div>
       <div className="flex items-center justify-between mb-2">
         <label className="text-xs font-mono font-semibold text-foreground/60 uppercase tracking-wider flex items-center gap-2">
-          WHERE Clause
+          HAVING Clause
           <HelpTooltip 
-            title="What is WHERE?"
-            content="WHERE filters your results based on conditions. For example, 'age > 18' only shows users over 18. Use AND/OR to combine multiple conditions."
+            title="What is HAVING?"
+            content="HAVING filters grouped results after aggregation. Like WHERE but for groups. Example: HAVING COUNT(*) > 5 shows only groups with more than 5 rows."
           />
-          {conditions.length > 0 && (
+          {having.length > 0 && (
             <span className="text-[10px] px-1.5 py-0.5 bg-foreground/10 text-foreground/60 rounded font-mono">
-              {conditions.length}
+              {having.length}
             </span>
           )}
         </label>
         <button
           onClick={addCondition}
           className="text-xs px-2 py-1 bg-foreground/10 hover:bg-foreground/15 text-foreground rounded transition-all flex items-center gap-1.5 font-mono"
-          aria-label="Add WHERE condition"
+          aria-label="Add HAVING condition"
         >
           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -68,11 +72,11 @@ export default function WhereClauseBuilder({ table, conditions, onChange }: Wher
         </button>
       </div>
 
-      {conditions.length === 0 ? (
+      {having.length === 0 ? (
         <div className="p-4 border border-dashed border-foreground/10 rounded bg-foreground/5">
           <div className="text-center mb-2">
             <p className="text-xs font-mono text-foreground/40">
-              → no filters applied (returns all rows)
+              → no group filtering
             </p>
           </div>
           <div className="flex items-start gap-2 text-left mt-3 pt-3 border-t border-foreground/10">
@@ -80,13 +84,13 @@ export default function WhereClauseBuilder({ table, conditions, onChange }: Wher
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
             </svg>
             <p className="text-[10px] text-foreground/50 font-mono leading-relaxed">
-              Tip: Click &quot;add&quot; to filter results. Try WHERE age {'>'} 18 or status = &apos;active&apos;
+              Tip: HAVING filters grouped data. Try HAVING COUNT(*) {'>'} 5 to show groups with more than 5 items
             </p>
           </div>
         </div>
       ) : (
         <div className="space-y-2.5">
-          {conditions.map((condition, index) => (
+          {having.map((condition, index) => (
             <div
               key={condition.id}
               className="p-3 bg-[#fafafa] dark:bg-black/40 border border-foreground/10 rounded"
@@ -98,8 +102,8 @@ export default function WhereClauseBuilder({ table, conditions, onChange }: Wher
                     onClick={() => updateCondition(condition.id, { conjunction: "AND" })}
                     className={`px-2 py-1 text-xs font-mono rounded transition-all ${
                       condition.conjunction === "AND"
-                        ? "bg-foreground text-background"
-                        : "bg-foreground/5 text-foreground/60 hover:bg-foreground/10"
+                        ? "bg-foreground/15 text-foreground border border-foreground/20"
+                        : "bg-foreground/5 text-foreground/60 border border-foreground/10 hover:bg-foreground/10"
                     }`}
                   >
                     AND
@@ -108,8 +112,8 @@ export default function WhereClauseBuilder({ table, conditions, onChange }: Wher
                     onClick={() => updateCondition(condition.id, { conjunction: "OR" })}
                     className={`px-2 py-1 text-xs font-mono rounded transition-all ${
                       condition.conjunction === "OR"
-                        ? "bg-foreground text-background"
-                        : "bg-foreground/5 text-foreground/60 hover:bg-foreground/10"
+                        ? "bg-foreground/15 text-foreground border border-foreground/20"
+                        : "bg-foreground/5 text-foreground/60 border border-foreground/10 hover:bg-foreground/10"
                     }`}
                   >
                     OR
@@ -117,7 +121,24 @@ export default function WhereClauseBuilder({ table, conditions, onChange }: Wher
                 </div>
               )}
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
+                {/* Function */}
+                <select
+                  value={condition.function}
+                  onChange={(e) => updateCondition(condition.id, { 
+                    function: e.target.value as AggregateFunction,
+                    column: e.target.value === "COUNT" ? "*" : condition.column
+                  })}
+                  className="px-2 py-1.5 bg-white dark:bg-black/40 border border-foreground/10 rounded text-xs text-foreground focus:outline-none focus:border-foreground/30 transition-all font-mono"
+                  aria-label="Function"
+                >
+                  {functions.map((fn) => (
+                    <option key={fn} value={fn}>
+                      {fn}
+                    </option>
+                  ))}
+                </select>
+
                 {/* Column */}
                 <select
                   value={condition.column}
@@ -125,7 +146,10 @@ export default function WhereClauseBuilder({ table, conditions, onChange }: Wher
                   className="px-2 py-1.5 bg-white dark:bg-black/40 border border-foreground/10 rounded text-xs text-foreground focus:outline-none focus:border-foreground/30 transition-all font-mono"
                   aria-label="Column"
                 >
-                  {tableSchema.columns.map((col) => (
+                  {condition.function === "COUNT" && (
+                    <option value="*">*</option>
+                  )}
+                  {(condition.function === "COUNT" ? tableSchema.columns : numericColumns).map((col) => (
                     <option key={col.name} value={col.name}>
                       {col.name}
                     </option>
@@ -147,16 +171,14 @@ export default function WhereClauseBuilder({ table, conditions, onChange }: Wher
                 </select>
 
                 {/* Value */}
-                {!condition.operator.includes("NULL") && (
-                  <input
-                    type="text"
-                    value={condition.value}
-                    onChange={(e) => updateCondition(condition.id, { value: e.target.value })}
-                    placeholder="value"
-                    className="px-2 py-1.5 bg-white dark:bg-black/40 border border-foreground/10 rounded text-xs text-foreground focus:outline-none focus:border-foreground/30 transition-all font-mono"
-                    aria-label="Value"
-                  />
-                )}
+                <input
+                  type="text"
+                  value={condition.value}
+                  onChange={(e) => updateCondition(condition.id, { value: e.target.value })}
+                  placeholder="value"
+                  className="px-2 py-1.5 bg-white dark:bg-black/40 border border-foreground/10 rounded text-xs text-foreground focus:outline-none focus:border-foreground/30 transition-all font-mono"
+                  aria-label="Value"
+                />
               </div>
 
               {/* Remove button */}
@@ -177,3 +199,4 @@ export default function WhereClauseBuilder({ table, conditions, onChange }: Wher
     </div>
   );
 }
+

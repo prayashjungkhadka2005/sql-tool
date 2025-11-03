@@ -1,4 +1,5 @@
 import { QueryType } from "@/features/sql-builder/types";
+import HelpTooltip from "./HelpTooltip";
 
 interface QueryTypeSelectorProps {
   value: QueryType;
@@ -6,17 +7,41 @@ interface QueryTypeSelectorProps {
 }
 
 export default function QueryTypeSelector({ value, onChange }: QueryTypeSelectorProps) {
-  const queryTypes: { value: QueryType; label: string; description: string }[] = [
-    { value: "SELECT", label: "SELECT", description: "Retrieve data" },
-    { value: "INSERT", label: "INSERT", description: "Add records" },
-    { value: "UPDATE", label: "UPDATE", description: "Modify records" },
-    { value: "DELETE", label: "DELETE", description: "Remove records" },
+  const queryTypes: { value: QueryType; label: string; description: string; tooltip: string }[] = [
+    { 
+      value: "SELECT", 
+      label: "SELECT", 
+      description: "Retrieve data",
+      tooltip: "Use SELECT to read/view data from tables. Most common query type for fetching information."
+    },
+    { 
+      value: "INSERT", 
+      label: "INSERT", 
+      description: "Add records",
+      tooltip: "Use INSERT to add new rows to a table. Creates new data entries."
+    },
+    { 
+      value: "UPDATE", 
+      label: "UPDATE", 
+      description: "Modify records",
+      tooltip: "Use UPDATE to change existing data. Modifies values in existing rows."
+    },
+    { 
+      value: "DELETE", 
+      label: "DELETE", 
+      description: "Remove records",
+      tooltip: "Use DELETE to remove rows from a table. Permanently deletes data."
+    },
   ];
 
   return (
     <div>
-      <label className="block text-xs font-mono font-semibold text-foreground/60 mb-3 uppercase tracking-wider">
+      <label className="block text-xs font-mono font-semibold text-foreground/60 mb-3 uppercase tracking-wider flex items-center gap-2">
         Query Type
+        <HelpTooltip 
+          title="Query Types Explained"
+          content="SELECT reads data, INSERT adds new data, UPDATE modifies existing data, DELETE removes data. Start with SELECT to learn the basics!"
+        />
       </label>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         {queryTypes.map((type) => (

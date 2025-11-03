@@ -7,9 +7,13 @@ import QuickTemplates from "@/features/sql-builder/components/QuickTemplates";
 import QueryTypeSelector from "@/features/sql-builder/components/QueryTypeSelector";
 import TableSelector from "@/features/sql-builder/components/TableSelector";
 import ColumnsSelector from "@/features/sql-builder/components/ColumnsSelector";
+import AggregateSelector from "@/features/sql-builder/components/AggregateSelector";
 import WhereClauseBuilder from "@/features/sql-builder/components/WhereClauseBuilder";
+import GroupByBuilder from "@/features/sql-builder/components/GroupByBuilder";
+import HavingBuilder from "@/features/sql-builder/components/HavingBuilder";
 import OrderByBuilder from "@/features/sql-builder/components/OrderByBuilder";
 import QueryPreview from "@/features/sql-builder/components/QueryPreview";
+import HelpTooltip from "@/features/sql-builder/components/HelpTooltip";
 import { useQueryBuilder } from "@/features/sql-builder/hooks/useQueryBuilder";
 
 export default function Home() {
@@ -18,7 +22,11 @@ export default function Home() {
     updateQueryType,
     updateTable,
     updateColumns,
+    updateAggregates,
+    updateDistinct,
     updateWhereConditions,
+    updateGroupBy,
+    updateHaving,
     updateOrderBy,
     updateLimit,
     updateOffset,
@@ -109,10 +117,12 @@ export default function Home() {
                         <h2 className="text-sm font-semibold text-foreground uppercase tracking-wider">Query Builder</h2>
                         <p className="text-xs text-foreground/40 font-mono mt-0.5">
                           {!queryState.table 
-                            ? "→ select table" 
+                            ? "→ step 1: select a table to start" 
                             : queryState.columns.length === 0 
-                            ? "→ select columns"
-                            : "→ customize query"}
+                            ? "✓ table selected! → step 2: choose columns"
+                            : queryState.whereConditions.length === 0
+                            ? "✓ looking good! → add filters or export"
+                            : "✓ great! query ready to execute"}
                         </p>
                       </div>
                     </div>
@@ -149,10 +159,28 @@ export default function Home() {
                           onChange={updateColumns}
                         />
 
+                        <AggregateSelector
+                          table={queryState.table}
+                          aggregates={queryState.aggregates}
+                          onChange={updateAggregates}
+                        />
+
                         <WhereClauseBuilder
                           table={queryState.table}
                           conditions={queryState.whereConditions}
                           onChange={updateWhereConditions}
+                        />
+
+                        <GroupByBuilder
+                          table={queryState.table}
+                          groupBy={queryState.groupBy}
+                          onChange={updateGroupBy}
+                        />
+
+                        <HavingBuilder
+                          table={queryState.table}
+                          having={queryState.having}
+                          onChange={updateHaving}
                         />
 
                         <OrderByBuilder
@@ -161,14 +189,22 @@ export default function Home() {
                           onChange={updateOrderBy}
                         />
 
-                        <div>
-                          <label className="block text-xs font-mono font-semibold text-foreground/60 mb-3 uppercase tracking-wider">
+                          <div>
+                          <label className="block text-xs font-mono font-semibold text-foreground/60 mb-3 uppercase tracking-wider flex items-center gap-2">
                             Pagination
+                            <HelpTooltip 
+                              title="What is Pagination?"
+                              content="LIMIT controls how many rows to return. OFFSET skips rows before starting. Use together for pages: Page 1 (LIMIT 10, OFFSET 0), Page 2 (LIMIT 10, OFFSET 10)."
+                            />
                           </label>
                           <div className="grid sm:grid-cols-2 gap-3">
                             <div>
-                              <label className="block text-xs font-mono text-foreground/50 mb-1.5 uppercase">
+                              <label className="block text-xs font-mono text-foreground/50 mb-1.5 uppercase flex items-center gap-1.5">
                                 LIMIT
+                                <HelpTooltip 
+                                  title="LIMIT"
+                                  content="Maximum number of rows to return. Example: LIMIT 10 returns only first 10 rows."
+                                />
                               </label>
                               <input
                                 type="number"
@@ -180,8 +216,12 @@ export default function Home() {
                               />
                             </div>
                             <div>
-                              <label className="block text-xs font-mono text-foreground/50 mb-1.5 uppercase">
+                              <label className="block text-xs font-mono text-foreground/50 mb-1.5 uppercase flex items-center gap-1.5">
                                 OFFSET
+                                <HelpTooltip 
+                                  title="OFFSET"
+                                  content="Number of rows to skip before starting. Example: OFFSET 10 skips first 10 rows. Used with LIMIT for pagination."
+                                />
                               </label>
                               <input
                                 type="number"
