@@ -11,9 +11,9 @@ const dmSans = DM_Sans({
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://prayash-portfolio.vercel.app'),
-  title: "SQL Query Builder | Visual SQL Learning Tool - Free",
-  description: "Free visual SQL query builder for developers. Build SELECT, INSERT, UPDATE, DELETE queries with real-time code generation. Export to CSV, JSON, SQL. Perfect for learning SQL syntax.",
-  keywords: ["SQL Query Builder", "SQL Generator", "Visual SQL", "SQL Learning Tool", "Database Query Builder", "SQL Tutorial", "Free SQL Tool", "Backend Developer Tools", "PostgreSQL", "MySQL", "Learn SQL", "SQL Syntax", "Prayash Khadka"],
+  title: "SQL & Database Tools | Free Developer Utilities by Prayash",
+  description: "Free visual tools for backend developers. SQL Query Builder, MongoDB Builder, GraphQL Builder and more. Build queries, learn database syntax, export data. No signup required.",
+  keywords: ["SQL Query Builder", "Database Tools", "Developer Tools", "SQL Generator", "MongoDB Builder", "GraphQL Builder", "Backend Tools", "Free SQL Tool", "Visual Query Builder", "Learn SQL", "PostgreSQL", "MySQL", "NoSQL", "Prayash Khadka"],
   authors: [{ name: "Prayash Jung Khadka" }],
   creator: "Prayash Jung Khadka",
   publisher: "Prayash Jung Khadka",
@@ -52,11 +52,11 @@ export const metadata: Metadata = {
   },
   manifest: '/site.webmanifest',
   openGraph: {
-    title: "SQL Query Builder | Free Visual SQL Tool",
-    description: "Free visual SQL query builder. Build queries with real-time code generation, export results to CSV/JSON/SQL. Perfect for learning SQL syntax.",
+    title: "SQL & Database Tools | Free Developer Utilities",
+    description: "Free visual tools for backend developers. SQL Query Builder, MongoDB Builder, GraphQL Builder. Build queries, learn database syntax, export data.",
     type: "website",
     locale: "en_US",
-    siteName: "SQL Query Builder by Prayash",
+    siteName: "Developer Tools by Prayash",
     images: [
       {
         url: '/images/profile.jpg',
@@ -68,8 +68,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "SQL Query Builder | Free Visual SQL Tool",
-    description: "Build SQL queries visually with real-time code generation. Export to CSV, JSON, SQL. Free tool for developers.",
+    title: "SQL & Database Tools | Free Developer Utilities",
+    description: "Free visual tools for backend developers. SQL Query Builder and more. Build queries, learn database syntax.",
     creator: "@prayashjungkhadka",
     images: ['/images/profile.jpg'],
   },

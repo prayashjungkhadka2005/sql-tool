@@ -1,16 +1,28 @@
 import { MetadataRoute } from 'next'
  
 export default function sitemap(): MetadataRoute.Sitemap {
+  const baseUrl = 'https://prayash-portfolio.vercel.app';
+  const now = new Date();
+  
   return [
+    // Landing page - Tool dashboard
     {
-      url: 'https://prayash-portfolio.vercel.app',
-      lastModified: new Date(),
+      url: baseUrl,
+      lastModified: now,
       changeFrequency: 'weekly',
       priority: 1,
     },
+    // SQL Query Builder
     {
-      url: 'https://prayash-portfolio.vercel.app/portfolio',
-      lastModified: new Date(),
+      url: `${baseUrl}/tools/sql-builder`,
+      lastModified: now,
+      changeFrequency: 'weekly',
+      priority: 0.95,
+    },
+    // Portfolio page
+    {
+      url: `${baseUrl}/portfolio`,
+      lastModified: now,
       changeFrequency: 'monthly',
       priority: 0.9,
     },
