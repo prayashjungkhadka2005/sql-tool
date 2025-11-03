@@ -36,7 +36,41 @@ export default function ValidationBanner({ queryState, onAutoFix }: ValidationBa
       return problems;
     }
 
-    // PRIORITY 2 - WARNING: Non-grouped columns with aggregates
+    // PRIORITY 2 - ERROR: Empty WHERE values
+    // Check for WHERE conditions with empty values
+    if (queryState.whereConditions && queryState.whereConditions.length > 0) {
+      const emptyConditions = queryState.whereConditions.filter(c => !c.value || c.value.trim() === '');
+      if (emptyConditions.length > 0) {
+        problems.push({
+          type: "error",
+          title: "Invalid WHERE Clause: Empty Value",
+          message: `${emptyConditions.length} WHERE condition${emptyConditions.length > 1 ? 's have' : ' has'} an empty value. Enter a value or remove the condition.`,
+          fixType: "remove-empty-where",
+          fixLabel: `Remove empty condition${emptyConditions.length > 1 ? 's' : ''}`
+        });
+        // Return early - this will prevent query from running
+        return problems;
+      }
+    }
+
+    // PRIORITY 2.5 - ERROR: Empty HAVING values
+    // Check for HAVING conditions with empty values
+    if (queryState.having && queryState.having.length > 0) {
+      const emptyHaving = queryState.having.filter(h => !h.value || h.value.trim() === '');
+      if (emptyHaving.length > 0) {
+        problems.push({
+          type: "error",
+          title: "Invalid HAVING Clause: Empty Value",
+          message: `${emptyHaving.length} HAVING condition${emptyHaving.length > 1 ? 's have' : ' has'} an empty value. Enter a value or remove the condition.`,
+          fixType: "remove-empty-having",
+          fixLabel: `Remove empty condition${emptyHaving.length > 1 ? 's' : ''}`
+        });
+        // Return early - this will prevent query from running
+        return problems;
+      }
+    }
+
+    // PRIORITY 3 - WARNING: Non-grouped columns with aggregates
     // Only check this if GROUP BY exists (or no HAVING issue above)
     if (queryState.aggregates && queryState.aggregates.length > 0 && queryState.columns && queryState.columns.length > 0) {
       const grouped = new Set(queryState.groupBy || []);

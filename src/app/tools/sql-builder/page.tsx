@@ -80,6 +80,18 @@ export default function Home() {
           { id: Date.now().toString(), function: "COUNT", column: "*", alias: "count" }
         ]);
         break;
+      
+      case "remove-empty-where":
+        // Remove WHERE conditions with empty values
+        const validConditions = queryState.whereConditions.filter(c => c.value && c.value.trim() !== '');
+        updateWhereConditions(validConditions);
+        break;
+      
+      case "remove-empty-having":
+        // Remove HAVING conditions with empty values
+        const validHaving = queryState.having.filter(h => h.value && h.value.trim() !== '');
+        updateHaving(validHaving);
+        break;
     }
   };
 
@@ -398,7 +410,7 @@ export default function Home() {
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.6, delay: 0.3 }}
-              className="lg:sticky lg:top-8 lg:self-start"
+              className="lg:sticky lg:top-20 lg:self-start"
             >
               <QueryPreview 
                 queryState={queryState} 
