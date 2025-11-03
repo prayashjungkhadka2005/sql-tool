@@ -219,7 +219,7 @@ export function explainQuery(state: QueryState): string {
   if (state.limit !== null && state.limit > 0) {
     parts.push(`\nIt returns up to ${state.limit} results.`);
   } else {
-    parts.push(`\n💡 Preview shows first 20 rows. Add LIMIT to change this.`);
+    parts.push(`\nPreview shows first 20 rows. Add LIMIT to change this.`);
   }
   if (state.offset !== null && state.offset > 0) {
     parts.push(`Starting from record #${state.offset + 1} (skipping first ${state.offset}).`);

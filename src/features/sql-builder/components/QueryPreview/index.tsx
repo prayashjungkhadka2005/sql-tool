@@ -12,6 +12,8 @@ import Toast from "@/features/sql-builder/components/ui/Toast";
 import QueryExplanation from "./QueryExplanation";
 import ResultsTable from "./ResultsTable";
 import ExportMenu from "./ExportMenu";
+import VisualQueryFlow from "./VisualQueryFlow";
+import DataVisualization from "./DataVisualization";
 
 interface QueryPreviewProps {
   queryState: QueryState;
@@ -57,7 +59,7 @@ export default function QueryPreview({ queryState }: QueryPreviewProps) {
         groups[groupKey].push(row);
       });
       
-      // Calculate aggregates for each group
+      // Calculate aggregates for each group (guarded)
       data = Object.entries(groups).map(([groupKey, rows]) => {
         const result: any = {};
         
@@ -82,20 +84,20 @@ export default function QueryPreview({ queryState }: QueryPreviewProps) {
               }
               break;
             case 'SUM':
-              result[columnName] = rows.reduce((sum, r) => sum + (Number(r[agg.column]) || 0), 0);
+              result[columnName] = rows.reduce((sum, r) => sum + (isNaN(Number(r[agg.column])) ? 0 : Number(r[agg.column])), 0);
               break;
             case 'AVG':
-              const values = rows.map(r => Number(r[agg.column]) || 0);
+              const values = rows.map(r => (isNaN(Number(r[agg.column])) ? 0 : Number(r[agg.column])));
               result[columnName] = values.length > 0 
                 ? values.reduce((a, b) => a + b, 0) / values.length 
                 : 0;
               break;
             case 'MIN':
-              const minValues = rows.map(r => Number(r[agg.column]) || 0);
+              const minValues = rows.map(r => (isNaN(Number(r[agg.column])) ? Infinity : Number(r[agg.column])));
               result[columnName] = minValues.length > 0 ? Math.min(...minValues) : 0;
               break;
             case 'MAX':
-              const maxValues = rows.map(r => Number(r[agg.column]) || 0);
+              const maxValues = rows.map(r => (isNaN(Number(r[agg.column])) ? -Infinity : Number(r[agg.column])));
               result[columnName] = maxValues.length > 0 ? Math.max(...maxValues) : 0;
               break;
           }
@@ -119,28 +121,30 @@ export default function QueryPreview({ queryState }: QueryPreviewProps) {
         data = data.filter(row => {
           let result = true;
           queryState.having!.forEach((condition, index) => {
-            const aggValue = row[condition.function + '(' + condition.column + ')'] || 
-                            row[queryState.aggregates!.find(a => a.function === condition.function && a.column === condition.column)?.alias || ''];
+            const alias = queryState.aggregates!.find(a => a.function === condition.function && a.column === condition.column)?.alias;
+            const directKey = condition.function + '(' + condition.column + ')';
+            const rawValue = (alias && row[alias] !== undefined) ? row[alias] : row[directKey];
+            const aggValue = Number(rawValue);
             let conditionMet = false;
             
             switch (condition.operator) {
               case '=':
-                conditionMet = Number(aggValue) === Number(condition.value);
+                conditionMet = !isNaN(aggValue) && aggValue === Number(condition.value);
                 break;
               case '!=':
-                conditionMet = Number(aggValue) !== Number(condition.value);
+                conditionMet = !isNaN(aggValue) && aggValue !== Number(condition.value);
                 break;
               case '>':
-                conditionMet = Number(aggValue) > Number(condition.value);
+                conditionMet = !isNaN(aggValue) && aggValue > Number(condition.value);
                 break;
               case '<':
-                conditionMet = Number(aggValue) < Number(condition.value);
+                conditionMet = !isNaN(aggValue) && aggValue < Number(condition.value);
                 break;
               case '>=':
-                conditionMet = Number(aggValue) >= Number(condition.value);
+                conditionMet = !isNaN(aggValue) && aggValue >= Number(condition.value);
                 break;
               case '<=':
-                conditionMet = Number(aggValue) <= Number(condition.value);
+                conditionMet = !isNaN(aggValue) && aggValue <= Number(condition.value);
                 break;
             }
             
@@ -188,6 +192,37 @@ export default function QueryPreview({ queryState }: QueryPreviewProps) {
     data = applyWhere(data, queryState.whereConditions);
     return data.length;
   }, [queryState.table, queryState.whereConditions]);
+
+  // Row counts for visual flow
+  const rowCounts = useMemo(() => {
+    if (!queryState.table) return { total: 0, afterWhere: 0, afterGroupBy: 0, final: 0 };
+    
+    let data = getMockData(queryState.table);
+    const total = data.length;
+    
+    // After WHERE
+    data = applyWhere(data, queryState.whereConditions);
+    const afterWhere = data.length;
+    
+    // After GROUP BY (if exists)
+    let afterGroupBy = afterWhere;
+    if (queryState.aggregates && queryState.aggregates.length > 0) {
+      const groups: Record<string, any[]> = {};
+      data.forEach(row => {
+        const groupKey = queryState.groupBy && queryState.groupBy.length > 0
+          ? queryState.groupBy.map(col => String(row[col] ?? '')).join('|||')
+          : 'all';
+        if (!groups[groupKey]) groups[groupKey] = [];
+        groups[groupKey].push(row);
+      });
+      afterGroupBy = Object.keys(groups).length;
+    }
+    
+    // Final (after HAVING and LIMIT)
+    const final = mockResults.length;
+    
+    return { total, afterWhere, afterGroupBy, final };
+  }, [queryState, mockResults]);
 
   // Download as .sql file
   const downloadSQL = () => {
@@ -342,6 +377,22 @@ export default function QueryPreview({ queryState }: QueryPreviewProps) {
           <QueryExplanation
             explanation={explanation}
             hasQuery={hasQuery}
+          />
+
+          {/* Visual Query Flow - NEW! */}
+          <VisualQueryFlow
+            queryState={queryState}
+            totalRows={rowCounts.total}
+            afterWhereRows={rowCounts.afterWhere}
+            afterGroupByRows={rowCounts.afterGroupBy}
+            finalRows={rowCounts.final}
+          />
+
+          {/* Data Visualization Charts - NEW! */}
+          <DataVisualization
+            data={mockResults}
+            hasAggregates={(queryState.aggregates && queryState.aggregates.length > 0) || false}
+            hasGroupBy={(queryState.groupBy && queryState.groupBy.length > 0) || false}
           />
 
           {/* Results Table with Export */}

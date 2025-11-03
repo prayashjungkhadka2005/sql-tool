@@ -90,14 +90,14 @@ export default function ApiTester({ onClose }: ApiTesterProps) {
       if (actualError === "Failed to fetch") {
         try {
           const origin = new URL(apiUrl).origin;
-          errorMessage = `${actualError}\n\n💡 This is likely a CORS error. The API at ${origin} doesn't allow requests from this website. Solutions:\n• Use a public API like https://jsonplaceholder.typicode.com/users/1\n• Configure CORS headers on your backend\n• Use a CORS proxy for testing`;
+          errorMessage = `${actualError}\n\nHint: This is likely a CORS error. The API at ${origin} doesn't allow requests from this website. Solutions:\n• Use a public API like https://jsonplaceholder.typicode.com/users/1\n• Configure CORS headers on your backend\n• Use a CORS proxy for testing`;
         } catch {
-          errorMessage = `${actualError}\n\n💡 Check your API URL format.`;
+          errorMessage = `${actualError}\n\nHint: Check your API URL format.`;
         }
       } else if (actualError.includes("Invalid JSON")) {
-        errorMessage = `${actualError}\n\n💡 Check your JSON syntax in headers or body.`;
+        errorMessage = `${actualError}\n\nHint: Check your JSON syntax in headers or body.`;
       } else if (actualError.includes("NetworkError") || actualError.includes("Network request failed")) {
-        errorMessage = `${actualError}\n\n💡 Check your internet connection and API URL.`;
+        errorMessage = `${actualError}\n\nHint: Check your internet connection and API URL.`;
       }
       
       setApiError(errorMessage);

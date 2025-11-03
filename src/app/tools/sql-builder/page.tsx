@@ -14,6 +14,8 @@ import HavingBuilder from "@/features/sql-builder/components/HavingBuilder";
 import OrderByBuilder from "@/features/sql-builder/components/OrderByBuilder";
 import QueryPreview from "@/features/sql-builder/components/QueryPreview";
 import HelpTooltip from "@/features/sql-builder/components/HelpTooltip";
+import TableStructureVisualizer from "@/features/sql-builder/components/TableStructureVisualizer";
+import LearningHints from "@/features/sql-builder/components/LearningHints";
 import { useQueryBuilder } from "@/features/sql-builder/hooks/useQueryBuilder";
 
 export default function Home() {
@@ -153,6 +155,13 @@ export default function Home() {
 
                     {queryState.table && queryState.queryType === "SELECT" && (
                       <>
+                        {/* Table Structure Visualizer - NEW! */}
+                        <TableStructureVisualizer
+                          tableName={queryState.table}
+                          selectedColumns={queryState.columns}
+                          selectedGroupBy={queryState.groupBy}
+                        />
+
                         <ColumnsSelector
                           table={queryState.table}
                           selectedColumns={queryState.columns}
@@ -234,6 +243,9 @@ export default function Home() {
                             </div>
                           </div>
                         </div>
+
+                        {/* Learning Hints - NEW! */}
+                        <LearningHints queryState={queryState} />
                       </>
                     )}
                   </div>

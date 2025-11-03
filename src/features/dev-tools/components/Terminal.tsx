@@ -101,7 +101,7 @@ export default function Terminal({ terminalHeight, setTerminalHeight, onClose }:
       case "hire":
       case "upwork":
         window.open("https://www.upwork.com/freelancers/~016e3cd0e919937c81", "_blank");
-        response = "Opening Upwork... Let's build something amazing! 🚀";
+            response = "Opening Upwork... Let's build something amazing!";
         break;
       case "github":
         window.open("https://github.com/prayashjungkhadka2005", "_blank");
@@ -118,13 +118,13 @@ export default function Terminal({ terminalHeight, setTerminalHeight, onClose }:
         response = "☕ Coffee.exe is running... Fuel for coding! My code runs on caffeine and pizza 🍕";
         break;
       case "joke":
-        const jokes = [
-          "Why do programmers prefer dark mode? Because light attracts bugs! 🐛",
-          "How many programmers does it take to change a light bulb? None, it's a hardware problem! 💡",
-          "A SQL query walks into a bar, walks up to two tables and asks... 'Can I JOIN you?' 🍺",
-          "Why do Java developers wear glasses? Because they don't C# 👓",
-          "I would tell you a UDP joke, but you might not get it... 📡",
-        ];
+            const jokes = [
+              "Why do programmers prefer dark mode? Because light attracts bugs!",
+              "How many programmers does it take to change a light bulb? None, it's a hardware problem!",
+              "A SQL query walks into a bar, walks up to two tables and asks... 'Can I JOIN you?'",
+              "Why do Java developers wear glasses? Because they don't C#",
+              "I would tell you a UDP joke, but you might not get it...",
+            ];
         response = jokes[Math.floor(Math.random() * jokes.length)];
         break;
       case "quote":
@@ -179,17 +179,17 @@ export default function Terminal({ terminalHeight, setTerminalHeight, onClose }:
         responseType = "info";
         break;
       case "compliment":
-        const compliments = [
-          "You have great taste in portfolios! 🌟",
-          "Your curiosity is inspiring! Keep exploring! 🔍",
-          "You're going to build amazing things! 💪",
-          "Smart people ask questions. You're smart! 🧠",
-        ];
+            const compliments = [
+              "You have great taste in portfolios!",
+              "Your curiosity is inspiring! Keep exploring!",
+              "You're going to build amazing things!",
+              "Smart people ask questions. You're smart!",
+            ];
         response = compliments[Math.floor(Math.random() * compliments.length)];
         responseType = "success";
         break;
       case "clear":
-        setTerminalHistory([{ text: "Terminal cleared. Ready for more commands! 🚀", type: "info" }]);
+            setTerminalHistory([{ text: "Terminal cleared. Ready for more commands!", type: "info" }]);
         return;
       default:
         response = `Command '${cmdLower}' not found. Type 'help' for available commands. Or try 'joke' for a laugh! 😄`;
