@@ -60,7 +60,7 @@ export default function AggregateSelector({ table, aggregates, onChange }: Aggre
         </label>
         <button
           onClick={addAggregate}
-          className="text-xs px-2 py-1 bg-foreground/10 hover:bg-foreground/15 text-foreground rounded transition-all flex items-center gap-1.5 font-mono"
+          className="text-xs px-2 py-1 bg-foreground/10 hover:bg-foreground/15 active:bg-foreground/20 active:scale-95 text-foreground rounded transition-all flex items-center gap-1.5 font-mono"
           aria-label="Add aggregate function"
         >
           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -82,7 +82,7 @@ export default function AggregateSelector({ table, aggregates, onChange }: Aggre
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
             </svg>
             <p className="text-[10px] text-foreground/50 font-mono leading-relaxed">
-              Tip: Click &quot;add&quot; for analytics. Try COUNT(*) to count rows, or SUM(price) for totals
+              Tip: Click &quot;add&quot; for analytics. Try COUNT(*) to count rows, or SUM/AVG for numeric columns
             </p>
           </div>
         </div>
@@ -143,7 +143,7 @@ export default function AggregateSelector({ table, aggregates, onChange }: Aggre
               {/* Remove button */}
               <button
                 onClick={() => removeAggregate(aggregate.id)}
-                className="text-xs text-foreground/40 hover:text-foreground/70 hover:bg-foreground/5 px-2 py-1 rounded transition-all flex items-center gap-1 font-mono"
+                className="text-xs text-foreground/40 hover:text-foreground/70 hover:bg-foreground/5 active:bg-foreground/10 active:scale-95 px-2 py-1 rounded transition-all flex items-center gap-1 font-mono"
                 aria-label="Remove aggregate"
               >
                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">

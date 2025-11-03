@@ -72,7 +72,7 @@ export default function Toast({
             <p className="text-sm font-medium flex-1">{message}</p>
             <button
               onClick={onClose}
-              className="flex-shrink-0 hover:bg-white/20 rounded-lg p-1 transition-colors"
+              className="flex-shrink-0 hover:bg-white/20 active:bg-white/30 active:scale-90 rounded-lg p-1 transition-all"
               aria-label="Close"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

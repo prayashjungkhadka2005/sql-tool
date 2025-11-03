@@ -1,10 +1,12 @@
 import { QueryState } from "@/features/sql-builder/types";
+import { useState } from "react";
 
 interface QuickTemplatesProps {
   onLoadTemplate: (state: Partial<QueryState>) => void;
 }
 
 export default function QuickTemplates({ onLoadTemplate }: QuickTemplatesProps) {
+  const [isExpanded, setIsExpanded] = useState(false);
   // Organized by difficulty for better learning
   const beginnerTemplates = [
     {
@@ -432,11 +434,11 @@ export default function QuickTemplates({ onLoadTemplate }: QuickTemplatesProps) 
 
         {/* Template Grid */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-          {allTemplates.map((template, idx) => (
+          {(isExpanded ? allTemplates : allTemplates.slice(0, 4)).map((template, idx) => (
             <button
               key={idx}
               onClick={() => onLoadTemplate(template.state)}
-              className={`group relative p-4 bg-[#fafafa] dark:bg-black/40 border ${templateStyle.border} ${templateStyle.hover} hover:border-foreground/20 rounded transition-all text-left`}
+              className={`group relative p-4 bg-[#fafafa] dark:bg-black/40 border ${templateStyle.border} ${templateStyle.hover} hover:border-foreground/20 active:scale-95 active:bg-foreground/10 rounded transition-all text-left`}
             >
               {/* Difficulty Badge */}
               <div className={`absolute top-2 right-2 px-1.5 py-0.5 rounded text-[9px] font-mono uppercase tracking-wider ${
@@ -467,6 +469,26 @@ export default function QuickTemplates({ onLoadTemplate }: QuickTemplatesProps) 
             </button>
           ))}
         </div>
+
+        {/* Show More/Less Button */}
+        {allTemplates.length > 4 && (
+          <div className="mt-4 text-center">
+            <button
+              onClick={() => setIsExpanded(!isExpanded)}
+              className="px-4 py-2 bg-foreground/5 hover:bg-foreground/10 active:bg-foreground/15 active:scale-95 border border-foreground/10 hover:border-foreground/20 text-foreground rounded-lg transition-all flex items-center gap-2 mx-auto text-xs font-mono"
+            >
+              <span>{isExpanded ? 'Show Less' : `Show All ${allTemplates.length} Templates`}</span>
+              <svg 
+                className={`w-3.5 h-3.5 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                fill="none" 
+                stroke="currentColor" 
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

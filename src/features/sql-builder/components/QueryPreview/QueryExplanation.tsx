@@ -18,7 +18,7 @@ export default function QueryExplanation({ explanation, hasQuery }: QueryExplana
       <div className="flex gap-2 mb-4">
         <button
           onClick={() => setShowExplanation(!showExplanation)}
-          className="flex-1 px-3 py-2 bg-foreground/5 hover:bg-foreground/10 border border-foreground/10 rounded transition-all flex items-center justify-center gap-2 text-xs font-mono text-foreground/70 hover:text-foreground"
+          className="flex-1 px-3 py-2 bg-foreground/5 hover:bg-foreground/10 active:bg-foreground/15 active:scale-95 border border-foreground/10 rounded transition-all flex items-center justify-center gap-2 text-xs font-mono text-foreground/70 hover:text-foreground"
         >
           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />

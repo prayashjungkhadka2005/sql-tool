@@ -11,28 +11,42 @@ interface DataVisualizationProps {
 
 export default function DataVisualization({ data, hasAggregates, hasGroupBy }: DataVisualizationProps) {
   // Only show charts for GROUP BY queries with aggregates
-  const shouldShowChart = hasAggregates && hasGroupBy && data.length > 0 && data.length <= 20;
+  const shouldShowChart = hasAggregates && hasGroupBy && data.length > 0 && data.length <= 50;
 
   // Detect if we have numeric aggregate data
   const chartData = useMemo(() => {
-    if (!shouldShowChart) return null;
+    if (!shouldShowChart || !data || data.length === 0) return null;
 
     // Find the first row to analyze columns
     const firstRow = data[0];
+    if (!firstRow) return null;
     const columns = Object.keys(firstRow);
 
     // Find group column (non-numeric) and value column (numeric aggregate)
     let groupColumn: string | null = null;
     let valueColumn: string | null = null;
 
+    // Separate numeric and non-numeric columns
+    const numericColumns: string[] = [];
+    const nonNumericColumns: string[] = [];
+
     for (const col of columns) {
       const value = firstRow[col];
-      if (typeof value === 'number' && (col.includes('count') || col.includes('total') || col.includes('sum') || col.includes('avg') || col.includes('revenue'))) {
-        valueColumn = col;
-      } else if (typeof value !== 'number' && !groupColumn) {
-        groupColumn = col;
+      if (typeof value === 'number') {
+        numericColumns.push(col);
+      } else {
+        nonNumericColumns.push(col);
       }
     }
+
+    // Find best aggregate column (prioritize common aggregate names)
+    const aggregateKeywords = ['count', 'total', 'sum', 'avg', 'revenue', 'min', 'max'];
+    valueColumn = numericColumns.find(col => 
+      aggregateKeywords.some(keyword => col.toLowerCase().includes(keyword))
+    ) || numericColumns[0] || null;
+
+    // Group column is the first non-numeric column
+    groupColumn = nonNumericColumns[0] || null;
 
     if (!groupColumn || !valueColumn) return null;
 
@@ -62,28 +76,14 @@ export default function DataVisualization({ data, hasAggregates, hasGroupBy }: D
   const total = points.reduce((sum, p) => sum + p.value, 0);
 
   return (
-    <div className="mb-6">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
-          <svg className="w-4 h-4 text-foreground/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-          </svg>
-          <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider">
-            Data Visualization
-          </h3>
-        </div>
-        <span className="text-xs text-foreground/40 font-mono">
-          → visual representation of your results
-        </span>
-      </div>
-
+    <div>
       <div className="grid md:grid-cols-2 gap-6">
         {/* Bar Chart */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4 }}
-          className="p-5 bg-white dark:bg-[#1a1a1a] border border-foreground/10 rounded-lg"
+          className="p-5 border border-foreground/10 rounded-lg"
         >
           <div className="flex items-center gap-2 mb-4">
             <div className="text-primary">
@@ -139,7 +139,7 @@ export default function DataVisualization({ data, hasAggregates, hasGroupBy }: D
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: 0.2 }}
-          className="p-5 bg-white dark:bg-[#1a1a1a] border border-foreground/10 rounded-lg"
+          className="p-5 border border-foreground/10 rounded-lg"
         >
           <div className="flex items-center gap-2 mb-4">
             <div className="text-primary">
@@ -158,7 +158,7 @@ export default function DataVisualization({ data, hasAggregates, hasGroupBy }: D
           <div className="space-y-2">
             {points.map((point, index) => {
               const percentage = (point.value / total) * 100;
-              const colorSet = { bg: 'bg-foreground/5', text: 'text-foreground', border: 'border-primary/30' };
+              const colorSet = { text: 'text-foreground', border: 'border-primary/30' };
 
               return (
                 <motion.div
@@ -166,7 +166,7 @@ export default function DataVisualization({ data, hasAggregates, hasGroupBy }: D
                   initial={{ opacity: 0, x: -10 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ duration: 0.3, delay: index * 0.1 }}
-                  className={`p-3 ${colorSet.bg} border ${colorSet.border} rounded`}
+                  className={`p-3 border ${colorSet.border} rounded`}
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex-1 min-w-0">
@@ -199,7 +199,7 @@ export default function DataVisualization({ data, hasAggregates, hasGroupBy }: D
       </div>
 
       {/* Learning Tip */}
-      <div className="mt-4 p-3 bg-foreground/5 border border-foreground/10 rounded-lg">
+      <div className="mt-4 p-3 border border-foreground/10 rounded-lg">
         <div className="flex items-start gap-2">
           <svg className="w-4 h-4 text-foreground/60 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />

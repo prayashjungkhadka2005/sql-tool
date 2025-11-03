@@ -51,7 +51,7 @@ export default function ResultsTable({
           {/* Quick copy button */}
           <button
             onClick={handleCopy}
-            className="px-2 py-1 hover:bg-foreground/5 rounded text-xs font-medium text-foreground/70 hover:text-foreground transition-all flex items-center gap-1.5"
+            className="px-2 py-1 hover:bg-foreground/5 active:bg-foreground/10 active:scale-95 rounded text-xs font-medium text-foreground/70 hover:text-foreground transition-all flex items-center gap-1.5"
             title="Copy table"
           >
             {copied ? (

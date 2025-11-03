@@ -100,31 +100,19 @@ export default function VisualQueryFlow({
 
   // Harmonized color accents using primary/accent palette
   const colorMap: Record<string, string> = {
-    blue: "border-foreground/10 bg-foreground/5 text-foreground",
-    orange: "border-foreground/10 bg-foreground/5 text-foreground",
-    purple: "border-foreground/10 bg-foreground/5 text-foreground",
-    green: "border-foreground/10 bg-foreground/5 text-foreground",
-    red: "border-foreground/10 bg-foreground/5 text-foreground",
-    indigo: "border-foreground/10 bg-foreground/5 text-foreground",
-    pink: "border-foreground/10 bg-foreground/5 text-foreground"
+    blue: "border-foreground/10 text-foreground",
+    orange: "border-foreground/10 text-foreground",
+    purple: "border-foreground/10 text-foreground",
+    green: "border-foreground/10 text-foreground",
+    red: "border-foreground/10 text-foreground",
+    indigo: "border-foreground/10 text-foreground",
+    pink: "border-foreground/10 text-foreground"
   };
 
   if (steps.length === 0) return null;
 
   return (
-    <div className="mb-6">
-      <div className="flex items-center gap-2 mb-4">
-        <svg className="w-4 h-4 text-foreground/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-        </svg>
-        <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider">
-          Query Execution Flow
-        </h3>
-        <span className="text-xs text-foreground/40 font-mono">
-          → see how SQL processes your query
-        </span>
-      </div>
-
+    <div>
       <div className="relative">
         {/* Flow Steps */}
         <div className="flex flex-col gap-0">
@@ -134,49 +122,75 @@ export default function VisualQueryFlow({
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: index * 0.1, duration: 0.3 }}
-                className={`relative flex items-center gap-4 p-4 border rounded-lg ${colorMap[step.color] || colorMap.blue} bg-white dark:bg-[#1a1a1a]`}
+                className={`relative flex flex-col gap-3 p-4 border rounded-lg ${colorMap[step.color] || colorMap.blue}`}
               >
-                {/* Step Number */}
-                <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gradient-to-r from-primary/20 to-accent/20 border border-foreground/10 flex items-center justify-center text-sm font-bold text-foreground">
-                  {index + 1}
+                <div className="flex items-center gap-4">
+                  {/* Step Number */}
+                  <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gradient-to-r from-primary/20 to-accent/20 border border-foreground/10 flex items-center justify-center text-sm font-bold text-foreground">
+                    {index + 1}
+                  </div>
+
+                  {/* Content */}
+                  <div className="flex-1 min-w-0">
+                    <div className="font-mono font-semibold text-sm mb-0.5">
+                      {step.label}
+                    </div>
+                    <div className="text-xs opacity-80 truncate">
+                      {step.description}
+                    </div>
+                  </div>
+
+                  {/* Row Count */}
+                  <div className="flex-shrink-0 text-right">
+                    <div className="text-2xl font-bold font-mono">
+                      {step.rows}
+                    </div>
+                    <div className="text-[10px] opacity-60 font-mono">
+                      rows
+                    </div>
+                  </div>
                 </div>
 
-                {/* Icon (subtle) */}
-                <div className="flex-shrink-0 text-primary">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-                  </svg>
-                </div>
-
-                {/* Content */}
-                <div className="flex-1 min-w-0">
-                  <div className="font-mono font-semibold text-sm mb-0.5">
-                    {step.label}
-                  </div>
-                  <div className="text-xs opacity-80 truncate">
-                    {step.description}
-                  </div>
-                </div>
-
-                {/* Row Count */}
-                <div className="flex-shrink-0 text-right">
-                  <div className="text-2xl font-bold font-mono">
-                    {step.rows}
-                  </div>
-                  <div className="text-[10px] opacity-60 font-mono">
-                    rows
-                  </div>
+                {/* Progress Bar Visualization */}
+                <div className="relative h-2 bg-foreground/5 rounded-full overflow-hidden">
+                  <motion.div
+                    initial={{ width: 0 }}
+                    animate={{ width: totalRows > 0 ? `${Math.min((step.rows / totalRows) * 100, 100)}%` : '0%' }}
+                    transition={{ duration: 0.6, delay: index * 0.1 + 0.2 }}
+                    className="h-full bg-gradient-to-r from-primary to-accent rounded-full"
+                  />
                 </div>
               </motion.div>
 
-              {/* Arrow */}
-              {index < steps.length - 1 && (
-                <div className="flex justify-center py-2">
-                  <svg className="w-5 h-5 text-foreground/30" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 3a1 1 0 011 1v10.586l2.293-2.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 111.414-1.414L9 14.586V4a1 1 0 011-1z" clipRule="evenodd" />
-                  </svg>
-                </div>
-              )}
+              {/* Arrow with Percentage Change */}
+              {index < steps.length - 1 && (() => {
+                const currentRows = step.rows;
+                const nextRows = steps[index + 1].rows;
+                const change = nextRows - currentRows;
+                const percentChange = currentRows > 0 ? Math.round((change / currentRows) * 100) : 0;
+                const isDecrease = change < 0;
+                const isIncrease = change > 0;
+
+                return (
+                  <div className="flex items-center justify-center py-2 gap-2">
+                    <svg className="w-5 h-5 text-foreground/30" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 3a1 1 0 011 1v10.586l2.293-2.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 111.414-1.414L9 14.586V4a1 1 0 011-1z" clipRule="evenodd" />
+                    </svg>
+                    
+                    {change !== 0 && (
+                      <div className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold ${
+                        isDecrease 
+                          ? 'bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-500/20' 
+                          : isIncrease 
+                          ? 'bg-green-500/10 text-green-600 dark:text-green-400 border border-green-500/20'
+                          : 'bg-foreground/5 text-foreground/60 border border-foreground/10'
+                      }`}>
+                        {isDecrease ? '' : '+'}{percentChange}%
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           ))}
         </div>
@@ -186,7 +200,7 @@ export default function VisualQueryFlow({
           initial={{ opacity: 0, scale: 0.8 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: steps.length * 0.1 + 0.2 }}
-          className="mt-4 p-4 bg-foreground/5 border border-foreground/10 rounded-lg"
+          className="mt-4 p-4 border border-foreground/10 rounded-lg"
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -215,16 +229,27 @@ export default function VisualQueryFlow({
       </div>
 
       {/* Educational Tip */}
-      <div className="mt-4 p-3 bg-white dark:bg-[#1a1a1a] border border-foreground/10 rounded-lg">
+      <div className="mt-4 p-3 border border-foreground/10 rounded-lg">
         <div className="flex items-start gap-2">
           <svg className="w-4 h-4 text-foreground/60 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
           </svg>
           <div>
-            <div className="text-xs font-semibold text-foreground mb-1">Learning Tip</div>
-            <div className="text-xs text-foreground/70 leading-relaxed">
-              SQL processes queries in this order: FROM → WHERE → GROUP BY → HAVING → SELECT → ORDER BY → LIMIT. 
-              Watch how your data transforms at each step!
+            <div className="text-xs font-semibold text-foreground mb-1">How to Read This</div>
+            <div className="text-xs text-foreground/70 leading-relaxed space-y-1">
+              <div>Each step shows row count changes. The <span className="font-semibold">progress bar</span> visualizes data volume.</div>
+              <div>
+                <span className="inline-flex items-center gap-1">
+                  <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-500/20">-50%</span>
+                  shows filtering (data removed)
+                </span>
+              </div>
+              <div>
+                <span className="inline-flex items-center gap-1">
+                  <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-green-500/10 text-green-600 dark:text-green-400 border border-green-500/20">+25%</span>
+                  shows expansion (data added)
+                </span>
+              </div>
             </div>
           </div>
         </div>

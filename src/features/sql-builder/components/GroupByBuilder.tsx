@@ -46,7 +46,7 @@ export default function GroupByBuilder({ table, groupBy, onChange }: GroupByBuil
         {groupBy.length > 0 && (
           <button
             onClick={clearAll}
-            className="text-xs px-2 py-1 bg-foreground/5 hover:bg-foreground/10 text-foreground/60 hover:text-foreground rounded transition-all font-mono"
+            className="text-xs px-2 py-1 bg-foreground/5 hover:bg-foreground/10 active:bg-foreground/15 active:scale-95 text-foreground/60 hover:text-foreground rounded transition-all font-mono"
             aria-label="Clear all"
           >
             clear
@@ -78,7 +78,7 @@ export default function GroupByBuilder({ table, groupBy, onChange }: GroupByBuil
               <button
                 key={column.name}
                 onClick={() => toggleColumn(column.name)}
-                className={`p-2.5 rounded border transition-all text-left ${
+                className={`p-2.5 rounded border transition-all text-left active:scale-95 ${
                   isSelected
                     ? "border-foreground/30 bg-foreground/10"
                     : "border-foreground/10 hover:border-foreground/20 hover:bg-foreground/5"

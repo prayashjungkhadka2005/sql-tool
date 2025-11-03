@@ -1,7 +1,7 @@
 "use client";
 
 import { QueryState } from "@/features/sql-builder/types";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { generateSQL, explainQuery } from "@/features/sql-builder/utils/sql-generator";
 import { getMockData, applyWhere, applyOrderBy, applyPagination } from "@/features/sql-builder/utils/mock-data-generator";
 import { exportToCSV, exportToJSON, exportToSQL, copyAsJSON, copyAsCSV, copyAsTable } from "@/features/sql-builder/utils/export-utils";
@@ -12,16 +12,16 @@ import Toast from "@/features/sql-builder/components/ui/Toast";
 import QueryExplanation from "./QueryExplanation";
 import ResultsTable from "./ResultsTable";
 import ExportMenu from "./ExportMenu";
-import VisualQueryFlow from "./VisualQueryFlow";
-import DataVisualization from "./DataVisualization";
 import ValidationBanner from "./ValidationBanner";
 
 interface QueryPreviewProps {
   queryState: QueryState;
   onAutoFix?: (fixType: string) => void;
+  onRowCountsChange?: (counts: { total: number; afterWhere: number; afterGroupBy: number; final: number }) => void;
+  onResultsChange?: (results: any[]) => void;
 }
 
-export default function QueryPreview({ queryState, onAutoFix }: QueryPreviewProps) {
+export default function QueryPreview({ queryState, onAutoFix, onRowCountsChange, onResultsChange }: QueryPreviewProps) {
   const { toast, showToast, hideToast } = useToast();
 
   // Generate SQL query
@@ -226,6 +226,19 @@ export default function QueryPreview({ queryState, onAutoFix }: QueryPreviewProp
     return { total, afterWhere, afterGroupBy, final };
   }, [queryState, mockResults]);
 
+  // Notify parent of changes for visualizations
+  useEffect(() => {
+    if (onRowCountsChange) {
+      onRowCountsChange(rowCounts);
+    }
+  }, [rowCounts, onRowCountsChange]);
+
+  useEffect(() => {
+    if (onResultsChange) {
+      onResultsChange(mockResults);
+    }
+  }, [mockResults, onResultsChange]);
+
   // Download as .sql file
   const downloadSQL = () => {
     const blob = new Blob([sqlQuery], { type: "text/plain" });
@@ -331,7 +344,7 @@ export default function QueryPreview({ queryState, onAutoFix }: QueryPreviewProp
           <div className="flex gap-2">
             <button
               onClick={copyToClipboard}
-              className="text-xs px-3 py-1.5 bg-foreground/10 hover:bg-foreground/15 text-foreground rounded transition-all flex items-center gap-1.5 font-mono"
+              className="text-xs px-3 py-1.5 bg-foreground/10 hover:bg-foreground/15 active:bg-foreground/20 active:scale-95 text-foreground rounded transition-all flex items-center gap-1.5 font-mono"
               aria-label="Copy SQL to clipboard"
             >
               {copied ? (
@@ -352,7 +365,7 @@ export default function QueryPreview({ queryState, onAutoFix }: QueryPreviewProp
             </button>
             <button
               onClick={downloadSQL}
-              className="hidden sm:flex text-xs px-3 py-1.5 bg-foreground/5 hover:bg-foreground/10 border border-foreground/10 hover:border-foreground/20 text-foreground rounded transition-all items-center gap-1.5 font-mono"
+              className="hidden sm:flex text-xs px-3 py-1.5 bg-foreground/5 hover:bg-foreground/10 active:bg-foreground/15 active:scale-95 border border-foreground/10 hover:border-foreground/20 text-foreground rounded transition-all items-center gap-1.5 font-mono"
               aria-label="Download SQL file"
             >
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -372,7 +385,7 @@ export default function QueryPreview({ queryState, onAutoFix }: QueryPreviewProp
             <pre className="p-4 bg-[#1e1e1e] dark:bg-black border border-gray-700 dark:border-gray-800 rounded overflow-x-auto text-xs font-mono leading-relaxed text-gray-100">
               <code className="language-sql">{sqlQuery}</code>
             </pre>
-            <div className="absolute top-2 left-2 text-[10px] text-gray-500 font-mono uppercase tracking-wider">sql</div>
+            <div className="absolute top-2 right-2 text-[10px] text-gray-500 font-mono uppercase tracking-wider">sql</div>
           </div>
 
           {/* Query Explanation */}
@@ -385,22 +398,6 @@ export default function QueryPreview({ queryState, onAutoFix }: QueryPreviewProp
           <ValidationBanner 
             queryState={queryState}
             onAutoFix={onAutoFix}
-          />
-
-          {/* Visual Query Flow - NEW! */}
-          <VisualQueryFlow
-            queryState={queryState}
-            totalRows={rowCounts.total}
-            afterWhereRows={rowCounts.afterWhere}
-            afterGroupByRows={rowCounts.afterGroupBy}
-            finalRows={rowCounts.final}
-          />
-
-          {/* Data Visualization Charts - NEW! */}
-          <DataVisualization
-            data={mockResults}
-            hasAggregates={(queryState.aggregates && queryState.aggregates.length > 0) || false}
-            hasGroupBy={(queryState.groupBy && queryState.groupBy.length > 0) || false}
           />
 
           {/* Results Table with Export */}

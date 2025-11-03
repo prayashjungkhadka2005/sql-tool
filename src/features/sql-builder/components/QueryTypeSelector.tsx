@@ -48,10 +48,10 @@ export default function QueryTypeSelector({ value, onChange }: QueryTypeSelector
           <button
             key={type.value}
             onClick={() => onChange(type.value)}
-            className={`p-3 rounded border transition-all text-left ${
+            className={`p-3 rounded border transition-all text-left active:scale-95 ${
               value === type.value
-                ? "border-foreground/30 bg-foreground/10"
-                : "border-foreground/10 hover:border-foreground/20 hover:bg-foreground/5"
+                ? "border-foreground/30 bg-foreground/10 active:bg-foreground/15"
+                : "border-foreground/10 hover:border-foreground/20 hover:bg-foreground/5 active:bg-foreground/10"
             }`}
             aria-pressed={value === type.value}
           >

@@ -16,7 +16,7 @@ export default function HelpTooltip({ title, content }: HelpTooltipProps) {
         onMouseEnter={() => setIsVisible(true)}
         onMouseLeave={() => setIsVisible(false)}
         onClick={() => setIsVisible(!isVisible)}
-        className="w-4 h-4 rounded-full bg-foreground/10 hover:bg-foreground/20 flex items-center justify-center transition-all"
+        className="w-4 h-4 rounded-full bg-foreground/10 hover:bg-foreground/20 active:bg-foreground/30 active:scale-90 flex items-center justify-center transition-all"
         aria-label="Help"
         type="button"
       >
@@ -26,13 +26,15 @@ export default function HelpTooltip({ title, content }: HelpTooltipProps) {
       </button>
 
       {isVisible && (
-        <div className="absolute left-0 top-full mt-2 w-64 p-3 bg-[#1e1e1e] dark:bg-black border border-gray-700 dark:border-gray-800 rounded-lg shadow-2xl z-50">
+        <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 w-64 p-3 bg-[#1e1e1e] dark:bg-black border border-gray-700 dark:border-gray-800 rounded-lg shadow-2xl z-50">
           <h4 className="text-xs font-semibold text-gray-200 mb-1.5 font-mono uppercase tracking-wide">
             {title}
           </h4>
           <p className="text-xs text-gray-400 leading-relaxed">
             {content}
           </p>
+          {/* Tooltip arrow pointing down */}
+          <div className="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-700 dark:border-t-gray-800"></div>
         </div>
       )}
     </div>

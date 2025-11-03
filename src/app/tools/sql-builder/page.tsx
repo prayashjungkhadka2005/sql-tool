@@ -16,7 +16,9 @@ import QueryPreview from "@/features/sql-builder/components/QueryPreview";
 import HelpTooltip from "@/features/sql-builder/components/HelpTooltip";
 import TableStructureVisualizer from "@/features/sql-builder/components/TableStructureVisualizer";
 import LearningHints from "@/features/sql-builder/components/LearningHints";
+import QueryVisualizations from "@/features/sql-builder/components/QueryVisualizations";
 import { useQueryBuilder } from "@/features/sql-builder/hooks/useQueryBuilder";
+import { useState, useCallback } from "react";
 
 export default function Home() {
   const {
@@ -35,6 +37,23 @@ export default function Home() {
     reset: resetBuilder,
     loadTemplate,
   } = useQueryBuilder();
+
+  // State for visualizations
+  const [rowCounts, setRowCounts] = useState({ total: 0, afterWhere: 0, afterGroupBy: 0, final: 0 });
+  const [mockResults, setMockResults] = useState<any[]>([]);
+
+  // State for collapsible sections (default: open for better UX)
+  const [isAdvancedFiltersOpen, setIsAdvancedFiltersOpen] = useState(true);
+  const [isSortingOpen, setIsSortingOpen] = useState(true);
+
+  // Memoized callbacks to prevent infinite loops
+  const handleRowCountsChange = useCallback((counts: typeof rowCounts) => {
+    setRowCounts(counts);
+  }, []);
+
+  const handleResultsChange = useCallback((results: any[]) => {
+    setMockResults(results);
+  }, []);
 
   // Auto-fix handler for validation issues
   const handleAutoFix = (fixType: string) => {
@@ -159,7 +178,7 @@ export default function Home() {
                     {queryState.table && (
                       <button
                         onClick={resetBuilder}
-                        className="px-2 py-1 text-xs bg-foreground/5 hover:bg-foreground/10 border border-foreground/10 rounded transition-all font-mono text-foreground/60 hover:text-foreground flex items-center gap-1.5"
+                        className="px-2 py-1 text-xs bg-foreground/5 hover:bg-foreground/10 active:bg-foreground/15 active:scale-95 border border-foreground/10 rounded transition-all font-mono text-foreground/60 hover:text-foreground flex items-center gap-1.5"
                         title="Reset"
                       >
                         <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -196,37 +215,127 @@ export default function Home() {
                           onChange={updateColumns}
                         />
 
-                        <AggregateSelector
-                          table={queryState.table}
-                          aggregates={queryState.aggregates}
-                          onChange={updateAggregates}
-                        />
+                        {/* Advanced Filters - Collapsible */}
+                        <div className="border border-foreground/10 rounded-lg overflow-visible">
+                          <button
+                            onClick={() => setIsAdvancedFiltersOpen(!isAdvancedFiltersOpen)}
+                            className="w-full px-4 py-3 flex items-center justify-between hover:bg-foreground/5 active:bg-foreground/10 transition-colors"
+                          >
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2">
+                                <svg className="w-4 h-4 text-foreground/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+                                </svg>
+                                <span className="text-xs font-mono font-semibold text-foreground/80 uppercase tracking-wider">
+                                  Advanced Filters
+                                </span>
+                                {/* Active indicator */}
+                                {(queryState.aggregates.length > 0 || queryState.whereConditions.length > 0 || (queryState.groupBy && queryState.groupBy.length > 0) || (queryState.having && queryState.having.length > 0)) && (
+                                  <span className="px-1.5 py-0.5 bg-primary/10 text-primary text-[10px] font-mono font-bold rounded">
+                                    active
+                                  </span>
+                                )}
+                              </div>
+                              {/* Summary when collapsed */}
+                              {!isAdvancedFiltersOpen && (
+                                <div className="text-[10px] text-foreground/40 font-mono mt-1">
+                                  {queryState.aggregates.length > 0 && `${queryState.aggregates.length} aggregate${queryState.aggregates.length > 1 ? 's' : ''}`}
+                                  {queryState.whereConditions.length > 0 && `${queryState.aggregates.length > 0 ? ' • ' : ''}${queryState.whereConditions.length} filter${queryState.whereConditions.length > 1 ? 's' : ''}`}
+                                  {(queryState.groupBy && queryState.groupBy.length > 0) && `${(queryState.aggregates.length > 0 || queryState.whereConditions.length > 0) ? ' • ' : ''}grouped by ${queryState.groupBy.length}`}
+                                  {(queryState.having && queryState.having.length > 0) && `${(queryState.aggregates.length > 0 || queryState.whereConditions.length > 0 || (queryState.groupBy && queryState.groupBy.length > 0)) ? ' • ' : ''}${queryState.having.length} having`}
+                                  {!(queryState.aggregates.length > 0 || queryState.whereConditions.length > 0 || (queryState.groupBy && queryState.groupBy.length > 0) || (queryState.having && queryState.having.length > 0)) && 'click to add filters'}
+                                </div>
+                              )}
+                            </div>
+                            <svg 
+                              className={`w-4 h-4 text-foreground/40 transition-transform ${isAdvancedFiltersOpen ? 'rotate-180' : ''}`}
+                              fill="none" 
+                              stroke="currentColor" 
+                              viewBox="0 0 24 24"
+                            >
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            </svg>
+                          </button>
 
-                        <WhereClauseBuilder
-                          table={queryState.table}
-                          conditions={queryState.whereConditions}
-                          onChange={updateWhereConditions}
-                        />
+                          {isAdvancedFiltersOpen && (
+                            <div className="p-4 space-y-5 border-t border-foreground/10">
+                              <AggregateSelector
+                                table={queryState.table}
+                                aggregates={queryState.aggregates}
+                                onChange={updateAggregates}
+                              />
 
-                        <GroupByBuilder
-                          table={queryState.table}
-                          groupBy={queryState.groupBy}
-                          onChange={updateGroupBy}
-                        />
+                              <WhereClauseBuilder
+                                table={queryState.table}
+                                conditions={queryState.whereConditions}
+                                onChange={updateWhereConditions}
+                              />
 
-                        <HavingBuilder
-                          table={queryState.table}
-                          having={queryState.having}
-                          onChange={updateHaving}
-                        />
+                              <GroupByBuilder
+                                table={queryState.table}
+                                groupBy={queryState.groupBy}
+                                onChange={updateGroupBy}
+                              />
 
-                        <OrderByBuilder
-                          table={queryState.table}
-                          orderBy={queryState.orderBy}
-                          onChange={updateOrderBy}
-                        />
+                              <HavingBuilder
+                                table={queryState.table}
+                                having={queryState.having}
+                                onChange={updateHaving}
+                              />
+                            </div>
+                          )}
+                        </div>
 
-                          <div>
+                        {/* Sorting & Limits - Collapsible */}
+                        <div className="border border-foreground/10 rounded-lg overflow-visible">
+                          <button
+                            onClick={() => setIsSortingOpen(!isSortingOpen)}
+                            className="w-full px-4 py-3 flex items-center justify-between hover:bg-foreground/5 active:bg-foreground/10 transition-colors"
+                          >
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2">
+                                <svg className="w-4 h-4 text-foreground/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h13M3 8h9m-9 4h9m5-4v12m0 0l-4-4m4 4l4-4" />
+                                </svg>
+                                <span className="text-xs font-mono font-semibold text-foreground/80 uppercase tracking-wider">
+                                  Sorting & Limits
+                                </span>
+                                {/* Active indicator */}
+                                {(queryState.orderBy.length > 0 || queryState.limit || queryState.offset) && (
+                                  <span className="px-1.5 py-0.5 bg-primary/10 text-primary text-[10px] font-mono font-bold rounded">
+                                    active
+                                  </span>
+                                )}
+                              </div>
+                              {/* Summary when collapsed */}
+                              {!isSortingOpen && (
+                                <div className="text-[10px] text-foreground/40 font-mono mt-1">
+                                  {queryState.orderBy.length > 0 && `sorted by ${queryState.orderBy.map(o => o.column).join(', ')}`}
+                                  {queryState.limit && `${queryState.orderBy.length > 0 ? ' • ' : ''}limit ${queryState.limit}`}
+                                  {queryState.offset && ` offset ${queryState.offset}`}
+                                  {!(queryState.orderBy.length > 0 || queryState.limit || queryState.offset) && 'click to add sorting or limits'}
+                                </div>
+                              )}
+                            </div>
+                            <svg 
+                              className={`w-4 h-4 text-foreground/40 transition-transform ${isSortingOpen ? 'rotate-180' : ''}`}
+                              fill="none" 
+                              stroke="currentColor" 
+                              viewBox="0 0 24 24"
+                            >
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            </svg>
+                          </button>
+
+                          {isSortingOpen && (
+                            <div className="p-4 space-y-5 border-t border-foreground/10">
+                              <OrderByBuilder
+                                table={queryState.table}
+                                orderBy={queryState.orderBy}
+                                onChange={updateOrderBy}
+                              />
+
+                              <div>
                           <label className="block text-xs font-mono font-semibold text-foreground/60 mb-3 uppercase tracking-wider flex items-center gap-2">
                             Pagination
                             <HelpTooltip 
@@ -270,6 +379,9 @@ export default function Home() {
                               />
                             </div>
                           </div>
+                              </div>
+                            </div>
+                          )}
                         </div>
 
                         {/* Learning Hints - NEW! */}
@@ -288,8 +400,22 @@ export default function Home() {
               transition={{ duration: 0.6, delay: 0.3 }}
               className="lg:sticky lg:top-8 lg:self-start"
             >
-              <QueryPreview queryState={queryState} onAutoFix={handleAutoFix} />
+              <QueryPreview 
+                queryState={queryState} 
+                onAutoFix={handleAutoFix}
+                onRowCountsChange={handleRowCountsChange}
+                onResultsChange={handleResultsChange}
+              />
             </motion.div>
+          </div>
+
+          {/* Visualizations Section - Full Width Below */}
+          <div className="mt-6 sm:mt-8">
+            <QueryVisualizations 
+              queryState={queryState}
+              mockResults={mockResults}
+              rowCounts={rowCounts}
+            />
           </div>
         </main>
 

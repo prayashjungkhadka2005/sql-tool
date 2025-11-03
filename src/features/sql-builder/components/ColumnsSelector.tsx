@@ -48,14 +48,14 @@ export default function ColumnsSelector({ table, selectedColumns, onChange }: Co
         <div className="flex gap-1.5">
           <button
             onClick={selectAll}
-            className="text-xs px-2 py-1 bg-foreground/5 hover:bg-foreground/10 text-foreground/60 hover:text-foreground rounded transition-all font-mono"
+            className="text-xs px-2 py-1 bg-foreground/5 hover:bg-foreground/10 active:bg-foreground/15 active:scale-95 text-foreground/60 hover:text-foreground rounded transition-all font-mono"
             aria-label="Select all columns"
           >
             all
           </button>
           <button
             onClick={deselectAll}
-            className="text-xs px-2 py-1 bg-foreground/5 hover:bg-foreground/10 text-foreground/60 hover:text-foreground rounded transition-all font-mono"
+            className="text-xs px-2 py-1 bg-foreground/5 hover:bg-foreground/10 active:bg-foreground/15 active:scale-95 text-foreground/60 hover:text-foreground rounded transition-all font-mono"
             aria-label="Deselect all columns"
           >
             clear
@@ -70,7 +70,7 @@ export default function ColumnsSelector({ table, selectedColumns, onChange }: Co
             <button
               key={column.name}
               onClick={() => toggleColumn(column.name)}
-              className={`p-2.5 rounded border transition-all text-left ${
+              className={`p-2.5 rounded border transition-all text-left active:scale-95 ${
                 isSelected
                   ? "border-foreground/30 bg-foreground/10"
                   : "border-foreground/10 hover:border-foreground/20 hover:bg-foreground/5"

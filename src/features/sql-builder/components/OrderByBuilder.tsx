@@ -53,7 +53,7 @@ export default function OrderByBuilder({ table, orderBy, onChange }: OrderByBuil
         </label>
         <button
           onClick={addOrderBy}
-          className="text-xs px-2 py-1 bg-foreground/10 hover:bg-foreground/15 text-foreground rounded transition-all flex items-center gap-1.5 font-mono"
+          className="text-xs px-2 py-1 bg-foreground/10 hover:bg-foreground/15 active:bg-foreground/20 active:scale-95 text-foreground rounded transition-all flex items-center gap-1.5 font-mono"
           aria-label="Add ORDER BY"
         >
           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -75,7 +75,7 @@ export default function OrderByBuilder({ table, orderBy, onChange }: OrderByBuil
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
             </svg>
             <p className="text-[10px] text-foreground/50 font-mono leading-relaxed">
-              Tip: Sort results by clicking &quot;add&quot;. Try created_at DESC for newest first, or age ASC for youngest first
+              Tip: Sort results by clicking &quot;add&quot;. Use ASC for ascending (A-Z, 1-9) or DESC for descending (Z-A, 9-1)
             </p>
           </div>
         </div>
@@ -105,20 +105,20 @@ export default function OrderByBuilder({ table, orderBy, onChange }: OrderByBuil
                 <div className="flex gap-1.5">
                   <button
                     onClick={() => updateOrderBy(index, { direction: "ASC" })}
-                    className={`flex-1 px-2 py-1.5 text-xs font-mono rounded transition-all ${
+                    className={`flex-1 px-2 py-1.5 text-xs font-mono rounded transition-all active:scale-95 ${
                       order.direction === "ASC"
-                        ? "bg-foreground text-background"
-                        : "bg-foreground/5 text-foreground/60 hover:bg-foreground/10"
+                        ? "bg-foreground text-background active:bg-foreground/80"
+                        : "bg-foreground/5 text-foreground/60 hover:bg-foreground/10 active:bg-foreground/15"
                     }`}
                   >
                     ASC ↑
                   </button>
                   <button
                     onClick={() => updateOrderBy(index, { direction: "DESC" })}
-                    className={`flex-1 px-2 py-1.5 text-xs font-mono rounded transition-all ${
+                    className={`flex-1 px-2 py-1.5 text-xs font-mono rounded transition-all active:scale-95 ${
                       order.direction === "DESC"
-                        ? "bg-foreground text-background"
-                        : "bg-foreground/5 text-foreground/60 hover:bg-foreground/10"
+                        ? "bg-foreground text-background active:bg-foreground/80"
+                        : "bg-foreground/5 text-foreground/60 hover:bg-foreground/10 active:bg-foreground/15"
                     }`}
                   >
                     DESC ↓
@@ -129,7 +129,7 @@ export default function OrderByBuilder({ table, orderBy, onChange }: OrderByBuil
               {/* Remove button */}
               <button
                 onClick={() => removeOrderBy(index)}
-                className="mt-2 text-xs text-foreground/40 hover:text-foreground/70 hover:bg-foreground/5 px-2 py-1 rounded transition-all flex items-center gap-1 font-mono"
+                className="mt-2 text-xs text-foreground/40 hover:text-foreground/70 hover:bg-foreground/5 active:bg-foreground/10 active:scale-95 px-2 py-1 rounded transition-all flex items-center gap-1 font-mono"
                 aria-label="Remove order"
               >
                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">

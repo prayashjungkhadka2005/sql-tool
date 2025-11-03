@@ -64,7 +64,7 @@ export default function HavingBuilder({ table, having, onChange }: HavingBuilder
         </label>
         <button
           onClick={addCondition}
-          className="text-xs px-2 py-1 bg-foreground/10 hover:bg-foreground/15 text-foreground rounded transition-all flex items-center gap-1.5 font-mono disabled:opacity-50"
+          className="text-xs px-2 py-1 bg-foreground/10 hover:bg-foreground/15 active:bg-foreground/20 active:scale-95 text-foreground rounded transition-all flex items-center gap-1.5 font-mono disabled:opacity-50 disabled:active:scale-100"
           aria-label="Add HAVING condition"
           disabled={!hasGroupBy}
           title={!hasGroupBy ? 'Add at least one GROUP BY column to enable HAVING' : undefined}
@@ -109,20 +109,20 @@ export default function HavingBuilder({ table, having, onChange }: HavingBuilder
                 <div className="mb-2 flex gap-1.5">
                   <button
                     onClick={() => updateCondition(condition.id, { conjunction: "AND" })}
-                    className={`px-2 py-1 text-xs font-mono rounded transition-all ${
+                    className={`px-2 py-1 text-xs font-mono rounded transition-all active:scale-95 ${
                       condition.conjunction === "AND"
-                        ? "bg-foreground/15 text-foreground border border-foreground/20"
-                        : "bg-foreground/5 text-foreground/60 border border-foreground/10 hover:bg-foreground/10"
+                        ? "bg-foreground/15 text-foreground border border-foreground/20 active:bg-foreground/20"
+                        : "bg-foreground/5 text-foreground/60 border border-foreground/10 hover:bg-foreground/10 active:bg-foreground/15"
                     }`}
                   >
                     AND
                   </button>
                   <button
                     onClick={() => updateCondition(condition.id, { conjunction: "OR" })}
-                    className={`px-2 py-1 text-xs font-mono rounded transition-all ${
+                    className={`px-2 py-1 text-xs font-mono rounded transition-all active:scale-95 ${
                       condition.conjunction === "OR"
-                        ? "bg-foreground/15 text-foreground border border-foreground/20"
-                        : "bg-foreground/5 text-foreground/60 border border-foreground/10 hover:bg-foreground/10"
+                        ? "bg-foreground/15 text-foreground border border-foreground/20 active:bg-foreground/20"
+                        : "bg-foreground/5 text-foreground/60 border border-foreground/10 hover:bg-foreground/10 active:bg-foreground/15"
                     }`}
                   >
                     OR
@@ -193,7 +193,7 @@ export default function HavingBuilder({ table, having, onChange }: HavingBuilder
               {/* Remove button */}
               <button
                 onClick={() => removeCondition(condition.id)}
-                className="mt-2 text-xs text-foreground/40 hover:text-foreground/70 hover:bg-foreground/5 px-2 py-1 rounded transition-all flex items-center gap-1 font-mono"
+                className="mt-2 text-xs text-foreground/40 hover:text-foreground/70 hover:bg-foreground/5 active:bg-foreground/10 active:scale-95 px-2 py-1 rounded transition-all flex items-center gap-1 font-mono"
                 aria-label="Remove condition"
               >
                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">

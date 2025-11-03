@@ -21,7 +21,8 @@ export default function ValidationBanner({ queryState, onAutoFix }: ValidationBa
   const issues = useMemo(() => {
     const problems: ValidationIssue[] = [];
 
-    // ERROR: HAVING without GROUP BY
+    // PRIORITY 1 - CRITICAL ERROR: HAVING without GROUP BY
+    // This is the most critical issue - show ONLY this if it exists
     if (queryState.having && queryState.having.length > 0 && (!queryState.groupBy || queryState.groupBy.length === 0)) {
       problems.push({
         type: "error",
@@ -30,16 +31,20 @@ export default function ValidationBanner({ queryState, onAutoFix }: ValidationBa
         fixType: "add-group-by-for-having",
         fixLabel: "Add GROUP BY automatically"
       });
+      
+      // Return early - don't show other issues until this critical one is fixed
+      return problems;
     }
 
-    // WARNING: Non-grouped columns with aggregates
+    // PRIORITY 2 - WARNING: Non-grouped columns with aggregates
+    // Only check this if GROUP BY exists (or no HAVING issue above)
     if (queryState.aggregates && queryState.aggregates.length > 0 && queryState.columns && queryState.columns.length > 0) {
       const grouped = new Set(queryState.groupBy || []);
       const offenders = queryState.columns.filter(c => !grouped.has(c));
       if (offenders.length > 0) {
         problems.push({
           type: "warning",
-          title: "SQL Rule Violation: Non-grouped Columns",
+          title: "SQL Rule: Non-grouped Columns",
           message: `These columns aren't in GROUP BY but appear with aggregates: ${offenders.join(', ')}. Standard SQL requires them to be grouped or removed.`,
           fixType: "add-columns-to-group-by",
           fixLabel: `Add ${offenders.length} column${offenders.length > 1 ? 's' : ''} to GROUP BY`
@@ -47,11 +52,11 @@ export default function ValidationBanner({ queryState, onAutoFix }: ValidationBa
       }
     }
 
-    // WARNING: GROUP BY without aggregates
+    // PRIORITY 3 - WARNING: GROUP BY without aggregates
     if (queryState.groupBy && queryState.groupBy.length > 0 && (!queryState.aggregates || queryState.aggregates.length === 0)) {
       problems.push({
         type: "warning",
-        title: "Incomplete Query: GROUP BY Without Aggregates",
+        title: "Suggestion: Add Aggregates",
         message: "You're grouping data but not calculating any statistics. Add COUNT(*) or other aggregates to make this meaningful.",
         fixType: "add-count-aggregate",
         fixLabel: "Add COUNT(*) aggregate"
@@ -78,12 +83,12 @@ export default function ValidationBanner({ queryState, onAutoFix }: ValidationBa
               className={`relative overflow-hidden border-2 rounded-lg p-4 ${
                 issue.type === "error"
                   ? "bg-red-500/10 border-red-500/50 dark:bg-red-500/20 dark:border-red-500/70"
-                  : "bg-orange-500/10 border-orange-500/50 dark:bg-orange-500/20 dark:border-orange-500/70"
+                  : "bg-blue-500/10 border-blue-500/50 dark:bg-blue-500/20 dark:border-blue-500/70"
               }`}
             >
               <div className="flex items-start gap-3">
                 {/* Icon */}
-                <div className={`flex-shrink-0 ${issue.type === "error" ? "text-red-600 dark:text-red-400" : "text-orange-600 dark:text-orange-400"}`}>
+                <div className={`flex-shrink-0 ${issue.type === "error" ? "text-red-600 dark:text-red-400" : "text-blue-600 dark:text-blue-400"}`}>
                   {issue.type === "error" ? (
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -97,10 +102,10 @@ export default function ValidationBanner({ queryState, onAutoFix }: ValidationBa
 
                 {/* Content */}
                 <div className="flex-1 min-w-0">
-                  <div className={`text-sm font-bold mb-1 ${issue.type === "error" ? "text-red-700 dark:text-red-300" : "text-orange-700 dark:text-orange-300"}`}>
+                  <div className={`text-sm font-bold mb-1 ${issue.type === "error" ? "text-red-700 dark:text-red-300" : "text-blue-700 dark:text-blue-300"}`}>
                     {issue.title}
                   </div>
-                  <div className={`text-xs leading-relaxed ${issue.type === "error" ? "text-red-600 dark:text-red-400" : "text-orange-600 dark:text-orange-400"}`}>
+                  <div className={`text-xs leading-relaxed ${issue.type === "error" ? "text-red-600 dark:text-red-400" : "text-blue-600 dark:text-blue-400"}`}>
                     {issue.message}
                   </div>
                 </div>
@@ -109,10 +114,10 @@ export default function ValidationBanner({ queryState, onAutoFix }: ValidationBa
                 {issue.fixType && onAutoFix && (
                   <button
                     onClick={() => onAutoFix(issue.fixType!)}
-                    className={`flex-shrink-0 text-xs font-semibold px-3 py-1.5 rounded transition-all ${
+                    className={`flex-shrink-0 text-xs font-semibold px-3 py-1.5 rounded transition-all active:scale-95 ${
                       issue.type === "error"
-                        ? "bg-red-600 hover:bg-red-700 text-white dark:bg-red-500 dark:hover:bg-red-600"
-                        : "bg-orange-600 hover:bg-orange-700 text-white dark:bg-orange-500 dark:hover:bg-orange-600"
+                        ? "bg-red-600 hover:bg-red-700 active:bg-red-800 text-white dark:bg-red-500 dark:hover:bg-red-600"
+                        : "bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white dark:bg-blue-500 dark:hover:bg-blue-600"
                     }`}
                   >
                     {issue.fixLabel}
