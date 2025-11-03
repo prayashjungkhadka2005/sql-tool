@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import QuickTemplates from "@/features/sql-builder/components/QuickTemplates";
@@ -10,83 +9,21 @@ import ColumnsSelector from "@/features/sql-builder/components/ColumnsSelector";
 import WhereClauseBuilder from "@/features/sql-builder/components/WhereClauseBuilder";
 import OrderByBuilder from "@/features/sql-builder/components/OrderByBuilder";
 import QueryPreview from "@/features/sql-builder/components/QueryPreview";
-import { QueryState, WhereCondition, OrderByClause } from "@/features/sql-builder/types";
+import { useQueryBuilder } from "@/features/sql-builder/hooks/useQueryBuilder";
 
 export default function Home() {
-  const [queryState, setQueryState] = useState<QueryState>({
-    queryType: "SELECT",
-    table: "",
-    columns: [],
-    whereConditions: [],
-    joins: [],
-    orderBy: [],
-    limit: null,
-    offset: null,
-  });
-
-  // Update query type
-  const updateQueryType = (type: QueryState["queryType"]) => {
-    setQueryState(prev => ({ ...prev, queryType: type }));
-  };
-
-  // Update table
-  const updateTable = (table: string) => {
-    setQueryState(prev => ({ ...prev, table, columns: [] }));
-  };
-
-  // Update columns
-  const updateColumns = (columns: string[]) => {
-    setQueryState(prev => ({ ...prev, columns }));
-  };
-
-  // Update WHERE conditions
-  const updateWhereConditions = (conditions: WhereCondition[]) => {
-    setQueryState(prev => ({ ...prev, whereConditions: conditions }));
-  };
-
-  // Update ORDER BY
-  const updateOrderBy = (orderBy: OrderByClause[]) => {
-    setQueryState(prev => ({ ...prev, orderBy }));
-  };
-
-  // Update LIMIT
-  const updateLimit = (limit: number | null) => {
-    setQueryState(prev => ({ ...prev, limit }));
-  };
-
-  // Update OFFSET
-  const updateOffset = (offset: number | null) => {
-    setQueryState(prev => ({ ...prev, offset }));
-  };
-
-  // Reset builder
-  const resetBuilder = () => {
-    setQueryState({
-      queryType: "SELECT",
-      table: "",
-      columns: [],
-      whereConditions: [],
-      joins: [],
-      orderBy: [],
-      limit: null,
-      offset: null,
-    });
-  };
-
-  // Load template
-  const loadTemplate = (templateState: Partial<QueryState>) => {
-    setQueryState({
-      queryType: "SELECT",
-      table: "",
-      columns: [],
-      whereConditions: [],
-      joins: [],
-      orderBy: [],
-      limit: null,
-      offset: null,
-      ...templateState,
-    });
-  };
+  const {
+    queryState,
+    updateQueryType,
+    updateTable,
+    updateColumns,
+    updateWhereConditions,
+    updateOrderBy,
+    updateLimit,
+    updateOffset,
+    reset: resetBuilder,
+    loadTemplate,
+  } = useQueryBuilder();
 
   return (
     <div className="min-h-screen bg-[#fafafa] dark:bg-[#0a0a0a]">
