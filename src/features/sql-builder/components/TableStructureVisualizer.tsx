@@ -151,7 +151,7 @@ export default function TableStructureVisualizer({
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
           <div>
-            <div className="text-xs font-semibold text-foreground mb-1">🏗️ Schema Understanding</div>
+            <div className="text-xs font-semibold text-foreground mb-1">Schema Understanding</div>
             <div className="text-xs text-foreground/70 leading-relaxed">
               Each table has columns with specific data types. <span className="font-mono">INTEGER</span> for numbers, 
               <span className="font-mono"> VARCHAR</span> for text. Required fields cannot be empty. 

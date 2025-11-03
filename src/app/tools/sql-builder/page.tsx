@@ -36,6 +36,34 @@ export default function Home() {
     loadTemplate,
   } = useQueryBuilder();
 
+  // Auto-fix handler for validation issues
+  const handleAutoFix = (fixType: string) => {
+    switch (fixType) {
+      case "add-group-by-for-having":
+        // Add all non-aggregated columns to GROUP BY
+        if (queryState.columns.length > 0) {
+          updateGroupBy([...queryState.columns]);
+        }
+        break;
+      
+      case "add-columns-to-group-by":
+        // Add all selected columns to GROUP BY
+        const existingGroupBy = queryState.groupBy || [];
+        const newGroupBy = [...new Set([...existingGroupBy, ...queryState.columns])];
+        updateGroupBy(newGroupBy);
+        break;
+      
+      case "add-count-aggregate":
+        // Add COUNT(*) aggregate
+        const existingAggregates = queryState.aggregates || [];
+        updateAggregates([
+          ...existingAggregates,
+          { id: Date.now().toString(), function: "COUNT", column: "*", alias: "count" }
+        ]);
+        break;
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#fafafa] dark:bg-[#0a0a0a] flex flex-col">
       {/* Navbar */}
@@ -121,10 +149,10 @@ export default function Home() {
                           {!queryState.table 
                             ? "→ step 1: select a table to start" 
                             : queryState.columns.length === 0 
-                            ? "✓ table selected! → step 2: choose columns"
+                            ? "table selected! → step 2: choose columns"
                             : queryState.whereConditions.length === 0
-                            ? "✓ looking good! → add filters or export"
-                            : "✓ great! query ready to execute"}
+                            ? "looking good! → add filters or export"
+                            : "great! query ready to execute"}
                         </p>
                       </div>
                     </div>
@@ -260,7 +288,7 @@ export default function Home() {
               transition={{ duration: 0.6, delay: 0.3 }}
               className="lg:sticky lg:top-8 lg:self-start"
             >
-              <QueryPreview queryState={queryState} />
+              <QueryPreview queryState={queryState} onAutoFix={handleAutoFix} />
             </motion.div>
           </div>
         </main>

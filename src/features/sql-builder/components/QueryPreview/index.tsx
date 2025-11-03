@@ -14,12 +14,14 @@ import ResultsTable from "./ResultsTable";
 import ExportMenu from "./ExportMenu";
 import VisualQueryFlow from "./VisualQueryFlow";
 import DataVisualization from "./DataVisualization";
+import ValidationBanner from "./ValidationBanner";
 
 interface QueryPreviewProps {
   queryState: QueryState;
+  onAutoFix?: (fixType: string) => void;
 }
 
-export default function QueryPreview({ queryState }: QueryPreviewProps) {
+export default function QueryPreview({ queryState, onAutoFix }: QueryPreviewProps) {
   const { toast, showToast, hideToast } = useToast();
 
   // Generate SQL query
@@ -377,6 +379,12 @@ export default function QueryPreview({ queryState }: QueryPreviewProps) {
           <QueryExplanation
             explanation={explanation}
             hasQuery={hasQuery}
+          />
+
+          {/* Validation Banner - Shows errors/warnings with auto-fix */}
+          <ValidationBanner 
+            queryState={queryState}
+            onAutoFix={onAutoFix}
           />
 
           {/* Visual Query Flow - NEW! */}

@@ -33,7 +33,7 @@ export default function ThemeToggle() {
     <div className="fixed bottom-20 sm:top-6 sm:bottom-auto left-4 sm:left-auto sm:right-6 z-50 flex items-center gap-3 group/container">
       {/* Fun label - appears on hover */}
       <span className="hidden md:block opacity-0 group-hover/container:opacity-100 transition-opacity duration-300 text-sm font-medium text-foreground/70 backdrop-blur-md bg-white/60 dark:bg-warm-dark/60 px-3 py-1.5 rounded-full border border-primary/20 shadow-md">
-        {darkMode ? "Light it up! ☀️" : "Go dark! 🌙"}
+        {darkMode ? "Light it up!" : "Go dark!"}
       </span>
       
       <button

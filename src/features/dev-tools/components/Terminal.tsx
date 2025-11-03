@@ -105,17 +105,17 @@ export default function Terminal({ terminalHeight, setTerminalHeight, onClose }:
         break;
       case "github":
         window.open("https://github.com/prayashjungkhadka2005", "_blank");
-        response = "Opening GitHub... Check out my code! 💻";
+        response = "Opening GitHub... Check out my code!";
         break;
       case "linkedin":
         window.open("https://www.linkedin.com/in/prayashjungkhadka/", "_blank");
-        response = "Opening LinkedIn... Let's connect! 🤝";
+        response = "Opening LinkedIn... Let's connect!";
         break;
       case "projects":
-        response = "Blue Sky (Client), PustakBhandar, WeAreCars. All built with ❤️ and lots of ☕";
+        response = "Blue Sky (Client), PustakBhandar, WeAreCars. All built with passion and lots of coffee!";
         break;
       case "coffee":
-        response = "☕ Coffee.exe is running... Fuel for coding! My code runs on caffeine and pizza 🍕";
+        response = "Coffee.exe is running... Fuel for coding! My code runs on caffeine and pizza.";
         break;
       case "joke":
             const jokes = [
@@ -147,11 +147,11 @@ export default function Terminal({ terminalHeight, setTerminalHeight, onClose }:
         responseType = "success";
         break;
       case "secret":
-        response = "🎉 You found the secret! I sometimes talk to my rubber duck 🦆 when debugging...";
+        response = "You found the secret! I sometimes talk to my rubber duck when debugging...";
         responseType = "success";
         break;
       case "sudo":
-        response = "Nice try! 😄 But you don't need sudo here, you already have full access!";
+        response = "Nice try! But you don't need sudo here, you already have full access!";
         responseType = "warning";
         break;
       case "ls":
@@ -159,19 +159,19 @@ export default function Terminal({ terminalHeight, setTerminalHeight, onClose }:
         responseType = "info";
         break;
       case "whoami":
-        response = "You're a visitor on Prayash's portfolio. But more importantly, you're awesome! 😎";
+        response = "You're a visitor on Prayash's portfolio. But more importantly, you're awesome!";
         responseType = "success";
         break;
       case "matrix":
-        response = "01001000 01100101 01101100 01101100 01101111 00100001 🟢 The Matrix has you... Welcome to the real world! 💊";
+        response = "01001000 01100101 01101100 01101100 01101111 00100001 The Matrix has you... Welcome to the real world!";
         responseType = "success";
         break;
       case "hack":
-        response = "Initializing... [████████████] 100% ✓ Access Granted! Just kidding 😄 I only hack code, not systems!";
+        response = "Initializing... [████████████] 100% Access Granted! Just kidding - I only hack code, not systems!";
         responseType = "success";
         break;
       case "quiz":
-        response = "Q: What's the worst thing about JavaScript? A: Trying to explain 'this' to someone! 😅";
+        response = "Q: What's the worst thing about JavaScript? A: Trying to explain 'this' to someone!";
         responseType = "info";
         break;
       case "date":
@@ -192,7 +192,7 @@ export default function Terminal({ terminalHeight, setTerminalHeight, onClose }:
             setTerminalHistory([{ text: "Terminal cleared. Ready for more commands!", type: "info" }]);
         return;
       default:
-        response = `Command '${cmdLower}' not found. Type 'help' for available commands. Or try 'joke' for a laugh! 😄`;
+        response = `Command '${cmdLower}' not found. Type 'help' for available commands. Or try 'joke' for a laugh!`;
         responseType = "error";
     }
 
@@ -293,7 +293,9 @@ export default function Terminal({ terminalHeight, setTerminalHeight, onClose }:
             className="text-gray-400 hover:text-gray-200 px-2 py-1 hover:bg-white/10 rounded transition-all"
             title="Maximize"
           >
-            ⛶
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+            </svg>
           </button>
           <button
             onClick={onClose}

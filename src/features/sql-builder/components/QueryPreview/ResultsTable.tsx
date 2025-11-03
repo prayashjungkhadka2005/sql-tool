@@ -100,7 +100,7 @@ export default function ResultsTable({
                       {Object.entries(row).map(([key, value], colIdx) => (
                         <td key={colIdx} className="py-2.5 px-3 text-foreground/70 whitespace-nowrap">
                           {typeof value === 'boolean' 
-                            ? (value ? '✓' : '✗')
+                            ? (value ? 'true' : 'false')
                             : typeof value === 'string' && value.includes('T') && value.includes('Z')
                             ? new Date(value).toLocaleString('en-US', { 
                                 month: 'short', 

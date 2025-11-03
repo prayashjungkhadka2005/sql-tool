@@ -30,15 +30,21 @@ export default function Hero() {
           
           <div className="flex flex-wrap justify-center gap-3 text-xs font-mono">
             <div className="flex items-center gap-2 px-3 py-1.5 bg-foreground/5 border border-foreground/10 rounded-full">
-              <span className="text-foreground/40">✓</span>
+              <svg className="w-3 h-3 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+              </svg>
               <span className="text-foreground/70">100% Free</span>
             </div>
             <div className="flex items-center gap-2 px-3 py-1.5 bg-foreground/5 border border-foreground/10 rounded-full">
-              <span className="text-foreground/40">✓</span>
+              <svg className="w-3 h-3 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+              </svg>
               <span className="text-foreground/70">No Sign-up</span>
             </div>
             <div className="flex items-center gap-2 px-3 py-1.5 bg-foreground/5 border border-foreground/10 rounded-full">
-              <span className="text-foreground/40">✓</span>
+              <svg className="w-3 h-3 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+              </svg>
               <span className="text-foreground/70">Open Source</span>
             </div>
           </div>

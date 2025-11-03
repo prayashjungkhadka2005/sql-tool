@@ -176,16 +176,16 @@ export function createComment(id: number, totalPosts: number, totalUsers: number
  */
 export function createCategory(id: number): any {
   const categories = [
-    { name: 'Electronics', icon: '💻', description: 'Computers, phones, and electronic devices' },
-    { name: 'Clothing', icon: '👕', description: 'Fashion and apparel items' },
-    { name: 'Books', icon: '📚', description: 'Physical and digital books' },
-    { name: 'Food & Beverage', icon: '🍔', description: 'Food products and drinks' },
-    { name: 'Sports & Outdoors', icon: '⚽', description: 'Sports equipment and outdoor gear' },
-    { name: 'Home & Garden', icon: '🏡', description: 'Home decor and gardening supplies' },
-    { name: 'Toys & Games', icon: '🎮', description: 'Toys, games, and entertainment' },
-    { name: 'Health & Beauty', icon: '💄', description: 'Health and beauty products' },
-    { name: 'Automotive', icon: '🚗', description: 'Car parts and accessories' },
-    { name: 'Office Supplies', icon: '📎', description: 'Office and school supplies' },
+    { name: 'Electronics', icon: 'ELEC', description: 'Computers, phones, and electronic devices' },
+    { name: 'Clothing', icon: 'CLTH', description: 'Fashion and apparel items' },
+    { name: 'Books', icon: 'BOOK', description: 'Physical and digital books' },
+    { name: 'Food & Beverage', icon: 'FOOD', description: 'Food products and drinks' },
+    { name: 'Sports & Outdoors', icon: 'SPRT', description: 'Sports equipment and outdoor gear' },
+    { name: 'Home & Garden', icon: 'HOME', description: 'Home decor and gardening supplies' },
+    { name: 'Toys & Games', icon: 'TOYS', description: 'Toys, games, and entertainment' },
+    { name: 'Health & Beauty', icon: 'HLTH', description: 'Health and beauty products' },
+    { name: 'Automotive', icon: 'AUTO', description: 'Car parts and accessories' },
+    { name: 'Office Supplies', icon: 'OFFC', description: 'Office and school supplies' },
   ];
   
   const category = categories[Math.min(id - 1, categories.length - 1)] || categories[0];
