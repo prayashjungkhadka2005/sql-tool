@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import Navbar from "@/features/sql-builder/components/Navbar";
 import Footer from "@/features/sql-builder/components/Footer";
 import QuickTemplates from "@/features/sql-builder/components/QuickTemplates";
+import RecipeStudio from "@/features/sql-builder/components/RecipeStudio";
 import CSVUploader from "@/features/sql-builder/components/CSVUploader";
 import QueryHistory from "@/features/sql-builder/components/QueryHistory";
 import CodeGenerator from "@/features/sql-builder/components/CodeGenerator";
@@ -290,6 +291,11 @@ export default function Home() {
           {/* Quick Templates */}
           <div className="mb-6">
             <QuickTemplates onLoadTemplate={loadTemplate} />
+          </div>
+
+          {/* SQL Recipe Studio */}
+          <div className="mb-6">
+            <RecipeStudio onLoadRecipe={loadTemplate} currentTable={queryState.table} />
           </div>
 
           {/* Tool Bar - Professional Tools */}
