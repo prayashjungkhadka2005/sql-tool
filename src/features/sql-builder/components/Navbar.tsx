@@ -34,12 +34,6 @@ export default function Navbar() {
             >
               Tools
             </Link>
-            <Link
-              href="/portfolio"
-              className="px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium text-foreground/70 hover:text-foreground hover:bg-foreground/5 rounded-full transition-all"
-            >
-              Portfolio
-            </Link>
             <a
               href="https://github.com/prayashjungkhadka2005"
               target="_blank"

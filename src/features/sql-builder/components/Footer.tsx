@@ -38,15 +38,6 @@ export default function Footer() {
                 </Link>
               </li>
               <li>
-                <Link 
-                  href="/portfolio" 
-                  className="text-foreground/60 hover:text-foreground transition-colors flex items-center gap-1.5 group"
-                >
-                  <span className="text-foreground/40 group-hover:text-foreground/60">→</span>
-                  <span>Portfolio</span>
-                </Link>
-              </li>
-              <li>
                 <a 
                   href="https://github.com/prayashjungkhadka2005" 
                   target="_blank"
@@ -110,9 +101,9 @@ export default function Footer() {
           <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-foreground/50 font-mono">
             <p>
               © {new Date().getFullYear()} Built by{" "}
-              <Link href="/portfolio" className="text-foreground/70 hover:text-foreground transition-colors">
+              <span className="text-foreground/70">
                 Prayash Jung Khadka
-              </Link>
+              </span>
             </p>
             <div className="flex items-center gap-4">
               <span>Next.js · TypeScript · Tailwind</span>

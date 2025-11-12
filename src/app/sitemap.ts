@@ -19,13 +19,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: 'weekly',
       priority: 0.95,
     },
-    // Portfolio page
-    {
-      url: `${baseUrl}/portfolio`,
-      lastModified: now,
-      changeFrequency: 'monthly',
-      priority: 0.9,
-    },
   ]
 }
 
