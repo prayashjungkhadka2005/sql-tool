@@ -4,9 +4,10 @@ interface KeyboardShortcutsProps {
   onShare?: () => void;
   onReset?: () => void;
   onExport?: () => void;
+  onSave?: () => void;
 }
 
-export function useKeyboardShortcuts({ onShare, onReset, onExport }: KeyboardShortcutsProps) {
+export function useKeyboardShortcuts({ onShare, onReset, onExport, onSave }: KeyboardShortcutsProps) {
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       // Don't trigger shortcuts when typing in input fields
@@ -27,6 +28,14 @@ export function useKeyboardShortcuts({ onShare, onReset, onExport }: KeyboardSho
             if (onShare) {
               event.preventDefault();
               onShare();
+            }
+            break;
+          
+          case 'h':
+            // Ctrl/Cmd + H: Save to history
+            if (onSave) {
+              event.preventDefault();
+              onSave();
             }
             break;
           
@@ -67,6 +76,6 @@ export function useKeyboardShortcuts({ onShare, onReset, onExport }: KeyboardSho
         window.removeEventListener('keydown', handleKeyDown);
       }
     };
-  }, [onShare, onReset, onExport]);
+  }, [onShare, onReset, onExport, onSave]);
 }
 

@@ -55,14 +55,15 @@ export default function Home() {
     },
     {
       title: "SQL Formatter",
-      description: "Format and beautify SQL queries with proper indentation and syntax highlighting. Support for multiple SQL dialects.",
+      description: "Format and beautify SQL queries with proper indentation and syntax highlighting. Auto-format as you type with live preview.",
       icon: (
         <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16m-7 6h7" />
         </svg>
       ),
-      href: "#",
-      available: false,
+      href: "/tools/sql-formatter",
+      badge: "NEW",
+      available: true,
     },
     {
       title: "Query Performance Analyzer",

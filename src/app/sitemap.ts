@@ -19,6 +19,13 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: 'weekly',
       priority: 0.95,
     },
+    // SQL Formatter
+    {
+      url: `${baseUrl}/tools/sql-formatter`,
+      lastModified: now,
+      changeFrequency: 'weekly',
+      priority: 0.9,
+    },
   ]
 }
 

@@ -5,6 +5,8 @@ import Navbar from "@/features/sql-builder/components/Navbar";
 import Footer from "@/features/sql-builder/components/Footer";
 import QuickTemplates from "@/features/sql-builder/components/QuickTemplates";
 import CSVUploader from "@/features/sql-builder/components/CSVUploader";
+import QueryHistory from "@/features/sql-builder/components/QueryHistory";
+import CodeGenerator from "@/features/sql-builder/components/CodeGenerator";
 import QueryTypeSelector from "@/features/sql-builder/components/QueryTypeSelector";
 import TableSelector from "@/features/sql-builder/components/TableSelector";
 import ColumnsSelector from "@/features/sql-builder/components/ColumnsSelector";
@@ -24,9 +26,11 @@ import DistinctToggle from "@/features/sql-builder/components/DistinctToggle";
 import WelcomeTutorial from "@/features/sql-builder/components/WelcomeTutorial";
 import { useQueryBuilder } from "@/features/sql-builder/hooks/useQueryBuilder";
 import { useKeyboardShortcuts } from "@/features/sql-builder/hooks/useKeyboardShortcuts";
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { decodeQueryFromURL, copyShareableURL } from "@/features/sql-builder/utils/url-sharing";
 import { isCSVTable } from "@/features/sql-builder/utils/csv-data-manager";
+import { saveToHistory } from "@/features/sql-builder/utils/query-history";
+import { generateSQL } from "@/features/sql-builder/utils/sql-generator";
 
 export default function Home() {
   const {
@@ -58,6 +62,7 @@ export default function Home() {
 
   // State for share functionality
   const [shareToast, setShareToast] = useState(false);
+  const [saveToast, setSaveToast] = useState(false);
 
   // State for welcome tutorial
   const [showTutorial, setShowTutorial] = useState(false);
@@ -67,6 +72,7 @@ export default function Home() {
 
   // State for collapsible CSV upload section
   const [isCSVSectionOpen, setIsCSVSectionOpen] = useState(true);
+
 
   // Check if first visit
   useEffect(() => {
@@ -113,16 +119,55 @@ export default function Home() {
   // State for error toast
   const [errorToast, setErrorToast] = useState<string | null>(null);
 
+  // Refs for toast timers to prevent memory leaks
+  const saveToastTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const shareToastTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const errorToastTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Cleanup toast timers on unmount
+  useEffect(() => {
+    return () => {
+      if (saveToastTimerRef.current) clearTimeout(saveToastTimerRef.current);
+      if (shareToastTimerRef.current) clearTimeout(shareToastTimerRef.current);
+      if (errorToastTimerRef.current) clearTimeout(errorToastTimerRef.current);
+    };
+  }, []);
+
+  // Manual save to history
+  const handleSaveToHistory = useCallback(() => {
+    if (!queryState.table) {
+      setErrorToast("No query to save");
+      if (errorToastTimerRef.current) clearTimeout(errorToastTimerRef.current);
+      errorToastTimerRef.current = setTimeout(() => setErrorToast(null), 3000);
+      return;
+    }
+    
+    const sql = generateSQL(queryState);
+    if (!sql || sql.trim() === ';') {
+      setErrorToast("Build a query first");
+      if (errorToastTimerRef.current) clearTimeout(errorToastTimerRef.current);
+      errorToastTimerRef.current = setTimeout(() => setErrorToast(null), 3000);
+      return;
+    }
+    
+    saveToHistory(queryState, sql);
+    setSaveToast(true);
+    if (saveToastTimerRef.current) clearTimeout(saveToastTimerRef.current);
+    saveToastTimerRef.current = setTimeout(() => setSaveToast(false), 2000);
+  }, [queryState]);
+
   // Share query handler
   const handleShareQuery = async () => {
     const result = await copyShareableURL(queryState);
     if (result.success) {
       setShareToast(true);
-      setTimeout(() => setShareToast(false), 3000);
+      if (shareToastTimerRef.current) clearTimeout(shareToastTimerRef.current);
+      shareToastTimerRef.current = setTimeout(() => setShareToast(false), 3000);
     } else {
       // Show error toast
       setErrorToast(result.error || "Failed to share query");
-      setTimeout(() => setErrorToast(null), 5000);
+      if (errorToastTimerRef.current) clearTimeout(errorToastTimerRef.current);
+      errorToastTimerRef.current = setTimeout(() => setErrorToast(null), 5000);
     }
   };
 
@@ -130,6 +175,7 @@ export default function Home() {
   useKeyboardShortcuts({
     onShare: queryState.table ? handleShareQuery : undefined,
     onReset: queryState.table ? resetBuilder : undefined,
+    onSave: queryState.table ? handleSaveToHistory : undefined,
   });
 
   // Memoized callbacks to prevent infinite loops
@@ -242,7 +288,32 @@ export default function Home() {
         {/* Main Content */}
         <main className="container mx-auto px-4 sm:px-6 pb-12">
           {/* Quick Templates */}
-          <QuickTemplates onLoadTemplate={loadTemplate} />
+          <div className="mb-6">
+            <QuickTemplates onLoadTemplate={loadTemplate} />
+          </div>
+
+          {/* Tool Bar - Professional Tools */}
+          <div className="mb-6 flex items-center gap-2 flex-wrap">
+            <QueryHistory 
+              onLoadQuery={(item) => {
+                loadTemplate(item.query);
+              }}
+            />
+            
+            <a
+              href="/tools/sql-formatter"
+              className="px-3 py-1.5 bg-foreground/5 hover:bg-foreground/10 border border-foreground/10 rounded-lg transition-all font-mono text-sm flex items-center gap-2 text-foreground/70 hover:text-foreground"
+              title="SQL Formatter - Format & beautify SQL"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16m-7 6h7" />
+              </svg>
+              SQL Formatter
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+              </svg>
+            </a>
+          </div>
 
           {/* CSV Upload Section - Collapsible */}
           <div className="mb-8">
@@ -383,6 +454,16 @@ export default function Home() {
                     </div>
                     {queryState.table && (
                       <div className="flex gap-2">
+                        <button
+                          onClick={handleSaveToHistory}
+                          className="px-2 py-1 text-xs bg-green-500/10 hover:bg-green-500/20 active:bg-green-500/30 active:scale-95 border border-green-500/20 rounded transition-all font-mono text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300 flex items-center gap-1.5"
+                          title="Save to history (⌘H)"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+                          </svg>
+                          <span className="hidden sm:inline">Save</span>
+                        </button>
                         <button
                           onClick={handleShareQuery}
                           className="px-2 py-1 text-xs bg-foreground/5 hover:bg-foreground/10 active:bg-foreground/15 active:scale-95 border border-foreground/10 rounded transition-all font-mono text-foreground/60 hover:text-foreground flex items-center gap-1.5"
@@ -698,48 +779,73 @@ export default function Home() {
               rowCounts={rowCounts}
             />
           </div>
+
+          {/* Code Generator Section */}
+          {queryState.table && (
+            <div className="mt-6 sm:mt-8">
+              <CodeGenerator queryState={queryState} />
+            </div>
+          )}
         </main>
 
         {/* Footer */}
         <Footer />
 
-        {/* Share Success Toast */}
-        {shareToast && (
-          <div className="fixed bottom-6 right-6 z-50 animate-in fade-in slide-in-from-bottom-4 duration-300">
-            <div className="px-4 py-3 bg-green-500 text-white rounded-lg shadow-lg flex items-center gap-3">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <div>
-                <p className="text-sm font-semibold">URL Copied!</p>
-                <p className="text-xs opacity-90">Share this link to load your query</p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Error Toast */}
-        {errorToast && (
-          <div className="fixed bottom-6 right-6 z-50 animate-in fade-in slide-in-from-bottom-4 duration-300">
-            <div className="px-4 py-3 bg-red-500 text-white rounded-lg shadow-lg flex items-center gap-3 max-w-md">
-              <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <div className="flex-1">
-                <p className="text-sm font-semibold">Cannot Share Query</p>
-                <p className="text-xs opacity-90">{errorToast}</p>
-              </div>
-              <button
-                onClick={() => setErrorToast(null)}
-                className="p-1 hover:bg-red-600 rounded transition-colors"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+        {/* Toast Notifications Stack */}
+        <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-3 pointer-events-none">
+          {/* Share Success Toast */}
+          {shareToast && (
+            <div className="animate-in fade-in slide-in-from-right-4 duration-300 pointer-events-auto">
+              <div className="px-4 py-3 bg-green-500 text-white rounded-lg shadow-lg flex items-center gap-3">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-              </button>
+                <div>
+                  <p className="text-sm font-semibold">URL Copied!</p>
+                  <p className="text-xs opacity-90">Share this link to load your query</p>
+                </div>
+              </div>
             </div>
-          </div>
-        )}
+          )}
+
+          {/* Save Success Toast */}
+          {saveToast && (
+            <div className="animate-in fade-in slide-in-from-right-4 duration-300 pointer-events-auto">
+              <div className="px-4 py-3 bg-green-500 text-white rounded-lg shadow-lg flex items-center gap-3">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+                </svg>
+                <div>
+                  <p className="text-sm font-semibold">Query Saved!</p>
+                  <p className="text-xs opacity-90">Added to your query history</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Error Toast */}
+          {errorToast && (
+            <div className="animate-in fade-in slide-in-from-right-4 duration-300 pointer-events-auto">
+              <div className="px-4 py-3 bg-red-500 text-white rounded-lg shadow-lg flex items-center gap-3 max-w-md">
+                <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <div className="flex-1">
+                  <p className="text-sm font-semibold">Error</p>
+                  <p className="text-xs opacity-90">{errorToast}</p>
+                </div>
+                <button
+                  onClick={() => setErrorToast(null)}
+                  className="p-1 hover:bg-red-600 rounded transition-colors"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Welcome Tutorial - Outside main container for proper fixed positioning */}
