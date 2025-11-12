@@ -8,12 +8,20 @@ import ConfirmDialog from "./ui/ConfirmDialog";
 
 interface QueryHistoryProps {
   onLoadQuery: (item: QueryHistoryItem) => void;
+  isOpen?: boolean;
+  onClose?: () => void;
+  onHistoryChange?: (count: number) => void;
 }
 
-export default function QueryHistory({ onLoadQuery }: QueryHistoryProps) {
+export default function QueryHistory({ onLoadQuery, isOpen: externalIsOpen, onClose: externalOnClose, onHistoryChange }: QueryHistoryProps) {
   const [history, setHistory] = useState<QueryHistoryItem[]>([]); // Start empty to avoid hydration mismatch
   const [searchTerm, setSearchTerm] = useState('');
-  const [isOpen, setIsOpen] = useState(false);
+  const [internalIsOpen, setInternalIsOpen] = useState(false);
+  
+  // Use external state if provided, otherwise internal
+  const isOpen = externalIsOpen !== undefined ? externalIsOpen : internalIsOpen;
+  const handleClose = externalOnClose || (() => setInternalIsOpen(false));
+  
   const [confirmDialog, setConfirmDialog] = useState<{
     isOpen: boolean;
     title: string;
@@ -36,6 +44,13 @@ export default function QueryHistory({ onLoadQuery }: QueryHistoryProps) {
     refreshHistory();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Load once on mount
+  
+  // Notify parent when history changes
+  useEffect(() => {
+    if (onHistoryChange) {
+      onHistoryChange(history.length);
+    }
+  }, [history.length, onHistoryChange]);
 
   // Refresh history when panel is opened
   useEffect(() => {
@@ -50,12 +65,13 @@ export default function QueryHistory({ onLoadQuery }: QueryHistoryProps) {
     
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        setIsOpen(false);
+        handleClose();
       }
     };
     
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
   const handleSearch = (term: string) => {
@@ -99,7 +115,7 @@ export default function QueryHistory({ onLoadQuery }: QueryHistoryProps) {
         message: `This query used CSV table "${item.tableName}" which is no longer loaded.\n\nThe query will load but you'll need to upload the CSV again to see results.`,
         onConfirm: () => {
           onLoadQuery(item);
-          setIsOpen(false);
+          handleClose();
           setConfirmDialog(prev => ({ ...prev, isOpen: false }));
         },
       });
@@ -107,22 +123,20 @@ export default function QueryHistory({ onLoadQuery }: QueryHistoryProps) {
     }
     
     onLoadQuery(item);
-    setIsOpen(false);
+    handleClose();
   };
 
   return (
     <>
-      {/* Toggle Button */}
-      <button
-        onClick={() => {
-          const newIsOpen = !isOpen;
-          setIsOpen(newIsOpen);
-          // Refresh history when opening
-          if (newIsOpen) {
+      {/* Toggle Button - Only show if not controlled externally */}
+      {externalIsOpen === undefined && (
+        <button
+          onClick={() => {
+            setInternalIsOpen(true);
+            // Refresh history when opening
             const items = getHistory();
             setHistory(items);
-          }
-        }}
+          }}
         className="relative px-3 py-1.5 bg-foreground/5 hover:bg-foreground/10 border border-foreground/10 rounded-lg transition-all font-mono text-sm flex items-center gap-2 text-foreground/70 hover:text-foreground"
         title="View query history"
       >
@@ -130,12 +144,13 @@ export default function QueryHistory({ onLoadQuery }: QueryHistoryProps) {
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
         History
-        {history.length > 0 && (
-          <span className="text-[10px] px-1.5 py-0.5 bg-primary/10 text-primary rounded font-mono font-bold">
-            {history.length}
-          </span>
-        )}
-      </button>
+          {history.length > 0 && (
+            <span className="text-[10px] px-1.5 py-0.5 bg-primary/10 text-primary rounded font-mono font-bold">
+              {history.length}
+            </span>
+          )}
+        </button>
+      )}
 
       {/* History Panel */}
       <AnimatePresence>
@@ -146,7 +161,7 @@ export default function QueryHistory({ onLoadQuery }: QueryHistoryProps) {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              onClick={() => setIsOpen(false)}
+              onClick={handleClose}
               className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[90] cursor-pointer"
             />
 
@@ -175,7 +190,7 @@ export default function QueryHistory({ onLoadQuery }: QueryHistoryProps) {
                 </div>
                 
                 <button
-                  onClick={() => setIsOpen(false)}
+                  onClick={handleClose}
                   className="p-1.5 hover:bg-foreground/10 rounded-lg transition-all"
                   aria-label="Close"
                 >

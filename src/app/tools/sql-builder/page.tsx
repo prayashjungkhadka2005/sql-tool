@@ -1,8 +1,6 @@
 "use client";
 
 import { motion } from "framer-motion";
-import Navbar from "@/features/sql-builder/components/Navbar";
-import Footer from "@/features/sql-builder/components/Footer";
 import QuickTemplates from "@/features/sql-builder/components/QuickTemplates";
 import RecipeStudio from "@/features/sql-builder/components/RecipeStudio";
 import CSVUploader from "@/features/sql-builder/components/CSVUploader";
@@ -73,6 +71,7 @@ export default function Home() {
 
   // State for collapsible CSV upload section
   const [isCSVSectionOpen, setIsCSVSectionOpen] = useState(true);
+
 
 
   // Check if first visit
@@ -244,101 +243,32 @@ export default function Home() {
     }
   };
 
+
   return (
     <>
-      <div className="min-h-screen bg-[#fafafa] dark:bg-[#0a0a0a] flex flex-col">
-      {/* Navbar */}
-      <Navbar />
-
-      {/* Subtle Grid Pattern - Backend Style */}
-      <div className="fixed inset-0 opacity-[0.02] dark:opacity-[0.03] pointer-events-none" style={{
-        backgroundImage: 'linear-gradient(#000 1px, transparent 1px), linear-gradient(90deg, #000 1px, transparent 1px)',
-        backgroundSize: '50px 50px'
-      }}></div>
-        
-        {/* Hero Section */}
-        <div className="relative py-12 sm:py-16 px-4 sm:px-6 overflow-hidden">
-          <div className="container mx-auto max-w-5xl text-center">
-            <motion.div
-              initial={{ opacity: 0, y: -20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6 }}
-            >
-              <div className="inline-flex items-center gap-2 px-3 py-1.5 mb-5 bg-foreground/5 border border-foreground/10 rounded font-mono text-xs">
-                <svg className="w-3.5 h-3.5 text-foreground/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" />
-                </svg>
-                <span className="text-foreground/70 uppercase tracking-wider">Backend Tools</span>
-              </div>
-              
-              <div className="flex items-center justify-center gap-3 mb-4">
-                <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold text-foreground">
-                  SQL Query Builder
-                </h1>
-                <span className="px-2.5 py-0.5 bg-foreground/10 border border-foreground/20 text-foreground/60 text-xs font-mono rounded">
-                  BETA
-                </span>
-              </div>
-              
-              <p className="text-base sm:text-lg text-foreground/60 max-w-3xl mx-auto mb-8 leading-relaxed font-mono text-sm">
-                Visual SQL query builder with real-time code generation
-              </p>
-              
-              <div className="flex flex-wrap justify-center gap-3 text-xs font-mono">
-                <div className="flex items-center gap-2 px-3 py-1.5 bg-foreground/5 border border-foreground/10 rounded">
-                  <span className="text-foreground/40">→</span>
-                  <span className="text-foreground/70">Real-time Generation</span>
-                </div>
-                <div className="flex items-center gap-2 px-3 py-1.5 bg-foreground/5 border border-foreground/10 rounded">
-                  <span className="text-foreground/40">→</span>
-                  <span className="text-foreground/70">Export Results</span>
-                </div>
-                <div className="flex items-center gap-2 px-3 py-1.5 bg-foreground/5 border border-foreground/10 rounded">
-                  <span className="text-foreground/40">→</span>
-                  <span className="text-foreground/70">No Database Required</span>
-                </div>
-              </div>
-            </motion.div>
-          </div>
+      {/* Main Content */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12 sm:pb-16">
+        {/* Quick Templates */}
+        <div className="mb-5 sm:mb-6">
+          <QuickTemplates onLoadTemplate={loadTemplate} />
         </div>
 
-        {/* Main Content */}
-        <main className="container mx-auto px-4 sm:px-6 pb-12">
-          {/* Quick Templates */}
-          <div className="mb-6">
-            <QuickTemplates onLoadTemplate={loadTemplate} />
-          </div>
+        {/* SQL Recipe Studio */}
+        <div className="mb-5 sm:mb-6">
+          <RecipeStudio onLoadRecipe={loadTemplate} currentTable={queryState.table} />
+        </div>
 
-          {/* SQL Recipe Studio */}
-          <div className="mb-6">
-            <RecipeStudio onLoadRecipe={loadTemplate} currentTable={queryState.table} />
-          </div>
-
-          {/* Tool Bar - Professional Tools */}
-          <div className="mb-6 flex items-center gap-2 flex-wrap">
-            <QueryHistory 
-              onLoadQuery={(item) => {
-                loadTemplate(item.query);
-              }}
-            />
-            
-            <a
-              href="/tools/sql-formatter"
-              className="px-3 py-1.5 bg-foreground/5 hover:bg-foreground/10 border border-foreground/10 rounded-lg transition-all font-mono text-sm flex items-center gap-2 text-foreground/70 hover:text-foreground"
-              title="SQL Formatter - Format & beautify SQL"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16m-7 6h7" />
-              </svg>
-              SQL Formatter
-              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-              </svg>
-            </a>
-          </div>
+        {/* Tool Bar - Professional Tools */}
+        <div className="mb-5 sm:mb-6 flex items-center gap-2 flex-wrap">
+          <QueryHistory 
+            onLoadQuery={(item) => {
+              loadTemplate(item.query);
+            }}
+          />
+        </div>
 
           {/* CSV Upload Section - Collapsible */}
-          <div className="mb-8">
+          <div className="mb-6 sm:mb-8">
             <div className="relative bg-white dark:bg-[#1a1a1a] border border-foreground/10 rounded-lg">
               <button
                 onClick={() => setIsCSVSectionOpen(!isCSVSectionOpen)}
@@ -437,16 +367,16 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="grid lg:grid-cols-2 gap-6 sm:gap-8">
+          <div className="grid lg:grid-cols-2 gap-5 sm:gap-6 lg:gap-8">
             
             {/* Left Panel - Query Builder */}
             <motion.div
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.6, delay: 0.2 }}
-              className="space-y-4 sm:space-y-6"
+              className="space-y-4 sm:space-y-5"
             >
-              <div className="relative bg-white dark:bg-[#1a1a1a] border border-foreground/10 rounded-lg p-5 sm:p-6">
+              <div className="relative bg-white dark:bg-[#1a1a1a] border border-foreground/10 rounded-lg p-4 sm:p-5 lg:p-6">
                 <div className="relative">
                   {/* Header */}
                   <div className="flex items-center justify-between mb-5 pb-4 border-b border-foreground/10">
@@ -782,7 +712,7 @@ export default function Home() {
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.6, delay: 0.3 }}
-              className="lg:sticky lg:top-20 lg:self-start"
+              className="lg:sticky lg:top-[80px] lg:self-start"
             >
               <QueryPreview 
                 queryState={queryState} 
@@ -794,7 +724,7 @@ export default function Home() {
           </div>
 
           {/* Visualizations Section - Full Width Below */}
-          <div className="mt-6 sm:mt-8">
+          <div className="mt-6 sm:mt-8 lg:mt-10">
             <QueryVisualizations 
               queryState={queryState}
               mockResults={mockResults}
@@ -804,14 +734,11 @@ export default function Home() {
 
           {/* Code Generator Section */}
           {queryState.table && (
-            <div className="mt-6 sm:mt-8">
+            <div className="mt-6 sm:mt-8 lg:mt-10">
               <CodeGenerator queryState={queryState} />
             </div>
           )}
         </main>
-
-        {/* Footer */}
-        <Footer />
 
         {/* Toast Notifications Stack */}
         <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-3 pointer-events-none">
@@ -868,10 +795,13 @@ export default function Home() {
             </div>
           )}
         </div>
-      </div>
 
-      {/* Welcome Tutorial - Outside main container for proper fixed positioning */}
-      {showTutorial && <WelcomeTutorial onComplete={handleTutorialComplete} />}
+      {/* Welcome Tutorial */}
+      {showTutorial && (
+        <WelcomeTutorial onComplete={() => setShowTutorial(false)} />
+      )}
+
+      
     </>
   );
 }
