@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { JoinClause, SAMPLE_TABLES } from "@/features/sql-builder/types";
+import { getCSVTableNames, getCSVData } from "../utils/csv-data-manager";
 import HelpTooltip from "./HelpTooltip";
 
 interface JoinBuilderProps {
@@ -30,13 +31,25 @@ export default function JoinBuilder({ baseTable, joins, onChange }: JoinBuilderP
     onChange(joins.filter(j => j.id !== id));
   };
 
-  // Get available tables (exclude base table and already joined tables)
-  const availableTables = SAMPLE_TABLES.filter(
-    t => t.name !== baseTable && !joins.some(j => j.table === t.name)
-  );
+  // Get available tables (both CSV and mock, excluding base table and already joined)
+  const availableTables = useMemo(() => {
+    const csvTables = getCSVTableNames().map(name => ({ name }));
+    const mockTables = SAMPLE_TABLES.map(t => ({ name: t.name }));
+    const allTables = [...csvTables, ...mockTables];
+    
+    return allTables.filter(
+      t => t.name !== baseTable && !joins.some(j => j.table === t.name)
+    );
+  }, [baseTable, joins]);
 
-  // Get columns for a specific table
+  // Get columns for a specific table (CSV or mock)
   const getTableColumns = (tableName: string) => {
+    // Check CSV first
+    const csvData = getCSVData(tableName);
+    if (csvData) {
+      return csvData.columns.map(c => c.name);
+    }
+    // Fallback to mock tables
     const table = SAMPLE_TABLES.find(t => t.name === tableName);
     return table ? table.columns.map(c => c.name) : [];
   };
@@ -108,14 +121,19 @@ export default function JoinBuilder({ baseTable, joins, onChange }: JoinBuilderP
                   <select
                     value={join.table}
                     onChange={(e) => updateJoin(join.id, { table: e.target.value, onRight: "" })}
-                    className="flex-1 min-w-[120px] px-2 py-1 bg-white dark:bg-black/60 border border-foreground/10 rounded text-xs font-mono text-foreground focus:outline-none focus:border-foreground/30 transition-all active:scale-95"
+                    className="flex-1 min-w-[120px] max-w-[200px] px-2 py-1 bg-white dark:bg-black/60 border border-foreground/10 rounded text-xs font-mono text-foreground focus:outline-none focus:border-foreground/30 transition-all active:scale-95 truncate"
+                    title={join.table || "Select table"}
                   >
                     <option value="">-- select table --</option>
                     {availableTables.map(t => (
-                      <option key={t.name} value={t.name}>{t.name}</option>
+                      <option key={t.name} value={t.name} title={t.name}>
+                        {t.name.length > 25 ? `${t.name.substring(0, 25)}...` : t.name}
+                      </option>
                     ))}
                     {join.table && !availableTables.some(t => t.name === join.table) && (
-                      <option value={join.table}>{join.table}</option>
+                      <option value={join.table} title={join.table}>
+                        {join.table.length > 25 ? `${join.table.substring(0, 25)}...` : join.table}
+                      </option>
                     )}
                   </select>
 
@@ -140,30 +158,44 @@ export default function JoinBuilder({ baseTable, joins, onChange }: JoinBuilderP
                     <select
                       value={join.onLeft}
                       onChange={(e) => updateJoin(join.id, { onLeft: e.target.value })}
-                      className="flex-1 px-2 py-1 bg-white dark:bg-black/60 border border-foreground/10 rounded text-xs font-mono text-foreground focus:outline-none focus:border-foreground/30 transition-all active:scale-95"
+                      className="flex-1 min-w-0 px-2 py-1 bg-white dark:bg-black/60 border border-foreground/10 rounded text-xs font-mono text-foreground focus:outline-none focus:border-foreground/30 transition-all active:scale-95 truncate"
+                      title={join.onLeft || `Select ${baseTable} column`}
                     >
-                      <option value="">-- {baseTable} column --</option>
-                      {baseTableColumns.map(col => (
-                        <option key={col} value={`${baseTable}.${col}`}>
-                          {baseTable}.{col}
-                        </option>
-                      ))}
+                      <option value="">
+                        -- {baseTable.length > 15 ? `${baseTable.substring(0, 15)}...` : baseTable} column --
+                      </option>
+                      {baseTableColumns.map(col => {
+                        const fullName = `${baseTable}.${col}`;
+                        const displayName = fullName.length > 30 ? `${fullName.substring(0, 30)}...` : fullName;
+                        return (
+                          <option key={col} value={fullName} title={fullName}>
+                            {displayName}
+                          </option>
+                        );
+                      })}
                     </select>
 
-                    <span className="text-xs font-mono text-foreground/40">=</span>
+                    <span className="text-xs font-mono text-foreground/40 flex-shrink-0">=</span>
 
                     {/* Right Column (Join Table) */}
                     <select
                       value={join.onRight}
                       onChange={(e) => updateJoin(join.id, { onRight: e.target.value })}
-                      className="flex-1 px-2 py-1 bg-white dark:bg-black/60 border border-foreground/10 rounded text-xs font-mono text-foreground focus:outline-none focus:border-foreground/30 transition-all active:scale-95"
+                      className="flex-1 min-w-0 px-2 py-1 bg-white dark:bg-black/60 border border-foreground/10 rounded text-xs font-mono text-foreground focus:outline-none focus:border-foreground/30 transition-all active:scale-95 truncate"
+                      title={join.onRight || `Select ${join.table} column`}
                     >
-                      <option value="">-- {join.table} column --</option>
-                      {joinTableColumns.map(col => (
-                        <option key={col} value={`${join.table}.${col}`}>
-                          {join.table}.{col}
-                        </option>
-                      ))}
+                      <option value="">
+                        -- {join.table.length > 15 ? `${join.table.substring(0, 15)}...` : join.table} column --
+                      </option>
+                      {joinTableColumns.map(col => {
+                        const fullName = `${join.table}.${col}`;
+                        const displayName = fullName.length > 30 ? `${fullName.substring(0, 30)}...` : fullName;
+                        return (
+                          <option key={col} value={fullName} title={fullName}>
+                            {displayName}
+                          </option>
+                        );
+                      })}
                     </select>
                   </div>
                 )}

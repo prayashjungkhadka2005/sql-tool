@@ -1,4 +1,5 @@
-import { QueryState, SAMPLE_TABLES } from "@/features/sql-builder/types";
+import { QueryState, SAMPLE_TABLES, TableSchema } from "@/features/sql-builder/types";
+import { getCSVData } from "./csv-data-manager";
 
 /**
  * Validate INSERT query for errors
@@ -11,7 +12,14 @@ export function validateInsertQuery(queryState: QueryState): {
 } | null {
   if (queryState.queryType !== "INSERT") return null;
 
-  const tableSchema = SAMPLE_TABLES.find(t => t.name === queryState.table);
+  // Get table schema (CSV or mock)
+  let tableSchema: TableSchema | undefined;
+  const csvData = getCSVData(queryState.table);
+  if (csvData) {
+    tableSchema = { name: csvData.tableName, columns: csvData.columns } as TableSchema;
+  } else {
+    tableSchema = SAMPLE_TABLES.find(t => t.name === queryState.table);
+  }
   if (!tableSchema) return null;
 
   // Check 1: Missing required fields

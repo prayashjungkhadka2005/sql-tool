@@ -5,6 +5,7 @@
 
 import * as factories from './factories';
 import { WhereCondition, OrderByClause } from '@/features/sql-builder/types';
+import { getCSVData, isCSVTable } from '../csv-data-manager';
 
 // Re-export JOIN executor
 export { executeJoins, getColumnValue as getJoinColumnValue } from './join-executor';
@@ -14,14 +15,23 @@ const dataCache: Record<string, any[]> = {};
 
 /**
  * Get mock data for a table (with caching)
+ * Now supports both mock data and uploaded CSV data
  */
 export function getMockData(tableName: string): any[] {
-  // Return cached data if exists
+  // Check if it's a CSV table first
+  if (isCSVTable(tableName)) {
+    const csvData = getCSVData(tableName);
+    if (csvData) {
+      return csvData.data;
+    }
+  }
+
+  // Return cached mock data if exists
   if (dataCache[tableName]) {
     return dataCache[tableName];
   }
 
-  // Generate and cache data
+  // Generate and cache mock data
   let data: any[] = [];
   
   switch (tableName) {
@@ -103,39 +113,67 @@ export function applyWhere(data: any[], whereConditions: WhereCondition[]): any[
       // Evaluate condition based on operator
       switch (condition.operator) {
         case '=':
-          conditionMet = String(columnValue).toLowerCase() === String(condition.value).toLowerCase();
+          // Handle null comparisons
+          if (columnValue == null) {
+            conditionMet = false;
+          } else {
+            conditionMet = String(columnValue).toLowerCase() === String(condition.value).toLowerCase();
+          }
           break;
         case '!=':
-          conditionMet = String(columnValue).toLowerCase() !== String(condition.value).toLowerCase();
+          // Handle null comparisons
+          if (columnValue == null) {
+            conditionMet = true;
+          } else {
+            conditionMet = String(columnValue).toLowerCase() !== String(condition.value).toLowerCase();
+          }
           break;
         case '>':
-          conditionMet = Number(columnValue) > Number(condition.value);
+          conditionMet = !isNaN(Number(columnValue)) && Number(columnValue) > Number(condition.value);
           break;
         case '<':
-          conditionMet = Number(columnValue) < Number(condition.value);
+          conditionMet = !isNaN(Number(columnValue)) && Number(columnValue) < Number(condition.value);
           break;
         case '>=':
-          conditionMet = Number(columnValue) >= Number(condition.value);
+          conditionMet = !isNaN(Number(columnValue)) && Number(columnValue) >= Number(condition.value);
           break;
         case '<=':
-          conditionMet = Number(columnValue) <= Number(condition.value);
+          conditionMet = !isNaN(Number(columnValue)) && Number(columnValue) <= Number(condition.value);
           break;
         case 'LIKE': {
-          // Convert SQL LIKE pattern to regex
-          const pattern = condition.value
-            .replace(/%/g, '.*')
-            .replace(/_/g, '.');
-          conditionMet = new RegExp(`^${pattern}$`, 'i').test(String(columnValue));
+          // Handle null
+          if (columnValue == null) {
+            conditionMet = false;
+          } else {
+            // Convert SQL LIKE pattern to regex
+            const pattern = condition.value
+              .replace(/%/g, '.*')
+              .replace(/_/g, '.');
+            try {
+              conditionMet = new RegExp(`^${pattern}$`, 'i').test(String(columnValue));
+            } catch (e) {
+              // Invalid regex pattern
+              conditionMet = false;
+            }
+          }
           break;
         }
         case 'IN': {
-          const values = condition.value.split(',').map(v => v.trim().replace(/['"]/g, ''));
-          conditionMet = values.includes(String(columnValue));
+          if (columnValue == null) {
+            conditionMet = false;
+          } else {
+            const values = condition.value.split(',').map(v => v.trim().replace(/['"]/g, ''));
+            conditionMet = values.includes(String(columnValue));
+          }
           break;
         }
         case 'NOT IN': {
-          const values = condition.value.split(',').map(v => v.trim().replace(/['"]/g, ''));
-          conditionMet = !values.includes(String(columnValue));
+          if (columnValue == null) {
+            conditionMet = true;
+          } else {
+            const values = condition.value.split(',').map(v => v.trim().replace(/['"]/g, ''));
+            conditionMet = !values.includes(String(columnValue));
+          }
           break;
         }
         case 'IS NULL':

@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo } from "react";
-import { SAMPLE_TABLES } from "@/features/sql-builder/types";
+import { SAMPLE_TABLES, TableSchema } from "@/features/sql-builder/types";
+import { getCSVData } from "../utils/csv-data-manager";
 import ColumnTypeIndicator from "./ColumnTypeIndicator";
 
 interface InsertValueBuilderProps {
@@ -11,10 +12,13 @@ interface InsertValueBuilderProps {
 }
 
 export default function InsertValueBuilder({ table, insertValues, onChange }: InsertValueBuilderProps) {
-  const tableSchema = useMemo(
-    () => SAMPLE_TABLES.find(t => t.name === table),
-    [table]
-  );
+  const tableSchema = useMemo(() => {
+    const csvData = getCSVData(table);
+    if (csvData) {
+      return { name: csvData.tableName, columns: csvData.columns } as TableSchema;
+    }
+    return SAMPLE_TABLES.find(t => t.name === table);
+  }, [table]);
 
   if (!tableSchema) return null;
 

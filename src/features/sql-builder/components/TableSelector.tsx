@@ -1,12 +1,35 @@
+"use client";
+
 import { SAMPLE_TABLES } from "@/features/sql-builder/types";
+import { getCSVData, getCSVTableNames } from "../utils/csv-data-manager";
 import HelpTooltip from "./HelpTooltip";
+import { useEffect, useState } from "react";
 
 interface TableSelectorProps {
   value: string;
   onChange: (table: string) => void;
+  refreshTrigger?: number; // Optional trigger to force refresh
 }
 
-export default function TableSelector({ value, onChange }: TableSelectorProps) {
+export default function TableSelector({ value, onChange, refreshTrigger }: TableSelectorProps) {
+  const [csvTables, setCsvTables] = useState<string[]>([]);
+
+  // Refresh CSV tables list when trigger changes
+  useEffect(() => {
+    setCsvTables(getCSVTableNames());
+  }, [refreshTrigger]);
+
+  // Get column count for selected table
+  const getColumnCount = (tableName: string) => {
+    // Check if it's a CSV table
+    const csvData = getCSVData(tableName);
+    if (csvData) {
+      return csvData.columns.length;
+    }
+    // Otherwise it's a mock table
+    return SAMPLE_TABLES.find(t => t.name === tableName)?.columns.length || 0;
+  };
+
   return (
     <div>
       <div className="flex items-center justify-between mb-2">
@@ -30,15 +53,30 @@ export default function TableSelector({ value, onChange }: TableSelectorProps) {
         aria-label="Select database table"
       >
         <option value="">-- select table --</option>
-        {SAMPLE_TABLES.map((table) => (
-          <option key={table.name} value={table.name}>
-            {table.name}
-          </option>
-        ))}
+        
+        {/* CSV Tables (if any) */}
+        {csvTables.length > 0 && (
+          <optgroup label="YOUR CSV FILES">
+            {csvTables.map((table) => (
+              <option key={table} value={table} title={table}>
+                {table.length > 40 ? `${table.substring(0, 40)}...` : table}
+              </option>
+            ))}
+          </optgroup>
+        )}
+        
+        {/* Mock Tables */}
+        <optgroup label="DEMO TABLES (MOCK DATA)">
+          {SAMPLE_TABLES.map((table) => (
+            <option key={table.name} value={table.name}>
+              {table.name}
+            </option>
+          ))}
+        </optgroup>
       </select>
       {value && (
-        <p className="mt-1.5 text-xs text-foreground/40 font-mono">
-          → {SAMPLE_TABLES.find(t => t.name === value)?.columns.length || 0} columns
+        <p className="mt-1.5 text-xs text-foreground/40 font-mono truncate" title={`${value} - ${getColumnCount(value)} columns`}>
+          → {value.length > 30 ? `${value.substring(0, 30)}...` : value} • {getColumnCount(value)} columns
         </p>
       )}
     </div>

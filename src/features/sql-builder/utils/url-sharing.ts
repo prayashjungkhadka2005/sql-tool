@@ -4,6 +4,7 @@
  */
 
 import { QueryState } from "@/features/sql-builder/types";
+import { isCSVTable } from "./csv-data-manager";
 
 /**
  * Encode query state to URL-safe string
@@ -95,16 +96,48 @@ export function generateShareableURL(queryState: QueryState): string {
 }
 
 /**
- * Copy URL to clipboard
+ * Check if query can be shared via URL
+ * CSV queries cannot be shared because data is local
  */
-export async function copyShareableURL(queryState: QueryState): Promise<boolean> {
+export function canShareQuery(queryState: QueryState): { 
+  canShare: boolean; 
+  reason?: string;
+} {
+  // Check if table is from CSV
+  if (queryState.table && isCSVTable(queryState.table)) {
+    return {
+      canShare: false,
+      reason: "CSV queries cannot be shared because the data is stored locally in your browser. Only demo table queries can be shared."
+    };
+  }
+  
+  return { canShare: true };
+}
+
+/**
+ * Copy URL to clipboard
+ * Returns { success: boolean, error?: string }
+ */
+export async function copyShareableURL(queryState: QueryState): Promise<{ success: boolean; error?: string }> {
   try {
+    // Check if query can be shared
+    const shareCheck = canShareQuery(queryState);
+    if (!shareCheck.canShare) {
+      return { 
+        success: false, 
+        error: shareCheck.reason 
+      };
+    }
+    
     const url = generateShareableURL(queryState);
     await navigator.clipboard.writeText(url);
-    return true;
+    return { success: true };
   } catch (error) {
     console.error('Failed to copy URL:', error);
-    return false;
+    return { 
+      success: false, 
+      error: "Failed to copy URL to clipboard" 
+    };
   }
 }
 

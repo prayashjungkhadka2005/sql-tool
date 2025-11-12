@@ -1,4 +1,5 @@
-import { SAMPLE_TABLES } from "@/features/sql-builder/types";
+import { SAMPLE_TABLES, TableSchema } from "@/features/sql-builder/types";
+import { getCSVData } from "../utils/csv-data-manager";
 import { useMemo } from "react";
 import HelpTooltip from "./HelpTooltip";
 import ColumnTypeIndicator from "./ColumnTypeIndicator";
@@ -10,10 +11,13 @@ interface GroupByBuilderProps {
 }
 
 export default function GroupByBuilder({ table, groupBy, onChange }: GroupByBuilderProps) {
-  const tableSchema = useMemo(
-    () => SAMPLE_TABLES.find(t => t.name === table),
-    [table]
-  );
+  const tableSchema = useMemo(() => {
+    const csvData = getCSVData(table);
+    if (csvData) {
+      return { name: csvData.tableName, columns: csvData.columns } as TableSchema;
+    }
+    return SAMPLE_TABLES.find(t => t.name === table);
+  }, [table]);
 
   if (!tableSchema) return null;
 

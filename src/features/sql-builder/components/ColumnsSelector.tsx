@@ -1,4 +1,5 @@
-import { SAMPLE_TABLES, JoinClause } from "@/features/sql-builder/types";
+import { SAMPLE_TABLES, JoinClause, TableSchema } from "@/features/sql-builder/types";
+import { getCSVData } from "../utils/csv-data-manager";
 import { useMemo } from "react";
 import HelpTooltip from "./HelpTooltip";
 import ColumnTypeIndicator from "./ColumnTypeIndicator";
@@ -11,19 +12,41 @@ interface ColumnsSelectorProps {
 }
 
 export default function ColumnsSelector({ table, selectedColumns, onChange, joins = [] }: ColumnsSelectorProps) {
-  const tableSchema = useMemo(
-    () => SAMPLE_TABLES.find(t => t.name === table),
-    [table]
-  );
+  // Get table schema (either from CSV or mock data)
+  const tableSchema = useMemo(() => {
+    // Check if it's a CSV table
+    const csvData = getCSVData(table);
+    if (csvData) {
+      return {
+        name: csvData.tableName,
+        columns: csvData.columns
+      } as TableSchema;
+    }
+    // Otherwise get from mock tables
+    return SAMPLE_TABLES.find(t => t.name === table);
+  }, [table]);
 
   // Get all available tables (base + joined)
   const allTables = useMemo(() => {
     const tables = [{ name: table, schema: tableSchema }];
     if (joins && joins.length > 0) {
       joins.forEach(join => {
-        const joinSchema = SAMPLE_TABLES.find(t => t.name === join.table);
-        if (joinSchema) {
-          tables.push({ name: join.table, schema: joinSchema });
+        // Check if joined table is CSV
+        const csvData = getCSVData(join.table);
+        if (csvData) {
+          tables.push({ 
+            name: join.table, 
+            schema: {
+              name: csvData.tableName,
+              columns: csvData.columns
+            } as TableSchema
+          });
+        } else {
+          // Get from mock tables
+          const joinSchema = SAMPLE_TABLES.find(t => t.name === join.table);
+          if (joinSchema) {
+            tables.push({ name: join.table, schema: joinSchema });
+          }
         }
       });
     }

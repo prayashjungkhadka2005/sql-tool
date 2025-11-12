@@ -1,7 +1,8 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { SAMPLE_TABLES } from "@/features/sql-builder/types";
+import { SAMPLE_TABLES, TableSchema } from "@/features/sql-builder/types";
+import { getCSVData } from "../utils/csv-data-manager";
 import { useMemo } from "react";
 import ColumnTypeIndicator from "./ColumnTypeIndicator";
 
@@ -16,10 +17,19 @@ export default function TableStructureVisualizer({
   selectedColumns = [],
   selectedGroupBy = []
 }: TableStructureVisualizerProps) {
-  const tableSchema = useMemo(
-    () => SAMPLE_TABLES.find(t => t.name === tableName),
-    [tableName]
-  );
+  // Get table schema (either from CSV or mock data)
+  const tableSchema = useMemo(() => {
+    // Check if it's a CSV table
+    const csvData = getCSVData(tableName);
+    if (csvData) {
+      return {
+        name: csvData.tableName,
+        columns: csvData.columns
+      } as TableSchema;
+    }
+    // Otherwise get from mock tables
+    return SAMPLE_TABLES.find(t => t.name === tableName);
+  }, [tableName]);
 
   if (!tableSchema) return null;
 

@@ -45,13 +45,17 @@ export default function QueryPreview({ queryState, onAutoFix, onRowCountsChange,
       return [];
     }
     
-    // Get all mock data for table (with JOINs if present)
-    let data = queryState.joins && queryState.joins.length > 0
-      ? executeJoins(queryState.table, queryState.joins)
-      : getMockData(queryState.table);
-    
-    // Apply WHERE filters
-    data = applyWhere(data, queryState.whereConditions);
+    try {
+      // Get all mock data for table (with JOINs if present)
+      let data = queryState.joins && queryState.joins.length > 0
+        ? executeJoins(queryState.table, queryState.joins)
+        : getMockData(queryState.table);
+      
+      // If no data (table might have been deleted), return empty
+      if (!data || data.length === 0) return [];
+      
+      // Apply WHERE filters
+      data = applyWhere(data, queryState.whereConditions);
     
     // Handle aggregate queries with GROUP BY
     if (queryState.aggregates && queryState.aggregates.length > 0) {
@@ -202,23 +206,34 @@ export default function QueryPreview({ queryState, onAutoFix, onRowCountsChange,
       });
     }
     
-    // Apply ORDER BY (after grouping for aggregate queries)
-    data = applyOrderBy(data, queryState.orderBy);
-    
-    // Apply LIMIT and OFFSET (default to 20 rows for better UX)
-    const defaultLimit = 20;
-    const effectiveLimit = queryState.limit || (queryState.limit === null ? defaultLimit : null);
-    data = applyPagination(data, effectiveLimit, queryState.offset);
-    
-    return data;
+      // Apply ORDER BY (after grouping for aggregate queries)
+      data = applyOrderBy(data, queryState.orderBy);
+      
+      // Apply LIMIT and OFFSET (default to 20 rows for better UX)
+      const defaultLimit = 20;
+      const effectiveLimit = queryState.limit || (queryState.limit === null ? defaultLimit : null);
+      data = applyPagination(data, effectiveLimit, queryState.offset);
+      
+      return data;
+    } catch (error) {
+      // If any error occurs (e.g., deleted table), return empty array
+      console.error('Error executing query:', error);
+      return [];
+    }
   }, [queryState]);
 
   // Count total matching rows (before LIMIT)
   const totalMatchingRows = useMemo(() => {
     if (!queryState.table) return 0;
-    let data = getMockData(queryState.table);
-    data = applyWhere(data, queryState.whereConditions);
-    return data.length;
+    try {
+      let data = getMockData(queryState.table);
+      if (!data || data.length === 0) return 0;
+      data = applyWhere(data, queryState.whereConditions);
+      return data.length;
+    } catch (error) {
+      console.error('Error counting rows:', error);
+      return 0;
+    }
   }, [queryState.table, queryState.whereConditions]);
 
   // Row counts for visual flow
@@ -230,11 +245,17 @@ export default function QueryPreview({ queryState, onAutoFix, onRowCountsChange,
       return { total: 0, afterWhere: 0, afterGroupBy: 0, final: 0 };
     }
     
-    // Get data (with JOINs if present)
-    let data = queryState.joins && queryState.joins.length > 0
-      ? executeJoins(queryState.table, queryState.joins)
-      : getMockData(queryState.table);
-    const total = data.length;
+    try {
+      // Get data (with JOINs if present)
+      let data = queryState.joins && queryState.joins.length > 0
+        ? executeJoins(queryState.table, queryState.joins)
+        : getMockData(queryState.table);
+      
+      if (!data || data.length === 0) {
+        return { total: 0, afterWhere: 0, afterGroupBy: 0, final: 0 };
+      }
+      
+      const total = data.length;
     
     // After WHERE
     data = applyWhere(data, queryState.whereConditions);
@@ -254,10 +275,14 @@ export default function QueryPreview({ queryState, onAutoFix, onRowCountsChange,
       afterGroupBy = Object.keys(groups).length;
     }
     
-    // Final (after HAVING and LIMIT)
-    const final = mockResults.length;
-    
-    return { total, afterWhere, afterGroupBy, final };
+      // Final (after HAVING and LIMIT)
+      const final = mockResults.length;
+      
+      return { total, afterWhere, afterGroupBy, final };
+    } catch (error) {
+      console.error('Error calculating row counts:', error);
+      return { total: 0, afterWhere: 0, afterGroupBy: 0, final: 0 };
+    }
   }, [queryState, mockResults]);
 
   // Notify parent of changes for visualizations

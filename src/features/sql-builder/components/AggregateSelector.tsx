@@ -1,4 +1,5 @@
-import { AggregateColumn, AggregateFunction, SAMPLE_TABLES } from "@/features/sql-builder/types";
+import { AggregateColumn, AggregateFunction, SAMPLE_TABLES, TableSchema } from "@/features/sql-builder/types";
+import { getCSVData } from "../utils/csv-data-manager";
 import { useMemo } from "react";
 import HelpTooltip from "./HelpTooltip";
 
@@ -9,10 +10,13 @@ interface AggregateSelectorProps {
 }
 
 export default function AggregateSelector({ table, aggregates, onChange }: AggregateSelectorProps) {
-  const tableSchema = useMemo(
-    () => SAMPLE_TABLES.find(t => t.name === table),
-    [table]
-  );
+  const tableSchema = useMemo(() => {
+    const csvData = getCSVData(table);
+    if (csvData) {
+      return { name: csvData.tableName, columns: csvData.columns } as TableSchema;
+    }
+    return SAMPLE_TABLES.find(t => t.name === table);
+  }, [table]);
 
   if (!tableSchema) return null;
 

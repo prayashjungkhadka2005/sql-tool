@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import Navbar from "@/features/sql-builder/components/Navbar";
 import Footer from "@/features/sql-builder/components/Footer";
 import QuickTemplates from "@/features/sql-builder/components/QuickTemplates";
+import CSVUploader from "@/features/sql-builder/components/CSVUploader";
 import QueryTypeSelector from "@/features/sql-builder/components/QueryTypeSelector";
 import TableSelector from "@/features/sql-builder/components/TableSelector";
 import ColumnsSelector from "@/features/sql-builder/components/ColumnsSelector";
@@ -25,6 +26,7 @@ import { useQueryBuilder } from "@/features/sql-builder/hooks/useQueryBuilder";
 import { useKeyboardShortcuts } from "@/features/sql-builder/hooks/useKeyboardShortcuts";
 import { useState, useCallback, useEffect } from "react";
 import { decodeQueryFromURL, copyShareableURL } from "@/features/sql-builder/utils/url-sharing";
+import { isCSVTable } from "@/features/sql-builder/utils/csv-data-manager";
 
 export default function Home() {
   const {
@@ -59,6 +61,12 @@ export default function Home() {
 
   // State for welcome tutorial
   const [showTutorial, setShowTutorial] = useState(false);
+
+  // State to trigger TableSelector refresh when CSV is uploaded
+  const [csvRefreshTrigger, setCsvRefreshTrigger] = useState(0);
+
+  // State for collapsible CSV upload section
+  const [isCSVSectionOpen, setIsCSVSectionOpen] = useState(true);
 
   // Check if first visit
   useEffect(() => {
@@ -102,12 +110,19 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Only run once on mount
 
+  // State for error toast
+  const [errorToast, setErrorToast] = useState<string | null>(null);
+
   // Share query handler
   const handleShareQuery = async () => {
-    const success = await copyShareableURL(queryState);
-    if (success) {
+    const result = await copyShareableURL(queryState);
+    if (result.success) {
       setShareToast(true);
       setTimeout(() => setShareToast(false), 3000);
+    } else {
+      // Show error toast
+      setErrorToast(result.error || "Failed to share query");
+      setTimeout(() => setErrorToast(null), 5000);
     }
   };
 
@@ -229,6 +244,80 @@ export default function Home() {
           {/* Quick Templates */}
           <QuickTemplates onLoadTemplate={loadTemplate} />
 
+          {/* CSV Upload Section - Collapsible */}
+          <div className="mb-8">
+            <div className="relative bg-white dark:bg-[#1a1a1a] border border-foreground/10 rounded-lg">
+              <button
+                onClick={() => setIsCSVSectionOpen(!isCSVSectionOpen)}
+                className="w-full px-5 sm:px-6 py-4 flex items-center justify-between hover:bg-foreground/5 active:bg-foreground/10 transition-colors rounded-t-lg"
+              >
+                <div className="flex items-center gap-2.5">
+                  <svg className="w-4 h-4 text-foreground/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                  </svg>
+                  <div className="text-left">
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider">
+                        Upload Your Data
+                      </h3>
+                      <span className="text-[10px] px-1.5 py-0.5 bg-green-500/10 text-green-600 dark:text-green-400 rounded font-mono font-semibold">
+                        NEW
+                      </span>
+                    </div>
+                    <p className="text-xs text-foreground/40 font-mono mt-0.5">
+                      → upload CSV to query your own data • 100% client-side • private
+                    </p>
+                  </div>
+                </div>
+                <svg 
+                  className={`w-4 h-4 text-foreground/40 transition-transform ${isCSVSectionOpen ? 'rotate-180' : ''}`}
+                  fill="none" 
+                  stroke="currentColor" 
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+
+              {isCSVSectionOpen && (
+                <div className="px-5 sm:px-6 py-5 sm:py-6 border-t border-foreground/10">
+                  <CSVUploader 
+                onUploadSuccess={(tableName) => {
+                  // Trigger refresh of TableSelector dropdown
+                  setCsvRefreshTrigger(prev => prev + 1);
+                  // Auto-select the uploaded table
+                  updateTable(tableName);
+                }}
+                onDelete={(tableName) => {
+                  // Trigger refresh of TableSelector dropdown
+                  setCsvRefreshTrigger(prev => prev + 1);
+                  
+                  // If empty string (clear all signal) or deleted table was selected, FULL RESET
+                  if (tableName === "" || queryState.table === tableName) {
+                    resetBuilder(); // Complete reset
+                    return;
+                  }
+                  
+                  // If deleted table is used in JOINs, remove those joins
+                  if (queryState.joins && queryState.joins.length > 0) {
+                    const cleanedJoins = queryState.joins.filter(join => join.table !== tableName);
+                    if (cleanedJoins.length !== queryState.joins.length) {
+                      updateJoins(cleanedJoins);
+                      // Also need to clear columns from deleted joined table
+                      const deletedTablePrefix = `${tableName}.`;
+                      const cleanedColumns = queryState.columns.filter(col => !col.startsWith(deletedTablePrefix));
+                      if (cleanedColumns.length !== queryState.columns.length) {
+                        updateColumns(cleanedColumns);
+                      }
+                    }
+                  }
+                }}
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+
           <div className="grid lg:grid-cols-2 gap-6 sm:gap-8">
             
             {/* Left Panel - Query Builder */}
@@ -247,7 +336,14 @@ export default function Home() {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
                       </svg>
                       <div>
-                        <h2 className="text-sm font-semibold text-foreground uppercase tracking-wider">Query Builder</h2>
+                        <div className="flex items-center gap-2">
+                          <h2 className="text-sm font-semibold text-foreground uppercase tracking-wider">Query Builder</h2>
+                          {queryState.table && isCSVTable(queryState.table) && (
+                            <span className="text-[9px] px-1.5 py-0.5 bg-green-500/10 text-green-600 dark:text-green-400 rounded font-mono font-bold">
+                              YOUR CSV
+                            </span>
+                          )}
+                        </div>
                         <p className="text-xs text-foreground/40 font-mono mt-0.5">
                           {!queryState.table 
                             ? "→ step 1: select a table to start" 
@@ -264,7 +360,7 @@ export default function Home() {
                         <button
                           onClick={handleShareQuery}
                           className="px-2 py-1 text-xs bg-foreground/5 hover:bg-foreground/10 active:bg-foreground/15 active:scale-95 border border-foreground/10 rounded transition-all font-mono text-foreground/60 hover:text-foreground flex items-center gap-1.5"
-                          title="Share query via URL"
+                          title={`Share query via URL ${isCSVTable(queryState.table) ? '(Not available for CSV queries)' : '(Cmd/Ctrl+S)'}`}
                         >
                           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
@@ -274,7 +370,7 @@ export default function Home() {
                         <button
                           onClick={resetBuilder}
                           className="px-2 py-1 text-xs bg-foreground/5 hover:bg-foreground/10 active:bg-foreground/15 active:scale-95 border border-foreground/10 rounded transition-all font-mono text-foreground/60 hover:text-foreground flex items-center gap-1.5"
-                          title="Reset"
+                          title="Reset (Cmd/Ctrl+Shift+R)"
                         >
                           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -294,6 +390,7 @@ export default function Home() {
                     <TableSelector
                       value={queryState.table}
                       onChange={updateTable}
+                      refreshTrigger={csvRefreshTrigger}
                     />
 
                     {/* INSERT-specific UI */}
@@ -563,6 +660,29 @@ export default function Home() {
                 <p className="text-sm font-semibold">URL Copied!</p>
                 <p className="text-xs opacity-90">Share this link to load your query</p>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Error Toast */}
+        {errorToast && (
+          <div className="fixed bottom-6 right-6 z-50 animate-in fade-in slide-in-from-bottom-4 duration-300">
+            <div className="px-4 py-3 bg-red-500 text-white rounded-lg shadow-lg flex items-center gap-3 max-w-md">
+              <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <div className="flex-1">
+                <p className="text-sm font-semibold">Cannot Share Query</p>
+                <p className="text-xs opacity-90">{errorToast}</p>
+              </div>
+              <button
+                onClick={() => setErrorToast(null)}
+                className="p-1 hover:bg-red-600 rounded transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
             </div>
           </div>
         )}

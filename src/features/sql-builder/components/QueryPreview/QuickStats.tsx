@@ -1,8 +1,9 @@
 "use client";
 
-import { QueryState } from "@/features/sql-builder/types";
+import { QueryState, TableSchema } from "@/features/sql-builder/types";
 import { useMemo } from "react";
 import { SAMPLE_TABLES } from "@/features/sql-builder/types";
+import { getCSVData } from "../../utils/csv-data-manager";
 
 interface QuickStatsProps {
   queryState: QueryState;
@@ -15,8 +16,14 @@ export default function QuickStats({ queryState, totalRows, displayedRows }: Qui
   const suggestions = useMemo(() => {
     const tips: string[] = [];
     
-    // Get table schema for smarter suggestions
-    const tableSchema = SAMPLE_TABLES.find(t => t.name === queryState.table);
+    // Get table schema for smarter suggestions (CSV or mock)
+    let tableSchema: TableSchema | undefined;
+    const csvData = getCSVData(queryState.table);
+    if (csvData) {
+      tableSchema = { name: csvData.tableName, columns: csvData.columns } as TableSchema;
+    } else {
+      tableSchema = SAMPLE_TABLES.find(t => t.name === queryState.table);
+    }
     if (!tableSchema) return tips;
 
     // Suggestion 1: Add WHERE if none exists (most common next step)
@@ -68,7 +75,15 @@ export default function QuickStats({ queryState, totalRows, displayedRows }: Qui
     return tips.slice(0, 2);
   }, [queryState]);
 
-  const tableSchema = SAMPLE_TABLES.find(t => t.name === queryState.table);
+  // Get table schema for column count (CSV or mock)
+  const tableSchema = useMemo(() => {
+    const csvData = getCSVData(queryState.table);
+    if (csvData) {
+      return { name: csvData.tableName, columns: csvData.columns } as TableSchema;
+    }
+    return SAMPLE_TABLES.find(t => t.name === queryState.table);
+  }, [queryState.table]);
+  
   const columnCount = queryState.columns.length > 0 ? queryState.columns.length : tableSchema?.columns.length || 0;
 
   return (

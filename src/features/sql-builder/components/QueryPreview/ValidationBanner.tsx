@@ -1,6 +1,6 @@
 "use client";
 
-import { QueryState, SAMPLE_TABLES } from "@/features/sql-builder/types";
+import { QueryState } from "@/features/sql-builder/types";
 import { validateInsertQuery } from "@/features/sql-builder/utils/insert-validator";
 import { motion, AnimatePresence } from "framer-motion";
 import { useMemo } from "react";

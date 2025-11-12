@@ -1,4 +1,5 @@
-import { WhereCondition, OperatorType, SAMPLE_TABLES } from "@/features/sql-builder/types";
+import { WhereCondition, OperatorType, SAMPLE_TABLES, TableSchema } from "@/features/sql-builder/types";
+import { getCSVData } from "../utils/csv-data-manager";
 import { useMemo } from "react";
 import HelpTooltip from "./HelpTooltip";
 
@@ -9,10 +10,13 @@ interface WhereClauseBuilderProps {
 }
 
 export default function WhereClauseBuilder({ table, conditions, onChange }: WhereClauseBuilderProps) {
-  const tableSchema = useMemo(
-    () => SAMPLE_TABLES.find(t => t.name === table),
-    [table]
-  );
+  const tableSchema = useMemo(() => {
+    const csvData = getCSVData(table);
+    if (csvData) {
+      return { name: csvData.tableName, columns: csvData.columns } as TableSchema;
+    }
+    return SAMPLE_TABLES.find(t => t.name === table);
+  }, [table]);
 
   const operators: OperatorType[] = ["=", "!=", ">", "<", ">=", "<=", "LIKE", "IN", "NOT IN", "IS NULL", "IS NOT NULL"];
 
