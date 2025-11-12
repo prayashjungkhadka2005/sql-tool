@@ -102,31 +102,88 @@ export default function ValidationBanner({ queryState, onAutoFix }: ValidationBa
       }
     }
 
-    // PRIORITY 3 - WARNING: Non-grouped columns with aggregates
-    // Only check this if GROUP BY exists (or no HAVING issue above)
-    if (queryState.aggregates && queryState.aggregates.length > 0 && queryState.columns && queryState.columns.length > 0) {
+    // PRIORITY 3 - ERROR: GROUP BY exists but columns not in GROUP BY (and no aggregates)
+    // This is a critical SQL error - you can't SELECT non-grouped columns with GROUP BY
+    if (queryState.groupBy && queryState.groupBy.length > 0 && queryState.columns && queryState.columns.length > 0) {
       const grouped = new Set(queryState.groupBy || []);
-      const offenders = queryState.columns.filter(c => !grouped.has(c));
+      const offenders = queryState.columns.filter(c => !grouped.has(c) && c !== '*');
+      
       if (offenders.length > 0) {
+        // If there are NO aggregates, this is an ERROR (invalid SQL)
+        // If there ARE aggregates, it's a WARNING (might work in some DBs)
+        const hasAggregates = queryState.aggregates && queryState.aggregates.length > 0;
+        
         problems.push({
-          type: "warning",
-          title: "SQL Rule: Non-grouped Columns",
-          message: `These columns aren't in GROUP BY but appear with aggregates: ${offenders.join(', ')}. Standard SQL requires them to be grouped or removed.`,
+          type: hasAggregates ? "warning" : "error",
+          title: hasAggregates ? "SQL Rule: Non-grouped Columns" : "Invalid SQL: Columns Not in GROUP BY",
+          message: hasAggregates 
+            ? `These columns aren't in GROUP BY but appear with aggregates: ${offenders.join(', ')}. Standard SQL requires them to be grouped or removed.`
+            : `Invalid query! These columns must be in GROUP BY or removed: ${offenders.join(', ')}. When using GROUP BY, you can only SELECT grouped columns or aggregates.`,
           fixType: "add-columns-to-group-by",
           fixLabel: `Add ${offenders.length} column${offenders.length > 1 ? 's' : ''} to GROUP BY`
         });
+        
+        // Return early if it's an error to prevent query execution
+        if (!hasAggregates) {
+          return problems;
+        }
       }
     }
 
-    // PRIORITY 3 - WARNING: GROUP BY without aggregates
-    if (queryState.groupBy && queryState.groupBy.length > 0 && (!queryState.aggregates || queryState.aggregates.length === 0)) {
+    // PRIORITY 4 - ERROR: ORDER BY with GROUP BY must use grouped or aggregate columns
+    if (queryState.groupBy && queryState.groupBy.length > 0 && 
+        queryState.orderBy && queryState.orderBy.length > 0) {
+      
+      const grouped = new Set(queryState.groupBy || []);
+      const aggregateAliases = new Set((queryState.aggregates || []).map(a => a.alias || a.column));
+      
+      const invalidOrderBy = queryState.orderBy.filter(order => {
+        const orderCol = order.column;
+        return !grouped.has(orderCol) && !aggregateAliases.has(orderCol);
+      });
+      
+      if (invalidOrderBy.length > 0) {
+        const invalidCols = invalidOrderBy.map(o => o.column).join(', ');
+        problems.push({
+          type: "error",
+          title: "Invalid ORDER BY with GROUP BY",
+          message: `ORDER BY column${invalidOrderBy.length > 1 ? 's' : ''} must be in GROUP BY or be aggregate${invalidOrderBy.length > 1 ? 's' : ''}: ${invalidCols}. When using GROUP BY, you can only order by grouped columns or aggregates.`,
+          fixType: "add-orderby-to-groupby",
+          fixLabel: `Add ${invalidOrderBy.length} column${invalidOrderBy.length > 1 ? 's' : ''} to GROUP BY`
+        });
+        
+        // Return early - this is an error
+        return problems;
+      }
+    }
+
+    // PRIORITY 5 - WARNING: SELECT * with GROUP BY
+    if (queryState.groupBy && queryState.groupBy.length > 0 && 
+        queryState.columns && queryState.columns.includes('*')) {
       problems.push({
         type: "warning",
-        title: "Suggestion: Add Aggregates",
-        message: "You're grouping data but not calculating any statistics. Add COUNT(*) or other aggregates to make this meaningful.",
-        fixType: "add-count-aggregate",
-        fixLabel: "Add COUNT(*) aggregate"
+        title: "SELECT * with GROUP BY",
+        message: "SELECT * doesn't work properly with GROUP BY. Select specific columns or aggregates instead.",
+        fixType: "replace-star-with-grouped",
+        fixLabel: "Select grouped columns only"
       });
+    }
+
+    // PRIORITY 6 - WARNING: GROUP BY without aggregates (only show if no errors above)
+    if (queryState.groupBy && queryState.groupBy.length > 0 && (!queryState.aggregates || queryState.aggregates.length === 0)) {
+      // Only show this if there are no non-grouped column errors
+      const grouped = new Set(queryState.groupBy || []);
+      const offenders = (queryState.columns || []).filter(c => !grouped.has(c) && c !== '*');
+      
+      if (offenders.length === 0 && !queryState.columns.includes('*')) {
+        problems.push({
+          type: "warning",
+          title: "Suggestion: Add Aggregates",
+          message: "You're grouping data but not calculating any statistics. Add COUNT(*) or other aggregates to make this meaningful.",
+          fixType: "add-count-aggregate",
+          fixLabel: "Add COUNT(*) aggregate"
+        });
+      }
     }
 
     return problems;

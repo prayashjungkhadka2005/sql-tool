@@ -214,6 +214,22 @@ export default function Home() {
         ]);
         break;
       
+      case "add-orderby-to-groupby":
+        // Add ORDER BY columns to GROUP BY
+        const orderByColumns = queryState.orderBy.map(o => o.column);
+        const currentGroupByForOrder = queryState.groupBy || [];
+        const newGroupByWithOrder = [...new Set([...currentGroupByForOrder, ...orderByColumns])];
+        updateGroupBy(newGroupByWithOrder);
+        break;
+      
+      case "replace-star-with-grouped":
+        // Replace SELECT * with grouped columns
+        const groupedColumns = queryState.groupBy || [];
+        if (groupedColumns.length > 0) {
+          updateColumns(groupedColumns);
+        }
+        break;
+      
       case "remove-empty-where":
         // Remove WHERE conditions with empty values
         const validConditions = queryState.whereConditions.filter(c => c.value && c.value.trim() !== '');
