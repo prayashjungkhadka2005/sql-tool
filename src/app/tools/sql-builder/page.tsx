@@ -298,16 +298,42 @@ export default function Home() {
                     return;
                   }
                   
-                  // If deleted table is used in JOINs, remove those joins
+                  // If deleted table is used in JOINs, clean up ALL references
                   if (queryState.joins && queryState.joins.length > 0) {
-                    const cleanedJoins = queryState.joins.filter(join => join.table !== tableName);
-                    if (cleanedJoins.length !== queryState.joins.length) {
-                      updateJoins(cleanedJoins);
-                      // Also need to clear columns from deleted joined table
+                    const wasJoined = queryState.joins.some(join => join.table === tableName);
+                    
+                    if (wasJoined) {
                       const deletedTablePrefix = `${tableName}.`;
-                      const cleanedColumns = queryState.columns.filter(col => !col.startsWith(deletedTablePrefix));
-                      if (cleanedColumns.length !== queryState.columns.length) {
-                        updateColumns(cleanedColumns);
+                      
+                      // Remove JOINs
+                      updateJoins(queryState.joins.filter(join => join.table !== tableName));
+                      
+                      // Remove columns from deleted table
+                      updateColumns(queryState.columns.filter(col => !col.startsWith(deletedTablePrefix)));
+                      
+                      // Remove WHERE conditions referencing deleted table
+                      updateWhereConditions(queryState.whereConditions.filter(cond => !cond.column.startsWith(deletedTablePrefix)));
+                      
+                      // Remove ORDER BY referencing deleted table
+                      updateOrderBy(queryState.orderBy.filter(order => !order.column.startsWith(deletedTablePrefix)));
+                      
+                      // Remove GROUP BY referencing deleted table
+                      if (queryState.groupBy) {
+                        updateGroupBy(queryState.groupBy.filter(col => !col.startsWith(deletedTablePrefix)));
+                      }
+                      
+                      // Remove aggregates referencing deleted table
+                      if (queryState.aggregates) {
+                        updateAggregates(queryState.aggregates.filter(agg => 
+                          !agg.column.startsWith(deletedTablePrefix)
+                        ));
+                      }
+                      
+                      // Remove HAVING referencing deleted table
+                      if (queryState.having) {
+                        updateHaving(queryState.having.filter(hav => 
+                          !hav.column.startsWith(deletedTablePrefix)
+                        ));
                       }
                     }
                   }
@@ -582,9 +608,23 @@ export default function Home() {
                               <input
                                 type="number"
                                 min="0"
+                                max="10000"
                                 placeholder="20"
                                 value={queryState.limit || ""}
-                                onChange={(e) => updateLimit(e.target.value ? parseInt(e.target.value) : null)}
+                                onChange={(e) => {
+                                  const value = e.target.value;
+                                  if (!value) {
+                                    updateLimit(null);
+                                    return;
+                                  }
+                                  const parsed = parseInt(value);
+                                  // Validate: must be positive and <= 10000
+                                  if (!isNaN(parsed) && parsed > 0 && parsed <= 10000) {
+                                    updateLimit(parsed);
+                                  } else if (parsed > 10000) {
+                                    updateLimit(10000); // Cap at max
+                                  }
+                                }}
                                 className="w-full px-3 py-2 bg-[#fafafa] dark:bg-black/40 border border-foreground/10 hover:border-foreground/20 focus:border-foreground/30 rounded text-sm text-foreground focus:outline-none transition-all font-mono"
                               />
                             </div>
@@ -599,9 +639,23 @@ export default function Home() {
                               <input
                                 type="number"
                                 min="0"
+                                max="50000"
                                 placeholder="0"
                                 value={queryState.offset || ""}
-                                onChange={(e) => updateOffset(e.target.value ? parseInt(e.target.value) : null)}
+                                onChange={(e) => {
+                                  const value = e.target.value;
+                                  if (!value) {
+                                    updateOffset(null);
+                                    return;
+                                  }
+                                  const parsed = parseInt(value);
+                                  // Validate: must be non-negative and <= 50000
+                                  if (!isNaN(parsed) && parsed >= 0 && parsed <= 50000) {
+                                    updateOffset(parsed);
+                                  } else if (parsed > 50000) {
+                                    updateOffset(50000); // Cap at max
+                                  }
+                                }}
                                 className="w-full px-3 py-2 bg-[#fafafa] dark:bg-black/40 border border-foreground/10 hover:border-foreground/20 focus:border-foreground/30 rounded text-sm text-foreground focus:outline-none transition-all font-mono"
                               />
                             </div>

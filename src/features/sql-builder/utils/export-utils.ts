@@ -96,6 +96,11 @@ export async function copyAsTable(data: any[]): Promise<void> {
     throw new Error('No data to copy');
   }
 
+  // Check clipboard API support
+  if (!navigator.clipboard || !navigator.clipboard.writeText) {
+    throw new Error('Clipboard API not supported in your browser');
+  }
+
   const headers = Object.keys(data[0]);
   
   // Calculate column widths
@@ -135,6 +140,11 @@ export async function copyAsJSON(data: any[]): Promise<void> {
     throw new Error('No data to copy');
   }
 
+  // Check clipboard API support
+  if (!navigator.clipboard || !navigator.clipboard.writeText) {
+    throw new Error('Clipboard API not supported in your browser');
+  }
+
   const json = JSON.stringify(data, null, 2);
   await navigator.clipboard.writeText(json);
 }
@@ -145,6 +155,11 @@ export async function copyAsJSON(data: any[]): Promise<void> {
 export async function copyAsCSV(data: any[]): Promise<void> {
   if (data.length === 0) {
     throw new Error('No data to copy');
+  }
+
+  // Check clipboard API support
+  if (!navigator.clipboard || !navigator.clipboard.writeText) {
+    throw new Error('Clipboard API not supported in your browser');
   }
 
   const headers = Object.keys(data[0]);
@@ -212,6 +227,11 @@ export function dataToMarkdown(data: any[]): string {
 export async function copyAsMarkdown(data: any[]): Promise<void> {
   if (data.length === 0) {
     throw new Error('No data to copy');
+  }
+
+  // Check clipboard API support
+  if (!navigator.clipboard || !navigator.clipboard.writeText) {
+    throw new Error('Clipboard API not supported in your browser');
   }
 
   const markdown = dataToMarkdown(data);

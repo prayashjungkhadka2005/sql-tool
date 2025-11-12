@@ -392,10 +392,20 @@ export default function QueryPreview({ queryState, onAutoFix, onRowCountsChange,
 
   const [copied, setCopied] = useState(false);
 
-  const copyToClipboard = () => {
-    navigator.clipboard.writeText(sqlQuery);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const copyToClipboard = async () => {
+    try {
+      // Check clipboard API support
+      if (!navigator.clipboard || !navigator.clipboard.writeText) {
+        showToast('Clipboard API not supported in your browser', 'error');
+        return;
+      }
+      
+      await navigator.clipboard.writeText(sqlQuery);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (error) {
+      showToast('Failed to copy SQL to clipboard', 'error');
+    }
   };
 
   return (

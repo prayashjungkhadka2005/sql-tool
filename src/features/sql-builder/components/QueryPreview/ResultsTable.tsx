@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 
 interface ResultsTableProps {
   mockResults: any[];
@@ -18,13 +18,22 @@ export default function ResultsTable({
   exportMenu,
 }: ResultsTableProps) {
   const [copied, setCopied] = useState(false);
+  const copyTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+    };
+  }, []);
 
   if (!hasQuery) return null;
 
   const handleCopy = () => {
     onCopyTable();
     setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+    copyTimerRef.current = setTimeout(() => setCopied(false), 2000);
   };
 
   return (
@@ -97,21 +106,38 @@ export default function ResultsTable({
                       key={rowIdx} 
                       className="border-b border-foreground/5 hover:bg-foreground/5 transition-colors"
                     >
-                      {Object.entries(row).map(([key, value], colIdx) => (
-                        <td key={colIdx} className="py-2.5 px-3 text-foreground/70 whitespace-nowrap">
-                          {typeof value === 'boolean' 
-                            ? (value ? 'true' : 'false')
-                            : typeof value === 'string' && value.includes('T') && value.includes('Z')
-                            ? new Date(value).toLocaleString('en-US', { 
-                                month: 'short', 
-                                day: 'numeric', 
-                                year: 'numeric',
-                                hour: '2-digit',
-                                minute: '2-digit'
-                              })
-                            : String(value)}
-                        </td>
-                      ))}
+                      {Object.entries(row).map(([key, value], colIdx) => {
+                        let displayValue: string;
+                        if (typeof value === 'boolean') {
+                          displayValue = value ? 'true' : 'false';
+                        } else if (typeof value === 'string' && value.includes('T') && value.includes('Z')) {
+                          displayValue = new Date(value).toLocaleString('en-US', { 
+                            month: 'short', 
+                            day: 'numeric', 
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          });
+                        } else {
+                          displayValue = String(value);
+                        }
+                        
+                        // Truncate very long values
+                        const isTruncated = displayValue.length > 100;
+                        const truncatedValue = isTruncated 
+                          ? displayValue.substring(0, 100) + '...' 
+                          : displayValue;
+                        
+                        return (
+                          <td 
+                            key={colIdx} 
+                            className="py-2.5 px-3 text-foreground/70 max-w-xs" 
+                            title={isTruncated ? displayValue : undefined}
+                          >
+                            <div className="truncate">{truncatedValue}</div>
+                          </td>
+                        );
+                      })}
                     </tr>
                   ))}
                 </tbody>

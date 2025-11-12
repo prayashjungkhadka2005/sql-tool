@@ -44,26 +44,21 @@ export async function parseCSVFile(file: File): Promise<ParsedCSV> {
 
 /**
  * Parse CSV text content
+ * Properly handles multi-line quoted values
  */
 export function parseCSVText(csvText: string, tableName: string = 'uploaded_data'): ParsedCSV {
   // Remove BOM (Byte Order Mark) if present
   const cleanText = csvText.replace(/^\uFEFF/, '');
   
-  // Split into lines and handle different line endings
-  const lines = cleanText
-    .trim()
-    .split(/\r?\n/)
-    .filter(line => line.trim() !== '');
-
-  if (lines.length === 0) {
+  if (!cleanText || cleanText.trim() === '') {
     throw new Error('CSV file is empty');
   }
   
-  // Check if this might be semicolon or tab-delimited
-  const firstLine = lines[0];
-  const commaCount = (firstLine.match(/,/g) || []).length;
-  const semicolonCount = (firstLine.match(/;/g) || []).length;
-  const tabCount = (firstLine.match(/\t/g) || []).length;
+  // Check if this might be semicolon or tab-delimited (check first 500 chars)
+  const sample = cleanText.substring(0, 500);
+  const commaCount = (sample.match(/,/g) || []).length;
+  const semicolonCount = (sample.match(/;/g) || []).length;
+  const tabCount = (sample.match(/\t/g) || []).length;
   
   if (semicolonCount > commaCount && semicolonCount > 0) {
     throw new Error('Semicolon-delimited files are not supported. Please use comma-delimited CSV.');
@@ -78,8 +73,15 @@ export function parseCSVText(csvText: string, tableName: string = 'uploaded_data
     throw new Error('Invalid CSV format. File must have at least 2 columns separated by commas.');
   }
 
+  // Parse CSV into rows (properly handles multi-line quoted values)
+  const rows = parseCSVRows(cleanText.trim());
+  
+  if (rows.length === 0) {
+    throw new Error('CSV file is empty');
+  }
+
   // Parse header row
-  const headers = parseCSVLine(lines[0]);
+  const headers = rows[0];
   
   if (headers.length === 0) {
     throw new Error('CSV file has no columns');
@@ -90,6 +92,17 @@ export function parseCSVText(csvText: string, tableName: string = 'uploaded_data
     throw new Error('CSV has too many columns (max 100). Please reduce columns and try again.');
   }
 
+  // SQL reserved keywords that should be avoided as column names
+  const SQL_KEYWORDS = new Set([
+    'select', 'from', 'where', 'and', 'or', 'not', 'in', 'like', 'between',
+    'insert', 'into', 'values', 'update', 'set', 'delete', 'create', 'drop',
+    'join', 'inner', 'left', 'right', 'full', 'outer', 'on', 'using',
+    'group', 'by', 'having', 'order', 'asc', 'desc', 'limit', 'offset',
+    'distinct', 'as', 'is', 'null', 'exists', 'case', 'when', 'then', 'else',
+    'end', 'union', 'all', 'table', 'index', 'key', 'primary', 'foreign',
+    'unique', 'constraint', 'default', 'check', 'references', 'cascade'
+  ]);
+  
   // Clean and validate column names
   const cleanHeaders = headers.map((header, index) => {
     // Trim and check if empty
@@ -113,7 +126,15 @@ export function parseCSVText(csvText: string, tableName: string = 'uploaded_data
       cleaned = cleaned.substring(0, 64);
     }
     
-    return cleaned.toLowerCase();
+    // Convert to lowercase
+    const lowerCleaned = cleaned.toLowerCase();
+    
+    // If it's a SQL keyword, append _col suffix
+    if (SQL_KEYWORDS.has(lowerCleaned)) {
+      return `${lowerCleaned}_col`;
+    }
+    
+    return lowerCleaned;
   });
 
   // Check for duplicate column names and fix them
@@ -138,10 +159,10 @@ export function parseCSVText(csvText: string, tableName: string = 'uploaded_data
   const data: Record<string, any>[] = [];
   let malformedRowCount = 0;
   
-  for (let i = 1; i < lines.length; i++) {
-    const values = parseCSVLine(lines[i]);
+  for (let i = 1; i < rows.length; i++) {
+    const values = rows[i];
     
-    if (values.length === 0) continue; // Skip empty lines
+    if (values.length === 0) continue; // Skip empty rows
     
     // Skip rows that are all empty
     if (values.every(v => !v || v.trim() === '')) continue;
@@ -222,7 +243,99 @@ export function parseCSVText(csvText: string, tableName: string = 'uploaded_data
 }
 
 /**
+ * Parse entire CSV text into rows, properly handling multi-line quoted values
+ * This respects quotes and only splits rows at newlines that are NOT inside quotes
+ */
+function parseCSVRows(csvText: string): string[][] {
+  const rows: string[][] = [];
+  let currentRow: string[] = [];
+  let currentField = '';
+  let inQuotes = false;
+  let i = 0;
+
+  while (i < csvText.length) {
+    const char = csvText[i];
+    const nextChar = csvText[i + 1];
+
+    if (char === '"') {
+      if (inQuotes && nextChar === '"') {
+        // Escaped quote ("") - add one quote to field
+        currentField += '"';
+        i += 2;
+        continue;
+      } else {
+        // Toggle quote mode
+        inQuotes = !inQuotes;
+        i++;
+        continue;
+      }
+    }
+
+    if (!inQuotes) {
+      // Outside quotes - check for field/row delimiters
+      if (char === ',') {
+        // End of field
+        currentRow.push(currentField.trim());
+        currentField = '';
+        i++;
+        continue;
+      }
+
+      if (char === '\n' || (char === '\r' && nextChar === '\n')) {
+        // End of row
+        currentRow.push(currentField.trim());
+        
+        // Only add non-empty rows
+        if (currentRow.length > 0 && !currentRow.every(f => f === '')) {
+          rows.push(currentRow);
+        }
+        
+        currentRow = [];
+        currentField = '';
+        
+        // Skip \r\n together
+        if (char === '\r' && nextChar === '\n') {
+          i += 2;
+        } else {
+          i++;
+        }
+        continue;
+      }
+
+      if (char === '\r') {
+        // Handle lone \r as row delimiter
+        currentRow.push(currentField.trim());
+        
+        if (currentRow.length > 0 && !currentRow.every(f => f === '')) {
+          rows.push(currentRow);
+        }
+        
+        currentRow = [];
+        currentField = '';
+        i++;
+        continue;
+      }
+    }
+
+    // Add character to current field (including newlines if inside quotes)
+    currentField += char;
+    i++;
+  }
+
+  // Handle last field and row
+  if (currentField || currentRow.length > 0) {
+    currentRow.push(currentField.trim());
+    if (currentRow.length > 0 && !currentRow.every(f => f === '')) {
+      rows.push(currentRow);
+    }
+  }
+
+  return rows;
+}
+
+/**
  * Parse a single CSV line, handling quoted values
+ * DEPRECATED: Use parseCSVRows for proper multi-line support
  */
 function parseCSVLine(line: string): string[] {
   const result: string[] = [];

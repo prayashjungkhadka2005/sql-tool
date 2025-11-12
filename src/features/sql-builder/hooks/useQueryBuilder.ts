@@ -36,9 +36,20 @@ export function useQueryBuilder(initialState?: Partial<QueryState>) {
     setQueryState(prev => ({ ...prev, queryType: type }));
   }, []);
 
-  // Update table (also resets columns when table changes)
+  // Update table (also resets ALL query components when table changes)
   const updateTable = useCallback((table: string) => {
-    setQueryState(prev => ({ ...prev, table, columns: [] }));
+    setQueryState(prev => ({ 
+      ...prev, 
+      table, 
+      columns: [],
+      aggregates: [],
+      whereConditions: [],
+      joins: [],
+      groupBy: [],
+      having: [],
+      orderBy: [],
+      insertValues: {},
+    }));
   }, []);
 
   // Update columns

@@ -92,7 +92,14 @@ export function generateShareableURL(queryState: QueryState): string {
     ? window.location.origin + window.location.pathname
     : '';
   
-  return `${baseURL}?q=${encoded}`;
+  const fullURL = `${baseURL}?q=${encoded}`;
+  
+  // Check URL length (browsers typically support ~2000 chars, be safe at 1900)
+  if (fullURL.length > 1900) {
+    console.warn(`Generated URL is very long (${fullURL.length} chars). Some browsers may have issues.`);
+  }
+  
+  return fullURL;
 }
 
 /**
@@ -130,6 +137,23 @@ export async function copyShareableURL(queryState: QueryState): Promise<{ succes
     }
     
     const url = generateShareableURL(queryState);
+    
+    // Check URL length (browsers have ~2000 char limit)
+    if (url.length > 2000) {
+      return {
+        success: false,
+        error: "Query is too complex to share via URL. Try simplifying your query (reduce WHERE conditions, columns, or JOINs)."
+      };
+    }
+    
+    // Check clipboard API support
+    if (!navigator.clipboard || !navigator.clipboard.writeText) {
+      return {
+        success: false,
+        error: "Clipboard API not supported in your browser"
+      };
+    }
+    
     await navigator.clipboard.writeText(url);
     return { success: true };
   } catch (error) {

@@ -244,10 +244,18 @@ export function applyOrderBy(data: any[], orderBy: OrderByClause[]): any[] {
 
 /**
  * Apply LIMIT and OFFSET
+ * Safely handles negative or invalid values
  */
 export function applyPagination(data: any[], limit: number | null, offset: number | null): any[] {
-  const start = offset || 0;
-  const end = limit ? start + limit : undefined;
+  // Ensure offset is non-negative (default to 0)
+  const start = Math.max(0, offset || 0);
+  
+  // Ensure limit is positive (null means no limit)
+  let end: number | undefined = undefined;
+  if (limit !== null && limit > 0) {
+    end = start + Math.min(limit, 10000); // Cap at 10000 for safety
+  }
+  
   return data.slice(start, end);
 }
 

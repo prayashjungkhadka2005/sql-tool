@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { parseCSVFile, validateCSVFile, formatFileSize } from "../utils/csv-parser";
 import { storeCSVData, getAllCSVTablesInfo, deleteCSVData, clearAllCSVData } from "../utils/csv-data-manager";
+import ConfirmDialog from "./ui/ConfirmDialog";
 
 interface CSVUploaderProps {
   onUploadSuccess: (tableName: string) => void;
@@ -17,6 +18,31 @@ export default function CSVUploader({ onUploadSuccess, onDelete }: CSVUploaderPr
   const [success, setSuccess] = useState<string | null>(null);
   const [uploadedTables, setUploadedTables] = useState(getAllCSVTablesInfo());
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Refs to track timers for cleanup
+  const successTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const errorTimerRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Confirmation dialog state
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: "",
+    message: "",
+    onConfirm: () => {},
+  });
+
+  // Cleanup timers on unmount
+  useEffect(() => {
+    return () => {
+      if (successTimerRef.current) clearTimeout(successTimerRef.current);
+      if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
+    };
+  }, []);
 
   const handleFile = useCallback(async (file: File) => {
     setError(null);
@@ -43,7 +69,10 @@ export default function CSVUploader({ onUploadSuccess, onDelete }: CSVUploaderPr
 
       // Show success message
       setSuccess(`${file.name} uploaded successfully! ${parsedData.rowCount.toLocaleString()} rows, ${parsedData.columns.length} columns.`);
-      setTimeout(() => setSuccess(null), 4000);
+      
+      // Clear existing timer and set new one
+      if (successTimerRef.current) clearTimeout(successTimerRef.current);
+      successTimerRef.current = setTimeout(() => setSuccess(null), 4000);
 
       // Notify parent
       onUploadSuccess(parsedData.tableName);
@@ -51,6 +80,10 @@ export default function CSVUploader({ onUploadSuccess, onDelete }: CSVUploaderPr
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to parse CSV file";
       setError(message);
+      
+      // Clear existing timer and set new one
+      if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
+      errorTimerRef.current = setTimeout(() => setError(null), 6000);
     } finally {
       setIsUploading(false);
     }
@@ -67,11 +100,15 @@ export default function CSVUploader({ onUploadSuccess, onDelete }: CSVUploaderPr
 
     if (csvFiles.length === 0) {
       setError("Please drop CSV files only");
+      if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
+      errorTimerRef.current = setTimeout(() => setError(null), 4000);
       return;
     }
 
     if (csvFiles.length > 1) {
       setError("Please drop one CSV file at a time");
+      if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
+      errorTimerRef.current = setTimeout(() => setError(null), 4000);
       return;
     }
 
@@ -101,29 +138,49 @@ export default function CSVUploader({ onUploadSuccess, onDelete }: CSVUploaderPr
   }, [handleFile]);
 
   const handleDeleteTable = useCallback((tableName: string) => {
-    deleteCSVData(tableName);
-    setUploadedTables(getAllCSVTablesInfo());
-    // Notify parent to refresh dropdowns and clear if selected
-    if (onDelete) {
-      onDelete(tableName);
-    }
+    // Show confirmation dialog
+    setConfirmDialog({
+      isOpen: true,
+      title: "Delete CSV Table?",
+      message: `Delete "${tableName}"?\n\nThis will remove the table and reset your query if it's currently selected.\n\nThis action cannot be undone.`,
+      onConfirm: () => {
+        deleteCSVData(tableName);
+        setUploadedTables(getAllCSVTablesInfo());
+        // Notify parent to refresh dropdowns and clear if selected
+        if (onDelete) {
+          onDelete(tableName);
+        }
+        setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+      },
+    });
   }, [onDelete]);
 
   const handleClearAll = useCallback(() => {
-    // Get all table names before clearing
-    const allTables = getAllCSVTablesInfo().map(t => t.name);
+    const count = uploadedTables.length;
     
-    // Clear all CSV data
-    clearAllCSVData();
-    
-    setUploadedTables([]);
-    
-    // Notify parent for each deleted table to trigger refresh
-    if (onDelete) {
-      // Just trigger once with empty string to signal full refresh
-      onDelete("");
-    }
-  }, [onDelete]);
+    // Show confirmation dialog
+    setConfirmDialog({
+      isOpen: true,
+      title: "Delete All CSV Tables?",
+      message: `Delete all ${count} CSV table${count > 1 ? 's' : ''}?\n\nThis will remove all uploaded CSVs and reset your query.\n\nThis action cannot be undone.`,
+      onConfirm: () => {
+        // Get all table names before clearing
+        const allTables = getAllCSVTablesInfo().map(t => t.name);
+        
+        // Clear all CSV data
+        clearAllCSVData();
+        
+        setUploadedTables([]);
+        
+        // Notify parent for each deleted table to trigger refresh
+        if (onDelete) {
+          // Just trigger once with empty string to signal full refresh
+          onDelete("");
+        }
+        setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+      },
+    });
+  }, [onDelete, uploadedTables.length]);
 
   // Generate sample CSV
   const downloadSampleCSV = useCallback((e: React.MouseEvent) => {
@@ -151,11 +208,21 @@ export default function CSVUploader({ onUploadSuccess, onDelete }: CSVUploaderPr
     <div>
       {/* Upload Area */}
       <div
+        role="button"
+        tabIndex={isUploading ? -1 : 0}
+        aria-label="Upload CSV file"
+        aria-disabled={isUploading}
         onDrop={handleDrop}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
-        onClick={() => fileInputRef.current?.click()}
-        className={`relative p-8 border-2 border-dashed rounded-lg cursor-pointer transition-all ${
+        onClick={() => !isUploading && fileInputRef.current?.click()}
+        onKeyDown={(e) => {
+          if (!isUploading && (e.key === 'Enter' || e.key === ' ')) {
+            e.preventDefault();
+            fileInputRef.current?.click();
+          }
+        }}
+        className={`relative p-8 border-2 border-dashed rounded-lg cursor-pointer transition-all focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 ${
           isDragging
             ? 'border-primary bg-primary/5'
             : 'border-foreground/20 hover:border-foreground/40 hover:bg-foreground/5'
@@ -167,6 +234,7 @@ export default function CSVUploader({ onUploadSuccess, onDelete }: CSVUploaderPr
           accept=".csv,text/csv"
           onChange={handleFileInput}
           className="hidden"
+          aria-hidden="true"
         />
 
         <div className="flex flex-col items-center justify-center gap-3">
@@ -218,9 +286,10 @@ export default function CSVUploader({ onUploadSuccess, onDelete }: CSVUploaderPr
       <AnimatePresence>
         {success && (
           <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
+            initial={{ opacity: 0, y: -10, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -10, scale: 0.95 }}
+            transition={{ duration: 0.2, ease: "easeOut" }}
             className="mt-3 p-3 bg-green-500/10 border border-green-500/20 rounded-lg"
           >
             <div className="flex items-center gap-2">
@@ -257,9 +326,10 @@ export default function CSVUploader({ onUploadSuccess, onDelete }: CSVUploaderPr
       <AnimatePresence>
         {error && (
           <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
+            initial={{ opacity: 0, y: -10, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -10, scale: 0.95 }}
+            transition={{ duration: 0.2, ease: "easeOut" }}
             className="mt-3 p-3 bg-red-500/10 border border-red-500/20 rounded-lg"
           >
             <div className="flex items-center gap-2">
@@ -371,6 +441,18 @@ export default function CSVUploader({ onUploadSuccess, onDelete }: CSVUploaderPr
           )}
         </div>
       )}
+
+      {/* Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        confirmVariant="danger"
+        onConfirm={confirmDialog.onConfirm}
+        onCancel={() => setConfirmDialog(prev => ({ ...prev, isOpen: false }))}
+      />
     </div>
   );
 }
