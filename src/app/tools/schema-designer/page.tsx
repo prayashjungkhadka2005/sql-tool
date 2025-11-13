@@ -64,11 +64,17 @@ export default function SchemaDesignerPage() {
     isOpen: boolean;
     title: string;
     message: string;
+    confirmLabel?: string;
+    cancelLabel?: string;
+    confirmVariant?: "danger" | "primary";
     onConfirm: () => void;
   }>({
     isOpen: false,
     title: '',
     message: '',
+    confirmLabel: 'Confirm',
+    cancelLabel: 'Cancel',
+    confirmVariant: 'danger',
     onConfirm: () => {},
   });
 
@@ -358,7 +364,7 @@ export default function SchemaDesignerPage() {
 
   // Auto-create indexes for all foreign key columns
   const handleAutoIndexForeignKeys = useCallback(() => {
-    // Prevent rapid clicks
+    // Prevent rapid clicks - check button state
     if (isOptimizingFKs) return;
     
     setIsOptimizingFKs(true);
@@ -373,10 +379,13 @@ export default function SchemaDesignerPage() {
       setEditingColumn(null);
     }
 
-    // Compute result inside setSchema to avoid closure issues
-    const result = { indexesCreated: 0, errors: [] as string[] };
+    // Use a ref to store result to avoid React Strict Mode double-call issues
+    const resultRef = { current: { indexesCreated: 0, errors: [] as string[], indexesBefore: 0, indexesAfter: 0 } };
 
     setSchema(prev => {
+      // Store initial count
+      resultRef.current.indexesBefore = prev.tables.reduce((sum, t) => sum + (t.indexes?.length || 0), 0);
+      
       // Collect all existing index names globally to prevent collisions
       const allIndexNames = new Set<string>();
       prev.tables.forEach(t => {
@@ -410,24 +419,24 @@ export default function SchemaDesignerPage() {
             return;
           }
 
-          // Generate unique index name
-          let indexName = `idx_${table.name}_${col.name}`;
+          // Generate unique index name with better collision avoidance
+          let indexName = `fk_${table.name}_${col.name}`;
           let nameCounter = 1;
           
-          // Ensure global uniqueness
-          while (allIndexNames.has(indexName)) {
-            indexName = `idx_${table.name}_${col.name}_${nameCounter}`;
+          // Ensure global uniqueness (check both existing and newly created)
+          while (allIndexNames.has(indexName) || newIndexes.some(idx => idx.name === indexName)) {
+            indexName = `fk_${table.name}_${col.name}_${nameCounter}`;
             nameCounter++;
           }
 
           // Validate index name length (max 64 characters for most databases)
           if (indexName.length > 64) {
-            result.errors.push(`Cannot create index for ${table.name}.${col.name}: Name too long (${indexName.length} > 64 chars)`);
+            resultRef.current.errors.push(`Cannot create index for ${table.name}.${col.name}: Name too long (${indexName.length} > 64 chars)`);
             return;
           }
 
           // Create index with unique ID to prevent collisions
-          const timestamp = Date.now() + result.indexesCreated; // Add counter to ensure unique timestamps
+          const timestamp = Date.now() + resultRef.current.indexesCreated;
           const random = Math.random().toString(36).substring(2, 9);
           const newIndex = {
             id: `idx-${timestamp}-${random}`,
@@ -439,12 +448,15 @@ export default function SchemaDesignerPage() {
           };
 
           newIndexes.push(newIndex);
-          allIndexNames.add(indexName); // Track for collision detection
-          result.indexesCreated++;
+          allIndexNames.add(indexName);
+          resultRef.current.indexesCreated++;
         });
 
         return { ...table, indexes: newIndexes };
       });
+
+      // Calculate actual indexes after
+      resultRef.current.indexesAfter = updatedTables.reduce((sum, t) => sum + (t.indexes?.length || 0), 0);
 
       return {
         ...prev,
@@ -456,22 +468,25 @@ export default function SchemaDesignerPage() {
     queueMicrotask(() => {
       setIsOptimizingFKs(false); // Re-enable button
       
-      if (result.errors.length > 0) {
+      // Use actual difference in index count (protection against double-calls)
+      const actualIndexesCreated = resultRef.current.indexesAfter - resultRef.current.indexesBefore;
+      
+      if (resultRef.current.errors.length > 0) {
         setAlertDialog({
           isOpen: true,
-          title: '⚠️ Partial Success',
-          message: `Created ${result.indexesCreated} index${result.indexesCreated !== 1 ? 'es' : ''} successfully, but encountered ${result.errors.length} error${result.errors.length !== 1 ? 's' : ''}:\n\n${result.errors.join('\n')}\n\nThese indexes need to be created manually using the "Indexes" button on each table.`,
+          title: 'Partial Success',
+          message: `Created ${actualIndexesCreated} index${actualIndexesCreated !== 1 ? 'es' : ''} successfully, but encountered ${resultRef.current.errors.length} error${resultRef.current.errors.length !== 1 ? 's' : ''}:\n\n${resultRef.current.errors.join('\n')}\n\nThese indexes need to be created manually using the "Indexes" button on each table.`,
         });
-      } else if (result.indexesCreated > 0) {
+      } else if (actualIndexesCreated > 0) {
         setAlertDialog({
           isOpen: true,
-          title: '✅ Indexes Created Successfully!',
-          message: `Created ${result.indexesCreated} index${result.indexesCreated !== 1 ? 'es' : ''} for foreign key columns.\n\n${result.indexesCreated === 1 ? 'This index optimizes' : 'These indexes optimize'} JOIN query performance.\n\nClick "Export" to see the CREATE INDEX statements in your schema.`,
+          title: 'Indexes Created Successfully',
+          message: `Created ${actualIndexesCreated} index${actualIndexesCreated !== 1 ? 'es' : ''} for foreign key columns.\n\n${actualIndexesCreated === 1 ? 'This index optimizes' : 'These indexes optimize'} JOIN query performance.\n\nClick "Export" to see the CREATE INDEX statements in your schema.`,
         });
       } else {
         setAlertDialog({
           isOpen: true,
-          title: '✅ Already Optimized!',
+          title: 'Already Optimized',
           message: 'All foreign key columns already have indexes.\n\nYour schema follows performance best practices. No action needed!',
         });
       }
@@ -643,6 +658,8 @@ export default function SchemaDesignerPage() {
       isOpen: true,
       title: 'Load Template?',
       message: `Load "${template.name}" template?\n\nThis will replace your current schema.`,
+      confirmLabel: 'Load Template',
+      cancelLabel: 'Cancel',
       onConfirm: () => {
         // Close any open editors to prevent state conflicts
         setIsColumnEditorOpen(false);
@@ -685,6 +702,8 @@ export default function SchemaDesignerPage() {
       isOpen: true,
       title: 'Delete Table?',
       message: `Delete table "${table.name}"?${incomingFKCount > 0 ? `\n\nThis table is referenced by ${incomingFKCount} foreign key${incomingFKCount > 1 ? 's' : ''} in other tables. These FK references will be removed.` : ''}\n\nThis action cannot be undone.`,
+      confirmLabel: 'Delete Table',
+      cancelLabel: 'Cancel',
       onConfirm: () => {
         // Close editors if this table is being edited or managed
         if (editingColumn?.table.id === tableId) {
@@ -784,10 +803,15 @@ export default function SchemaDesignerPage() {
 
   // Reset schema
   const handleReset = useCallback(() => {
+    const totalColumns = schema.tables.reduce((sum, t) => sum + t.columns.length, 0);
+    const totalIndexes = schema.tables.reduce((sum, t) => sum + (t.indexes?.length || 0), 0);
+    
     setConfirmDialog({
       isOpen: true,
-      title: 'Reset Schema?',
-      message: 'This will delete all tables and start fresh.\n\nThis action cannot be undone. Your saved work and history will also be cleared.',
+      title: 'Delete All Tables?',
+      message: `This will permanently delete:\n\n• ${schema.tables.length} table${schema.tables.length !== 1 ? 's' : ''}\n• ${totalColumns} column${totalColumns !== 1 ? 's' : ''}\n• ${totalIndexes} index${totalIndexes !== 1 ? 'es' : ''}\n\nYour saved work and undo history will also be cleared.`,
+      confirmLabel: 'Delete Everything',
+      cancelLabel: 'Cancel',
       onConfirm: () => {
         // Close any open editors to prevent state conflicts
         setIsColumnEditorOpen(false);
@@ -838,8 +862,11 @@ export default function SchemaDesignerPage() {
       queueMicrotask(() => {
         setConfirmDialog({
           isOpen: true,
-          title: 'Import Successful!',
-          message: `Imported ${importedSchema.tables.length} tables.\n\nWould you like to auto-arrange them by dependencies for better visualization?`,
+          title: 'Auto-Arrange Tables?',
+          message: `Successfully imported ${importedSchema.tables.length} tables.\n\nWould you like to auto-arrange them by dependencies for better visualization?`,
+          confirmLabel: 'Auto-Arrange',
+          cancelLabel: 'Skip',
+          confirmVariant: 'primary',
           onConfirm: () => {
             // Apply auto-layout
             const layoutedTables = autoLayoutTables(importedSchema.tables, 'hierarchical');
@@ -1032,7 +1059,7 @@ export default function SchemaDesignerPage() {
             <button
                 onClick={undo}
                 disabled={!canUndo}
-                className="p-2 text-foreground/70 hover:text-foreground hover:bg-foreground/10 rounded transition-all disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                className="p-2 text-foreground/70 hover:text-foreground hover:bg-foreground/10 rounded transition-all disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent active:scale-95"
                 title={canUndo ? `Undo (Cmd+Z)` : 'Nothing to undo'}
                 aria-label="Undo"
             >
@@ -1043,7 +1070,7 @@ export default function SchemaDesignerPage() {
               <button
                 onClick={redo}
                 disabled={!canRedo}
-                className="p-2 text-foreground/70 hover:text-foreground hover:bg-foreground/10 rounded transition-all disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                className="p-2 text-foreground/70 hover:text-foreground hover:bg-foreground/10 rounded transition-all disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent active:scale-95"
                 title={canRedo ? 'Redo (Cmd+Shift+Z)' : 'Nothing to redo'}
                 aria-label="Redo"
               >
@@ -1072,7 +1099,7 @@ export default function SchemaDesignerPage() {
             {/* File actions group */}
             <button
               onClick={() => setIsImportModalOpen(true)}
-              className="px-2 py-1.5 text-foreground/70 hover:text-foreground hover:bg-foreground/10 rounded transition-all flex items-center gap-1.5"
+              className="px-2 py-1.5 text-foreground/70 hover:text-foreground hover:bg-foreground/10 rounded transition-all flex items-center gap-1.5 active:scale-95"
               title="Import schema (Cmd+I)"
               aria-label="Import schema"
             >
@@ -1084,7 +1111,7 @@ export default function SchemaDesignerPage() {
 
           <button
             onClick={() => setIsTemplatesOpen(!isTemplatesOpen)}
-              className="px-2 py-1.5 text-foreground/70 hover:text-foreground hover:bg-foreground/10 rounded transition-all flex items-center gap-1.5"
+              className="px-2 py-1.5 text-foreground/70 hover:text-foreground hover:bg-foreground/10 rounded transition-all flex items-center gap-1.5 active:scale-95"
               title="Templates"
               aria-label="Templates"
           >
@@ -1097,14 +1124,14 @@ export default function SchemaDesignerPage() {
             {schema.tables.length > 1 && (
               <button
                 onClick={() => handleAutoLayout('hierarchical')}
-                className="px-2 py-1.5 text-foreground/70 hover:text-foreground hover:bg-foreground/10 rounded transition-all flex items-center gap-1.5"
+                className="px-2 py-1.5 text-foreground/70 hover:text-foreground hover:bg-foreground/10 rounded transition-all flex items-center gap-1.5 active:scale-95"
                 title="Auto-arrange tables (Cmd+L)"
                 aria-label="Auto-layout"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h4a1 1 0 011 1v7a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM14 5a1 1 0 011-1h4a1 1 0 011 1v7a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 17a1 1 0 011-1h4a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1v-2zM14 17a1 1 0 011-1h4a1 1 0 011 1v2a1 1 0 01-1 1h-4a1 1 0 01-1-1v-2z" />
             </svg>
-                <span className="text-xs font-medium hidden lg:inline">Layout</span>
+                <span className="text-xs font-medium hidden lg:inline">Auto Layout</span>
           </button>
             )}
             
@@ -1114,7 +1141,7 @@ export default function SchemaDesignerPage() {
                 <button
                   onClick={handleAutoIndexForeignKeys}
                   disabled={isOptimizingFKs}
-                  className="px-2 py-1.5 text-purple-600 dark:text-purple-400 hover:bg-purple-500/10 rounded transition-all flex items-center gap-1.5 disabled:opacity-50"
+                  className="px-2 py-1.5 text-purple-600 dark:text-purple-400 hover:bg-purple-500/10 rounded transition-all flex items-center gap-1.5 disabled:opacity-50 active:scale-95"
                   title={isOptimizingFKs ? 'Creating indexes...' : 'Auto-create indexes for foreign keys'}
                   aria-label="Optimize foreign keys"
                 >
@@ -1138,7 +1165,7 @@ export default function SchemaDesignerPage() {
             {schema.tables.length > 0 && (
               <button
                 onClick={handleReset}
-                className="px-2 py-1.5 text-foreground/60 hover:text-red-600 hover:bg-red-500/10 rounded transition-all flex items-center gap-1.5"
+                className="px-2 py-1.5 text-foreground/60 hover:text-red-600 hover:bg-red-500/10 rounded transition-all flex items-center gap-1.5 active:scale-95"
                 title="Reset schema (Cmd+Shift+R)"
                 aria-label="Reset schema"
               >
@@ -1456,9 +1483,9 @@ export default function SchemaDesignerPage() {
         isOpen={confirmDialog.isOpen}
         title={confirmDialog.title}
         message={confirmDialog.message}
-        confirmLabel="Confirm"
-        cancelLabel="Cancel"
-        confirmVariant="danger"
+        confirmLabel={confirmDialog.confirmLabel || "Confirm"}
+        cancelLabel={confirmDialog.cancelLabel || "Cancel"}
+        confirmVariant={confirmDialog.confirmVariant || "danger"}
         onConfirm={confirmDialog.onConfirm}
         onCancel={() => setConfirmDialog(prev => ({ ...prev, isOpen: false }))}
       />

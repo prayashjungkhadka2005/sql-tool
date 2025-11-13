@@ -64,7 +64,7 @@ function TableNode({ data, selected }: NodeProps<TableNodeData>) {
                 e.stopPropagation();
                 onEdit(table.id);
               }}
-              className="px-2 py-1 text-[10px] font-mono bg-primary/10 hover:bg-primary/20 text-primary rounded transition-all flex items-center gap-1"
+              className="px-2 py-1 text-[10px] font-mono bg-primary/10 hover:bg-primary/20 text-primary rounded transition-all flex items-center gap-1 active:scale-95"
               title="Edit table name"
               aria-label={`Edit table ${table.name}`}
             >
@@ -78,7 +78,7 @@ function TableNode({ data, selected }: NodeProps<TableNodeData>) {
                 e.stopPropagation();
                 onDelete(table.id);
               }}
-              className="p-1 hover:bg-red-500/10 hover:text-red-500 rounded transition-all"
+              className="p-1 hover:bg-red-500/10 hover:text-red-500 rounded transition-all active:scale-95"
               title="Delete table"
               aria-label={`Delete table ${table.name}`}
             >
@@ -120,7 +120,7 @@ function TableNode({ data, selected }: NodeProps<TableNodeData>) {
                 e.stopPropagation();
                 onEditColumn(table.id, column.id);
               }}
-              className="flex items-center gap-2 text-xs font-mono group hover:bg-foreground/10 active:bg-foreground/15 px-2 py-1.5 rounded transition-all cursor-pointer w-full text-left"
+              className="flex items-center gap-2 text-xs font-mono group hover:bg-foreground/10 px-2 py-1.5 rounded transition-all cursor-pointer w-full text-left active:scale-[0.98]"
               title="Click to edit column"
             >
               {/* Primary Key Icon */}
@@ -222,7 +222,7 @@ function TableNode({ data, selected }: NodeProps<TableNodeData>) {
             e.stopPropagation();
             onAddColumn(table.id);
           }}
-          className="py-2 text-xs font-mono text-foreground/60 hover:text-foreground hover:bg-foreground/5 active:bg-foreground/10 rounded transition-all flex items-center justify-center gap-1.5"
+          className="py-2 text-xs font-mono text-foreground/60 hover:text-foreground hover:bg-foreground/5 rounded transition-all flex items-center justify-center gap-1.5 active:scale-95"
           title="Add column to table"
           aria-label={`Add column to ${table.name} table`}
         >
@@ -236,7 +236,7 @@ function TableNode({ data, selected }: NodeProps<TableNodeData>) {
             e.stopPropagation();
             onManageIndexes(table.id);
           }}
-          className="py-2 text-xs font-mono text-purple-600 dark:text-purple-400 hover:text-purple-700 hover:bg-purple-500/10 active:bg-purple-500/20 rounded transition-all flex items-center justify-center gap-1.5 relative"
+          className="py-2 text-xs font-mono text-purple-600 dark:text-purple-400 hover:text-purple-700 hover:bg-purple-500/10 rounded transition-all flex items-center justify-center gap-1.5 relative active:scale-95"
           title="Manage indexes for performance optimization"
           aria-label={`Manage indexes for ${table.name} table. Currently ${table.indexes?.length || 0} indexes.`}
         >

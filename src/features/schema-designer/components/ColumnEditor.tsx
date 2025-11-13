@@ -94,11 +94,17 @@ export default function ColumnEditor({
     isOpen: boolean;
     title: string;
     message: string;
+    confirmLabel?: string;
+    cancelLabel?: string;
+    confirmVariant?: "danger" | "primary";
     onConfirm: () => void;
   }>({
     isOpen: false,
     title: '',
     message: '',
+    confirmLabel: 'Confirm',
+    cancelLabel: 'Cancel',
+    confirmVariant: 'primary',
     onConfirm: () => {},
   });
 
@@ -288,8 +294,11 @@ export default function ColumnEditor({
       if (formData.references.table === tableName) {
         setConfirmDialog({
           isOpen: true,
-          title: 'Self-Referencing Table',
+          title: 'Self-Referencing Table?',
           message: `This will create a self-referencing foreign key (table references itself).\n\nCommon for hierarchical data like:\n• Employee → Manager (same table)\n• Category → Parent Category\n• Comment → Reply To\n\nDo you want to continue?`,
+          confirmLabel: 'Allow Self-Reference',
+          cancelLabel: 'Cancel',
+          confirmVariant: 'primary',
           onConfirm: () => {
             setValidationError(null);
             onSave(formData);
@@ -358,8 +367,11 @@ export default function ColumnEditor({
         // Show warning dialog but allow save
         setConfirmDialog({
           isOpen: true,
-          title: 'Foreign Key Warning',
-          message: `Column "${formData.references.table}.${formData.references.column}" is not a primary key or unique column.\n\nForeign keys should typically reference primary keys or unique columns.\n\nDo you want to continue?`,
+          title: 'Non-Unique Reference',
+          message: `Column "${formData.references.table}.${formData.references.column}" is not a primary key or unique column.\n\nForeign keys should typically reference primary keys or unique columns for data integrity.\n\nDo you want to continue anyway?`,
+          confirmLabel: 'Save Anyway',
+          cancelLabel: 'Cancel',
+          confirmVariant: 'primary',
           onConfirm: () => {
             setValidationError(null);
             onSave(formData);
@@ -379,10 +391,20 @@ export default function ColumnEditor({
 
   const handleDelete = () => {
     if (column && onDelete) {
+      // Check if this column is referenced by other tables
+      const referencingColumns = allTables.flatMap(t => 
+        t.columns.filter(c => 
+          c.references?.table === tableName && c.references?.column === column.name
+        ).map(c => ({ table: t.name, column: c.name }))
+      );
+      
       setConfirmDialog({
         isOpen: true,
         title: 'Delete Column?',
-        message: `Delete column "${column.name}"?\n\nThis action cannot be undone.`,
+        message: `Delete column "${column.name}"?${referencingColumns.length > 0 ? `\n\nThis column is referenced by ${referencingColumns.length} foreign key${referencingColumns.length !== 1 ? 's' : ''} in other tables. These references will be removed.` : ''}\n\nThis action cannot be undone.`,
+        confirmLabel: 'Delete Column',
+        cancelLabel: 'Cancel',
+        confirmVariant: 'danger',
         onConfirm: () => {
           onDelete(column.id);
           onClose();
@@ -896,7 +918,7 @@ export default function ColumnEditor({
                 <button
                   type="button"
                   onClick={handleDelete}
-                  className="px-4 py-2 text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-500/10 rounded-lg transition-all font-mono"
+                  className="px-4 py-2 text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-500/10 rounded-lg transition-all font-mono active:scale-95"
                 >
                   Delete Column
                 </button>
@@ -908,7 +930,7 @@ export default function ColumnEditor({
                 <button
                   type="button"
                   onClick={onClose}
-                  className="px-4 py-2 text-sm font-medium text-foreground/70 hover:text-foreground/90 hover:bg-foreground/10 rounded-lg transition-all font-mono"
+                  className="px-4 py-2 text-sm font-medium text-foreground/70 hover:text-foreground/90 hover:bg-foreground/10 rounded-lg transition-all font-mono active:scale-95"
                 >
                   Cancel
                 </button>
@@ -930,9 +952,9 @@ export default function ColumnEditor({
         isOpen={confirmDialog.isOpen}
         title={confirmDialog.title}
         message={confirmDialog.message}
-        confirmLabel="Delete"
-        cancelLabel="Cancel"
-        confirmVariant="danger"
+        confirmLabel={confirmDialog.confirmLabel || "Confirm"}
+        cancelLabel={confirmDialog.cancelLabel || "Cancel"}
+        confirmVariant={confirmDialog.confirmVariant || "danger"}
         onConfirm={confirmDialog.onConfirm}
         onCancel={() => setConfirmDialog(prev => ({ ...prev, isOpen: false }))}
       />

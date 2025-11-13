@@ -231,7 +231,7 @@ CREATE INDEX idx_posts_user_id ON posts(user_id);`;
                   <button
                     onClick={onClose}
                     disabled={isProcessing}
-                    className="p-2 hover:bg-foreground/10 rounded-lg transition-colors disabled:opacity-50"
+                    className="p-2 hover:bg-foreground/10 rounded-lg transition-all disabled:opacity-50 active:scale-95"
                     aria-label="Close"
                   >
                     <svg className="w-5 h-5 text-foreground/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -259,7 +259,7 @@ CREATE INDEX idx_posts_user_id ON posts(user_id);`;
                           setPreviewSchema(null);
                         }}
                         disabled={isProcessing}
-                        className={`px-3 py-1.5 text-xs font-medium font-mono rounded-lg transition-all disabled:opacity-50 ${
+                        className={`px-3 py-1.5 text-xs font-medium font-mono rounded-lg transition-all disabled:opacity-50 active:scale-95 ${
                           format === fmt.value
                             ? 'bg-primary text-white shadow-sm'
                             : 'bg-foreground/5 text-foreground/70 hover:bg-foreground/10'
@@ -272,7 +272,7 @@ CREATE INDEX idx_posts_user_id ON posts(user_id);`;
                   <button
                     onClick={loadExample}
                     disabled={isProcessing}
-                    className="ml-auto text-xs px-3 py-1.5 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 text-blue-600 dark:text-blue-400 rounded-lg transition-all font-mono disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-blue-500/10"
+                    className="ml-auto text-xs px-3 py-1.5 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 text-blue-600 dark:text-blue-400 rounded-lg transition-all font-mono disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-blue-500/10 active:scale-95"
                     title="Load example SQL schema"
                   >
                     Load Example
@@ -344,7 +344,7 @@ CREATE INDEX idx_posts_user_id ON posts(user_id);`;
                                 setParseError(null);
                                 textareaRef.current?.focus();
                               }}
-                              className="text-xs px-2 py-1 bg-green-600/10 hover:bg-green-600/20 border border-green-600/20 text-green-700 dark:text-green-400 rounded font-mono transition-all"
+                              className="text-xs px-2 py-1 bg-green-600/10 hover:bg-green-600/20 border border-green-600/20 text-green-700 dark:text-green-400 rounded font-mono transition-all active:scale-95"
                               title="Clear preview and modify schema"
                             >
                               Edit & Re-parse
@@ -400,7 +400,7 @@ CREATE INDEX idx_posts_user_id ON posts(user_id);`;
                   <button
                     onClick={onClose}
                     disabled={isProcessing}
-                    className="px-4 py-2 text-sm font-medium text-foreground/70 hover:text-foreground/90 hover:bg-foreground/10 rounded-lg transition-all font-mono disabled:opacity-50"
+                    className="px-4 py-2 text-sm font-medium text-foreground/70 hover:text-foreground/90 hover:bg-foreground/10 rounded-lg transition-all font-mono disabled:opacity-50 active:scale-95"
                   >
                     Cancel
                   </button>

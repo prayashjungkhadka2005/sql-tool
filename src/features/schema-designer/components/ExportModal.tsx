@@ -236,7 +236,7 @@ export default function ExportModal({ isOpen, schema, onClose, onExportImage }: 
                 </div>
                 <button
                   onClick={onClose}
-                  className="p-1.5 hover:bg-foreground/10 rounded-lg transition-all"
+                  className="p-1.5 hover:bg-foreground/10 rounded-lg transition-all active:scale-95"
                   aria-label="Close"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -271,7 +271,7 @@ export default function ExportModal({ isOpen, schema, onClose, onExportImage }: 
                               onClose();
                               // The main page will show the Auto-Index FKs button
                             }}
-                            className="text-xs font-mono font-semibold text-yellow-700 dark:text-yellow-400 hover:text-yellow-800 dark:hover:text-yellow-300 hover:bg-yellow-500/10 px-2 py-1 rounded transition-all inline-flex items-center gap-1"
+                            className="text-xs font-mono font-semibold text-yellow-700 dark:text-yellow-400 hover:text-yellow-800 dark:hover:text-yellow-300 hover:bg-yellow-500/10 px-2 py-1 rounded transition-all inline-flex items-center gap-1 active:scale-95"
                           >
                             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
@@ -296,7 +296,7 @@ export default function ExportModal({ isOpen, schema, onClose, onExportImage }: 
                     <button
                       key={format.value}
                       onClick={() => setSelectedFormat(format.value)}
-                      className={`p-3 border rounded-lg transition-all text-left ${
+                      className={`p-3 border rounded-lg transition-all text-left active:scale-95 ${
                         selectedFormat === format.value
                           ? 'bg-primary text-white border-primary'
                           : 'bg-foreground/5 text-foreground border-foreground/10 hover:bg-foreground/10'

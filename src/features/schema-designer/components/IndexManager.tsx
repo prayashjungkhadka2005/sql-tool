@@ -357,7 +357,7 @@ export default function IndexManager({ isOpen, table, allTables, onClose, onSave
               </div>
               <button
                 onClick={handleClose}
-                className="p-1.5 hover:bg-foreground/10 rounded-lg transition-all"
+                className="p-1.5 hover:bg-foreground/10 rounded-lg transition-all active:scale-95"
                 aria-label="Close"
                 title="Close (Esc)"
               >
@@ -444,7 +444,7 @@ export default function IndexManager({ isOpen, table, allTables, onClose, onSave
                           <div className="flex items-center gap-1 ml-2">
                             <button
                               onClick={() => handleEdit(index)}
-                              className="p-1.5 hover:bg-foreground/10 rounded transition-all"
+                              className="p-1.5 hover:bg-foreground/10 rounded transition-all active:scale-95"
                               title="Edit index"
                               aria-label={`Edit index ${index.name}`}
                             >
@@ -454,7 +454,7 @@ export default function IndexManager({ isOpen, table, allTables, onClose, onSave
                             </button>
                             <button
                               onClick={() => handleDelete(index.id)}
-                              className="p-1.5 hover:bg-red-500/10 hover:text-red-500 rounded transition-all"
+                              className="p-1.5 hover:bg-red-500/10 hover:text-red-500 rounded transition-all active:scale-95"
                               title="Delete index"
                               aria-label={`Delete index ${index.name}`}
                             >
@@ -622,7 +622,7 @@ export default function IndexManager({ isOpen, table, allTables, onClose, onSave
                   <div className="flex items-center gap-2">
                     <button
                       onClick={handleCancelEdit}
-                      className="flex-1 px-4 py-2 text-sm font-medium text-foreground/70 hover:text-foreground/90 hover:bg-foreground/10 rounded-lg transition-all font-mono"
+                      className="flex-1 px-4 py-2 text-sm font-medium text-foreground/70 hover:text-foreground/90 hover:bg-foreground/10 rounded-lg transition-all font-mono active:scale-95"
                     >
                       Cancel
                     </button>
@@ -658,7 +658,7 @@ export default function IndexManager({ isOpen, table, allTables, onClose, onSave
                   <>
                     <button
                       onClick={handleAddNew}
-                      className="px-4 py-2 text-sm font-medium text-purple-600 dark:text-purple-400 hover:bg-purple-500/10 rounded-lg transition-all font-mono flex items-center gap-2"
+                      className="px-4 py-2 text-sm font-medium text-purple-600 dark:text-purple-400 hover:bg-purple-500/10 rounded-lg transition-all font-mono flex items-center gap-2 active:scale-95"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
