@@ -70,13 +70,13 @@ export default function QuickStats({ queryState, totalRows, displayedRows }: Qui
         const aggName = `${firstAggregate.function}_${firstAggregate.column}`;
         tips.push(`Try ORDER BY ${aggName} DESC to see top results`);
       } else {
-        const createdCol = tableSchema.columns.find(c => c.name === 'created_at');
-        const idCol = tableSchema.columns.find(c => c.name === 'id');
-        
-        if (createdCol) {
-          tips.push("Try ORDER BY created_at DESC to see newest first");
-        } else if (idCol) {
-          tips.push("Try ORDER BY to sort your results");
+      const createdCol = tableSchema.columns.find(c => c.name === 'created_at');
+      const idCol = tableSchema.columns.find(c => c.name === 'id');
+      
+      if (createdCol) {
+        tips.push("Try ORDER BY created_at DESC to see newest first");
+      } else if (idCol) {
+        tips.push("Try ORDER BY to sort your results");
         }
       }
     }

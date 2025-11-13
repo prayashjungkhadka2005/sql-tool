@@ -12,6 +12,7 @@ import SchemaCanvas from '@/features/schema-designer/components/SchemaCanvas';
 import ColumnEditor from '@/features/schema-designer/components/ColumnEditor';
 import ExportModal from '@/features/schema-designer/components/ExportModal';
 import ImportModal from '@/features/schema-designer/components/ImportModal';
+import { MigrationModal } from '@/features/schema-designer/components/MigrationModal';
 import IndexManager from '@/features/schema-designer/components/IndexManager';
 import { SCHEMA_TEMPLATES } from '@/features/schema-designer/data/schema-templates';
 import { autoLayoutTables, LayoutAlgorithm } from '@/features/schema-designer/utils/auto-layout';
@@ -51,6 +52,7 @@ export default function SchemaDesignerPage() {
 
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [isMigrationModalOpen, setIsMigrationModalOpen] = useState(false);
   const [isTemplatesOpen, setIsTemplatesOpen] = useState(false);
   const [isOptimizingFKs, setIsOptimizingFKs] = useState(false);
   const [canvasRef, setCanvasRef] = useState<HTMLElement | null>(null);
@@ -882,6 +884,44 @@ export default function SchemaDesignerPage() {
     }
   }, [replaceSchema]);
 
+  /**
+   * Load a schema version from migration history
+   */
+  const handleLoadVersion = useCallback((loadedSchema: SchemaState) => {
+    // Close migration modal
+    setIsMigrationModalOpen(false);
+    
+    // Confirm before loading (will replace current schema)
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Load Schema Version?',
+      message: `This will replace your current schema with the selected version.\n\nMake sure you've saved your current work if you want to keep it.`,
+      confirmLabel: 'Load Version',
+      cancelLabel: 'Cancel',
+      confirmVariant: 'primary',
+      onConfirm: () => {
+        // Close any open editors
+        setIsColumnEditorOpen(false);
+        setEditingColumn(null);
+        setIsIndexManagerOpen(false);
+        setManagingIndexTable(null);
+        setIsOptimizingFKs(false);
+        
+        // Replace schema
+        replaceSchema(loadedSchema);
+        
+        setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+        
+        // Show success alert
+        setAlertDialog({
+          isOpen: true,
+          title: 'Version Loaded',
+          message: `Schema version loaded successfully. You can now continue editing or save a new version.`,
+        });
+      },
+    });
+  }, [replaceSchema]);
+
   // Auto-layout tables
   const handleAutoLayout = useCallback((algorithm: LayoutAlgorithm = 'hierarchical') => {
     if (schema.tables.length === 0) return;
@@ -974,7 +1014,7 @@ export default function SchemaDesignerPage() {
       }
       
       // Don't trigger when any dialog/drawer is open
-      if (isColumnEditorOpen || isIndexManagerOpen || isExportModalOpen || isImportModalOpen || confirmDialog.isOpen || inputDialog.isOpen || alertDialog.isOpen || isShortcutsOpen) {
+      if (isColumnEditorOpen || isIndexManagerOpen || isExportModalOpen || isImportModalOpen || isMigrationModalOpen || confirmDialog.isOpen || inputDialog.isOpen || alertDialog.isOpen || isShortcutsOpen) {
         return;
       }
 
@@ -1035,13 +1075,19 @@ export default function SchemaDesignerPage() {
               handleReset();
             }
             break;
+          
+          case 'm':
+            // Cmd/Ctrl + M: Migrations
+            e.preventDefault();
+            setIsMigrationModalOpen(true);
+            break;
         }
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [schema.tables, isColumnEditorOpen, isIndexManagerOpen, isExportModalOpen, isImportModalOpen, confirmDialog.isOpen, inputDialog.isOpen, alertDialog.isOpen, isShortcutsOpen, canUndo, canRedo, undo, redo, handleAddTable, handleReset, handleAutoLayout]);
+  }, [schema.tables, isColumnEditorOpen, isIndexManagerOpen, isExportModalOpen, isImportModalOpen, isMigrationModalOpen, confirmDialog.isOpen, inputDialog.isOpen, alertDialog.isOpen, isShortcutsOpen, canUndo, canRedo, undo, redo, handleAddTable, handleReset, handleAutoLayout]);
 
   return (
     <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12 sm:pb-16">
@@ -1178,6 +1224,18 @@ export default function SchemaDesignerPage() {
                 <span className="text-xs font-medium hidden lg:inline">Auto Layout</span>
           </button>
             )}
+            
+            <button
+              onClick={() => setIsMigrationModalOpen(true)}
+              className="px-2 py-1.5 text-foreground/70 hover:text-foreground hover:bg-foreground/10 rounded transition-all flex items-center gap-1.5 active:scale-95"
+              title="Version history & migrations (Cmd+M)"
+              aria-label="Migrations"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+              </svg>
+              <span className="text-xs font-medium hidden lg:inline">Migrations</span>
+            </button>
             
             {hasFKsWithoutIndexes && (
               <>
@@ -1400,6 +1458,10 @@ export default function SchemaDesignerPage() {
                       <span className="text-sm text-foreground/80 font-mono">Auto-layout</span>
                       <kbd className="px-2 py-1 bg-foreground/10 border border-foreground/20 rounded text-xs font-mono">Cmd+L</kbd>
                     </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-foreground/80 font-mono">Migrations</span>
+                      <kbd className="px-2 py-1 bg-foreground/10 border border-foreground/20 rounded text-xs font-mono">Cmd+M</kbd>
+                    </div>
                   </div>
                 </div>
 
@@ -1482,6 +1544,14 @@ export default function SchemaDesignerPage() {
         onClose={() => setIsImportModalOpen(false)}
         onImport={handleImport}
         hasExistingTables={schema.tables.length > 0}
+      />
+
+      {/* Migration Modal */}
+      <MigrationModal
+        isOpen={isMigrationModalOpen}
+        onClose={() => setIsMigrationModalOpen(false)}
+        currentSchema={schema}
+        onLoadVersion={handleLoadVersion}
       />
 
       {/* Confirmation Dialog */}
