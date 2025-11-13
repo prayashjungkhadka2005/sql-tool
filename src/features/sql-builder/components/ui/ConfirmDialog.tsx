@@ -95,12 +95,14 @@ export default function ConfirmDialog({
 
               {/* Footer */}
               <div className="px-6 py-4 bg-foreground/5 flex items-center justify-end gap-3">
-                <button
-                  onClick={onCancel}
-                  className="px-4 py-2 text-sm font-medium text-foreground/70 hover:text-foreground hover:bg-foreground/10 rounded-lg transition-all font-mono"
-                >
-                  {cancelLabel}
-                </button>
+                {cancelLabel && (
+                  <button
+                    onClick={onCancel}
+                    className="px-4 py-2 text-sm font-medium text-foreground/70 hover:text-foreground hover:bg-foreground/10 rounded-lg transition-all font-mono"
+                  >
+                    {cancelLabel}
+                  </button>
+                )}
                 <button
                   onClick={onConfirm}
                   className={`px-4 py-2 text-sm font-medium text-white rounded-lg transition-all font-mono active:scale-95 ${

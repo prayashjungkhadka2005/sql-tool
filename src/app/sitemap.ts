@@ -19,12 +19,19 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: 'weekly',
       priority: 0.95,
     },
+    // Schema Designer
+    {
+      url: `${baseUrl}/tools/schema-designer`,
+      lastModified: now,
+      changeFrequency: 'weekly',
+      priority: 0.9,
+    },
     // SQL Formatter
     {
       url: `${baseUrl}/tools/sql-formatter`,
       lastModified: now,
       changeFrequency: 'weekly',
-      priority: 0.9,
+      priority: 0.85,
     },
   ]
 }

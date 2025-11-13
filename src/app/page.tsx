@@ -43,15 +43,16 @@ export default function Home() {
       available: false,
     },
     {
-      title: "Database Schema Visualizer",
-      description: "Visualize database relationships and schema. Generate ER diagrams from SQL CREATE statements automatically.",
+      title: "Schema Designer",
+      description: "Design database schemas visually with drag & drop. Create tables, define relationships, and export to SQL or Prisma. Perfect for planning databases.",
       icon: (
         <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h4a1 1 0 011 1v7a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM14 5a1 1 0 011-1h4a1 1 0 011 1v7a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 17a1 1 0 011-1h4a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1v-2zM14 17a1 1 0 011-1h4a1 1 0 011 1v2a1 1 0 01-1 1h-4a1 1 0 01-1-1v-2z" />
         </svg>
       ),
-      href: "#",
-      available: false,
+      href: "/tools/schema-designer",
+      badge: "NEW",
+      available: true,
     },
     {
       title: "SQL Formatter",

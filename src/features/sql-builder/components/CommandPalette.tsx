@@ -39,6 +39,19 @@ export default function CommandPalette({ isOpen, onClose }: CommandPaletteProps)
       keywords: ["sql", "builder", "query", "database"],
     },
     {
+      id: "schema-designer",
+      name: "Schema Designer",
+      description: "Design database schemas visually",
+      category: "Navigate",
+      icon: (
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h4a1 1 0 011 1v7a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM14 5a1 1 0 011-1h4a1 1 0 011 1v7a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 17a1 1 0 011-1h4a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1v-2zM14 17a1 1 0 011-1h4a1 1 0 011 1v2a1 1 0 01-1 1h-4a1 1 0 01-1-1v-2z" />
+        </svg>
+      ),
+      action: () => router.push("/tools/schema-designer"),
+      keywords: ["schema", "designer", "erd", "database", "tables", "design"],
+    },
+    {
       id: "sql-formatter",
       name: "SQL Formatter",
       description: "Format and beautify SQL",
