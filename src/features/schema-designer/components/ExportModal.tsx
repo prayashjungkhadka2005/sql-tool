@@ -263,7 +263,7 @@ export default function ExportModal({ isOpen, schema, onClose }: ExportModalProp
                             ⚡ Performance Optimization Available
                           </h4>
                           <p className="text-xs text-yellow-600 dark:text-yellow-500 font-mono leading-relaxed mb-2">
-                            Some foreign key columns don't have indexes, which can significantly slow down JOIN queries in production.
+                            Some foreign key columns don&apos;t have indexes, which can significantly slow down JOIN queries in production.
                           </p>
                           <button
                             onClick={() => {
@@ -275,7 +275,7 @@ export default function ExportModal({ isOpen, schema, onClose }: ExportModalProp
                             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                             </svg>
-                            Close and use "Auto-Index FKs" button
+                            Close and use &quot;Auto-Index FKs&quot; button
                           </button>
                         </div>
                       </div>
