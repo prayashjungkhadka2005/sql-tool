@@ -54,6 +54,7 @@ export default function SchemaDesignerPage() {
   const [isTemplatesOpen, setIsTemplatesOpen] = useState(false);
   const [isOptimizingFKs, setIsOptimizingFKs] = useState(false);
   const [canvasRef, setCanvasRef] = useState<HTMLElement | null>(null);
+  const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
   
   // LocalStorage persistence state
   const [lastSavedTime, setLastSavedTime] = useState<number | null>(null);
@@ -939,6 +940,30 @@ export default function SchemaDesignerPage() {
     }
   }, [canvasRef, schema.name, schema.tables]);
 
+  // Keyboard shortcut overlay (? key)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Toggle shortcuts overlay with ? key (only when not typing)
+      if (e.key === '?' || (e.shiftKey && e.key === '/')) {
+        const target = e.target as HTMLElement;
+        if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT')) {
+          return;
+        }
+        e.preventDefault();
+        setIsShortcutsOpen(prev => !prev);
+      }
+      
+      // Close overlay with Escape
+      if (e.key === 'Escape' && isShortcutsOpen) {
+        e.preventDefault();
+        setIsShortcutsOpen(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isShortcutsOpen]);
+
   // Keyboard shortcuts (Cmd+E for Export, Cmd+T for Add Table, Cmd+Shift+R for Reset, Cmd+I for Import)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -949,7 +974,7 @@ export default function SchemaDesignerPage() {
       }
       
       // Don't trigger when any dialog/drawer is open
-      if (isColumnEditorOpen || isIndexManagerOpen || isExportModalOpen || isImportModalOpen || confirmDialog.isOpen || inputDialog.isOpen || alertDialog.isOpen) {
+      if (isColumnEditorOpen || isIndexManagerOpen || isExportModalOpen || isImportModalOpen || confirmDialog.isOpen || inputDialog.isOpen || alertDialog.isOpen || isShortcutsOpen) {
         return;
       }
 
@@ -1016,39 +1041,58 @@ export default function SchemaDesignerPage() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [schema.tables, isColumnEditorOpen, isIndexManagerOpen, isExportModalOpen, isImportModalOpen, confirmDialog.isOpen, inputDialog.isOpen, alertDialog.isOpen, canUndo, canRedo, undo, redo, handleAddTable, handleReset, handleAutoLayout]);
+  }, [schema.tables, isColumnEditorOpen, isIndexManagerOpen, isExportModalOpen, isImportModalOpen, confirmDialog.isOpen, inputDialog.isOpen, alertDialog.isOpen, isShortcutsOpen, canUndo, canRedo, undo, redo, handleAddTable, handleReset, handleAutoLayout]);
 
   return (
     <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12 sm:pb-16">
-      {/* Header - Industry Standard */}
+      {/* Header - Industry Standard Compact */}
       <div className="mb-6">
         <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-4">
-            <h1 className="text-2xl sm:text-3xl font-bold text-foreground font-mono">
+          <div className="flex items-baseline gap-3">
+            <h1 className="text-2xl sm:text-3xl font-bold text-foreground">
               Schema Designer
             </h1>
-            {/* Auto-save status - integrated with title */}
+            {/* Schema stats - integrated with title */}
+            {schema.tables.length > 0 && (
+              <div className="flex items-center gap-2 text-xs text-foreground/50 font-mono">
+                <span className="hidden sm:inline">•</span>
+                <span>{schema.tables.length} {schema.tables.length === 1 ? 'Table' : 'Tables'}</span>
+                <span>•</span>
+                <span>{schema.tables.reduce((sum, t) => sum + t.columns.length, 0)} Cols</span>
+                {(() => {
+                  const totalIndexes = schema.tables.reduce((sum, t) => sum + (t.indexes?.length || 0), 0);
+                  return totalIndexes > 0 ? (
+                    <>
+                      <span>•</span>
+                      <span className="text-purple-500">{totalIndexes} {totalIndexes === 1 ? 'Idx' : 'Idxs'}</span>
+                    </>
+                  ) : null;
+                })()}
+              </div>
+            )}
+            {/* Auto-save status */}
             {isStorageEnabled && lastSavedTime && (
-              <div className="flex items-center gap-1.5 text-xs text-foreground/50 font-mono">
+              <div className="flex items-center gap-1.5 text-xs text-foreground/40 font-mono">
+                <span className="hidden sm:inline">•</span>
                 <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
                   <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z" />
                 </svg>
-                <span>{formatTimestamp(lastSavedTime)}</span>
+                <span className="hidden sm:inline">{formatTimestamp(lastSavedTime)}</span>
               </div>
             )}
           </div>
 
-              <button
+          <button
             onClick={() => setIsExportModalOpen(true)}
             disabled={schema.tables.length === 0}
             className="px-4 py-2 text-sm font-semibold text-white bg-primary hover:bg-primary/90 rounded-lg transition-all font-mono flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed active:scale-95 shadow-sm"
             title={schema.tables.length === 0 ? 'Add tables to enable export' : 'Export schema (Cmd+E)'}
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
-                </svg>
+            </svg>
             Export
-              </button>
+          </button>
         </div>
             
         {/* Toolbar - Clean and consistent */}
@@ -1162,6 +1206,18 @@ export default function SchemaDesignerPage() {
           
           {/* Right side actions */}
           <div className="flex items-center gap-1.5">
+            {/* Keyboard Shortcuts Button */}
+            <button
+              onClick={() => setIsShortcutsOpen(true)}
+              className="p-2 text-foreground/60 hover:text-foreground hover:bg-foreground/10 rounded transition-all active:scale-95"
+              title="Keyboard shortcuts (?)"
+              aria-label="Show keyboard shortcuts"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </button>
+            
             {schema.tables.length > 0 && (
               <button
                 onClick={handleReset}
@@ -1228,43 +1284,6 @@ export default function SchemaDesignerPage() {
         </section>
       )}
 
-      {/* Schema Stats Bar (only show if there are tables) */}
-      {schema.tables.length > 0 && (
-        <div className="mb-6 w-full flex items-center justify-between px-4 py-2.5 bg-foreground/5 border border-foreground/10 rounded-lg">
-          <div className="flex items-center gap-2">
-            <svg className="w-4 h-4 text-foreground/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-            </svg>
-            <span className="text-sm text-foreground/60 font-mono">Current Schema:</span>
-          </div>
-          
-          {(() => {
-            const totalColumns = schema.tables.reduce((sum, t) => sum + t.columns.length, 0);
-            const totalIndexes = schema.tables.reduce((sum, t) => sum + (t.indexes?.length || 0), 0);
-            
-            return (
-              <div className="flex items-center gap-3 text-sm font-mono">
-                <span className="text-foreground font-semibold">
-                  {schema.tables.length} {schema.tables.length === 1 ? 'Table' : 'Tables'}
-                </span>
-                <span className="text-foreground/30">•</span>
-                <span className="text-foreground/70">
-                  {totalColumns} {totalColumns === 1 ? 'Column' : 'Columns'}
-                </span>
-                {totalIndexes > 0 && (
-                  <>
-                    <span className="text-foreground/30">•</span>
-                    <span className="text-purple-600 dark:text-purple-400 font-semibold">
-                      {totalIndexes} {totalIndexes === 1 ? 'Index' : 'Indexes'}
-                    </span>
-                  </>
-                )}
-              </div>
-            );
-          })()}
-        </div>
-      )}
-
       {/* Canvas */}
       {schema.tables.length === 0 ? (
         <section className="flex flex-col items-center justify-center py-20 text-center bg-white dark:bg-[#1a1a1a] border border-foreground/10 rounded-lg" role="region" aria-label="Empty schema canvas">
@@ -1320,116 +1339,103 @@ export default function SchemaDesignerPage() {
         </section>
       )}
 
-      {/* Help Tips */}
-      {schema.tables.length > 0 && (
-        <aside className="mt-6 bg-gradient-to-br from-blue-500/5 to-purple-500/5 border border-blue-500/20 rounded-lg overflow-hidden" role="complementary" aria-label="Quick tips and keyboard shortcuts">
-          <div className="px-4 py-3 bg-foreground/5 border-b border-foreground/10 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-              <h4 className="text-sm font-semibold text-foreground font-mono">Quick Guide</h4>
-            </div>
-          </div>
+      {/* Keyboard Shortcuts Overlay - Press ? to toggle */}
+      {isShortcutsOpen && (
+        <>
+          {/* Backdrop */}
+          <div 
+            className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[110]"
+            onClick={() => setIsShortcutsOpen(false)}
+          />
           
-          <div className="p-4 grid sm:grid-cols-2 gap-3">
-            {/* Navigation */}
-            <div>
-              <div className="flex items-center gap-1.5 mb-2">
-                <svg className="w-3.5 h-3.5 text-foreground/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 11.5V14m0-2.5v-6a1.5 1.5 0 113 0m-3 6a1.5 1.5 0 00-3 0v2a7.5 7.5 0 0015 0v-5a1.5 1.5 0 00-3 0m-6-3V11m0-5.5v-1a1.5 1.5 0 013 0v1m0 0V11m0-5.5a1.5 1.5 0 013 0v3m0 0V11" />
-                </svg>
-                <span className="text-xs font-semibold text-foreground/80 font-mono">Navigation</span>
+          {/* Modal */}
+          <div className="fixed inset-0 z-[111] flex items-center justify-center p-4 pointer-events-none">
+            <div 
+              className="w-full max-w-2xl bg-white dark:bg-[#1a1a1a] border-2 border-foreground/20 rounded-xl shadow-2xl overflow-hidden pointer-events-auto"
+              onClick={(e) => e.stopPropagation()}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="shortcuts-title"
+            >
+              {/* Header */}
+              <div className="px-6 py-4 border-b border-foreground/10 flex items-center justify-between bg-gradient-to-br from-blue-500/5 to-purple-500/5">
+                <div className="flex items-center gap-3">
+                  <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+                  </svg>
+                  <h3 id="shortcuts-title" className="text-lg font-bold text-foreground font-mono">
+                    Keyboard Shortcuts
+                  </h3>
+                </div>
+                <button
+                  onClick={() => setIsShortcutsOpen(false)}
+                  className="p-1.5 hover:bg-foreground/10 rounded-lg transition-all active:scale-95"
+                  aria-label="Close"
+                >
+                  <svg className="w-5 h-5 text-foreground/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
               </div>
-              <ul className="text-xs text-foreground/60 font-mono space-y-1.5 leading-relaxed">
-                <li className="flex items-start gap-1.5">
-                  <span className="text-foreground/40 flex-shrink-0">•</span>
-                  <span>Drag empty canvas to pan</span>
-                </li>
-                <li className="flex items-start gap-1.5">
-                  <span className="text-foreground/40 flex-shrink-0">•</span>
-                  <span>Hold <kbd className="px-1 py-0.5 bg-foreground/10 rounded text-[10px]">Space</kbd> to lock tables</span>
-                </li>
-                <li className="flex items-start gap-1.5">
-                  <span className="text-foreground/40 flex-shrink-0">•</span>
-                  <span>Use minimap or zoom buttons</span>
-                </li>
-              </ul>
-            </div>
 
-            {/* Editing */}
-            <div>
-              <div className="flex items-center gap-1.5 mb-2">
-                <svg className="w-3.5 h-3.5 text-foreground/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                </svg>
-                <span className="text-xs font-semibold text-foreground/80 font-mono">Editing</span>
-          </div>
-              <ul className="text-xs text-foreground/60 font-mono space-y-1.5 leading-relaxed">
-                <li className="flex items-start gap-1.5">
-                  <span className="text-foreground/40 flex-shrink-0">•</span>
-                  <span>Drag tables to reposition them</span>
-                </li>
-                <li className="flex items-start gap-1.5">
-                  <span className="text-foreground/40 flex-shrink-0">•</span>
-                  <span>Click columns to edit properties</span>
-                </li>
-                <li className="flex items-start gap-1.5">
-                  <span className="text-foreground/40 flex-shrink-0">•</span>
-                  <span>Use Column Editor for foreign keys</span>
-                </li>
-              </ul>
-        </div>
+              {/* Content */}
+              <div className="px-6 py-5 grid sm:grid-cols-2 gap-6">
+                {/* General Actions */}
+                <div>
+                  <h4 className="text-xs font-semibold text-foreground/60 uppercase tracking-wider mb-3 font-mono">General Actions</h4>
+                  <div className="space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-foreground/80 font-mono">New table</span>
+                      <kbd className="px-2 py-1 bg-foreground/10 border border-foreground/20 rounded text-xs font-mono">Cmd+T</kbd>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-foreground/80 font-mono">Export schema</span>
+                      <kbd className="px-2 py-1 bg-foreground/10 border border-foreground/20 rounded text-xs font-mono">Cmd+E</kbd>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-foreground/80 font-mono">Import schema</span>
+                      <kbd className="px-2 py-1 bg-foreground/10 border border-foreground/20 rounded text-xs font-mono">Cmd+I</kbd>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-foreground/80 font-mono">Auto-layout</span>
+                      <kbd className="px-2 py-1 bg-foreground/10 border border-foreground/20 rounded text-xs font-mono">Cmd+L</kbd>
+                    </div>
+                  </div>
+                </div>
 
-            {/* Performance */}
-            <div>
-              <div className="flex items-center gap-1.5 mb-2">
-                <svg className="w-3.5 h-3.5 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                </svg>
-                <span className="text-xs font-semibold text-foreground/80 font-mono">Performance</span>
+                {/* History & Navigation */}
+                <div>
+                  <h4 className="text-xs font-semibold text-foreground/60 uppercase tracking-wider mb-3 font-mono">History & Navigation</h4>
+                  <div className="space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-foreground/80 font-mono">Undo</span>
+                      <kbd className="px-2 py-1 bg-foreground/10 border border-foreground/20 rounded text-xs font-mono">Cmd+Z</kbd>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-foreground/80 font-mono">Redo</span>
+                      <kbd className="px-2 py-1 bg-foreground/10 border border-foreground/20 rounded text-xs font-mono">Cmd+Shift+Z</kbd>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-foreground/80 font-mono">Pan mode</span>
+                      <kbd className="px-2 py-1 bg-foreground/10 border border-foreground/20 rounded text-xs font-mono">Hold Space</kbd>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-foreground/80 font-mono">Reset schema</span>
+                      <kbd className="px-2 py-1 bg-foreground/10 border border-foreground/20 rounded text-xs font-mono">Cmd+Shift+R</kbd>
+                    </div>
+                  </div>
+                </div>
               </div>
-              <ul className="text-xs text-foreground/60 font-mono space-y-1.5 leading-relaxed">
-                <li className="flex items-start gap-1.5">
-                  <span className="text-foreground/40 flex-shrink-0">•</span>
-                  <span><span className="text-purple-600 dark:text-purple-400">Auto-Index FKs</span> optimizes JOINs</span>
-                </li>
-                <li className="flex items-start gap-1.5">
-                  <span className="text-foreground/40 flex-shrink-0">•</span>
-                  <span>Lightning icon = indexed column</span>
-                </li>
-                <li className="flex items-start gap-1.5">
-                  <span className="text-foreground/40 flex-shrink-0">•</span>
-                  <span>Manage indexes per table</span>
-                </li>
-              </ul>
-            </div>
 
-            {/* Shortcuts */}
-            <div>
-              <div className="flex items-center gap-1.5 mb-2">
-                <svg className="w-3.5 h-3.5 text-foreground/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
-                </svg>
-                <span className="text-xs font-semibold text-foreground/80 font-mono">Shortcuts</span>
+              {/* Footer */}
+              <div className="px-6 py-3 bg-foreground/5 border-t border-foreground/10 text-center">
+                <p className="text-xs text-foreground/50 font-mono">
+                  Press <kbd className="px-1.5 py-0.5 bg-foreground/10 border border-foreground/20 rounded text-[10px] mx-0.5">?</kbd> or <kbd className="px-1.5 py-0.5 bg-foreground/10 border border-foreground/20 rounded text-[10px] mx-0.5">Esc</kbd> to close
+                </p>
               </div>
-              <ul className="text-xs text-foreground/60 font-mono space-y-1.5 leading-relaxed">
-                <li className="flex items-start gap-1.5">
-                  <span className="text-foreground/40 flex-shrink-0">•</span>
-                  <span><kbd className="px-1 py-0.5 bg-foreground/10 rounded text-[10px]">Cmd+Z</kbd> Undo changes</span>
-                </li>
-                <li className="flex items-start gap-1.5">
-                  <span className="text-foreground/40 flex-shrink-0">•</span>
-                  <span><kbd className="px-1 py-0.5 bg-foreground/10 rounded text-[10px]">Cmd+I</kbd> Import schema</span>
-                </li>
-                <li className="flex items-start gap-1.5">
-                  <span className="text-foreground/40 flex-shrink-0">•</span>
-                  <span><kbd className="px-1 py-0.5 bg-foreground/10 rounded text-[10px]">Cmd+L</kbd> Auto-layout</span>
-                </li>
-              </ul>
             </div>
           </div>
-        </aside>
+        </>
       )}
 
       {/* Column Editor Drawer */}
