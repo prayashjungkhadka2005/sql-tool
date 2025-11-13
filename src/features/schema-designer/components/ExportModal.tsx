@@ -207,13 +207,13 @@ export default function ExportModal({ isOpen, schema, onClose, onExportImage }: 
       {/* Modal */}
       <AnimatePresence>
         {isOpen && (
-          <div key="export-modal-wrapper" className="fixed inset-0 z-[101] flex items-center justify-center p-4">
+          <div key="export-modal-wrapper" className="fixed inset-0 z-[101] flex items-center justify-center p-4 pointer-events-none">
             <motion.div
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
               transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-              className="w-full max-w-4xl bg-white dark:bg-[#1a1a1a] border-2 border-foreground/20 rounded-xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col"
+              className="w-full max-w-4xl bg-white dark:bg-[#1a1a1a] border-2 border-foreground/20 rounded-xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col pointer-events-auto"
               onClick={(e) => e.stopPropagation()}
               role="dialog"
               aria-modal="true"

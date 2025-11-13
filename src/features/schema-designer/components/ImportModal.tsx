@@ -183,7 +183,12 @@ CREATE INDEX idx_posts_user_id ON posts(user_id);`;
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
             className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4"
-            onClick={onClose}
+            onClick={() => {
+              // Don't close if processing or confirm dialog is open
+              if (!isProcessing && !showConfirm) {
+                onClose();
+              }
+            }}
           />
         )}
       </AnimatePresence>
