@@ -97,17 +97,17 @@ export default function Footer() {
           </div>
         </div>
 
-          {/* Bottom Bar */}
+        {/* Bottom Bar */}
           <div className="pt-4 border-t border-foreground/10">
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-foreground/50 font-mono">
-              <p>
-                © {new Date().getFullYear()} Built by{" "}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-foreground/50 font-mono">
+            <p>
+              © {new Date().getFullYear()} Built by{" "}
                 <span className="text-foreground/70">
-                  Prayash Jung Khadka
+                Prayash Jung Khadka
                 </span>
-              </p>
-              <div className="flex items-center gap-4">
-                <span>Next.js · TypeScript · Tailwind</span>
+            </p>
+            <div className="flex items-center gap-4">
+              <span>Next.js · TypeScript · Tailwind</span>
               </div>
             </div>
           </div>

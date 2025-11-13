@@ -5,7 +5,7 @@
 
 "use client";
 
-import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { ReactFlowProvider } from 'reactflow';
 import { SchemaState, SchemaTable, SchemaColumn, SchemaTemplate, SchemaIndex } from '@/features/schema-designer/types';
 import SchemaCanvas from '@/features/schema-designer/components/SchemaCanvas';
@@ -16,14 +16,28 @@ import IndexManager from '@/features/schema-designer/components/IndexManager';
 import { SCHEMA_TEMPLATES } from '@/features/schema-designer/data/schema-templates';
 import { autoLayoutTables, LayoutAlgorithm } from '@/features/schema-designer/utils/auto-layout';
 import { exportCanvasAsImage, getSuggestedFilename } from '@/features/schema-designer/utils/image-export';
+import { saveSchema, loadSchema, clearSchema, getLastSaved, formatTimestamp, isStorageAvailable } from '@/features/schema-designer/utils/schema-storage';
+import { useSchemaHistory } from '@/features/schema-designer/hooks/useSchemaHistory';
 import ConfirmDialog from '@/features/sql-builder/components/ui/ConfirmDialog';
 import InputDialog from '@/features/sql-builder/components/ui/InputDialog';
 
 export default function SchemaDesignerPage() {
-  const [schema, setSchema] = useState<SchemaState>({
+  // Schema state with undo/redo support
+  const {
+    schema,
+    setSchema,
+    setSchemaDebounced,
+    undo,
+    redo,
+    canUndo,
+    canRedo,
+    clearHistory,
+    replaceSchema,
+    lastActionName,
+  } = useSchemaHistory({
     name: 'My Database',
     tables: [],
-    relationships: [], // Deprecated: kept for backward compatibility
+    relationships: [],
   });
 
   const [isColumnEditorOpen, setIsColumnEditorOpen] = useState(false);
@@ -40,6 +54,11 @@ export default function SchemaDesignerPage() {
   const [isTemplatesOpen, setIsTemplatesOpen] = useState(false);
   const [isOptimizingFKs, setIsOptimizingFKs] = useState(false);
   const [canvasRef, setCanvasRef] = useState<HTMLElement | null>(null);
+  
+  // LocalStorage persistence state
+  const [lastSavedTime, setLastSavedTime] = useState<number | null>(null);
+  const [isStorageEnabled, setIsStorageEnabled] = useState(true);
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const [confirmDialog, setConfirmDialog] = useState<{
     isOpen: boolean;
@@ -76,6 +95,66 @@ export default function SchemaDesignerPage() {
     title: '',
     message: '',
   });
+
+  // LOCALSTORAGE PERSISTENCE
+  // Restore schema from localStorage on mount
+  useEffect(() => {
+    // Check if storage is available
+    if (!isStorageAvailable()) {
+      setIsStorageEnabled(false);
+      console.warn('LocalStorage not available - auto-save disabled');
+      return;
+    }
+    
+    // Try to load saved schema
+    const savedSchema = loadSchema();
+    
+    if (savedSchema) {
+      replaceSchema(savedSchema); // Use replaceSchema to avoid adding to history
+      setLastSavedTime(getLastSaved());
+      console.log('✅ Schema restored from localStorage');
+    }
+  }, [replaceSchema]); // Run only on mount
+  
+  // Auto-save schema to localStorage (debounced)
+  useEffect(() => {
+    if (!isStorageEnabled) return;
+    
+    // Skip auto-save for empty schema on initial mount
+    if (schema.tables.length === 0 && !lastSavedTime) return;
+    
+    // Clear previous timeout
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+    
+    // Debounce save by 2 seconds
+    saveTimeoutRef.current = setTimeout(() => {
+      const success = saveSchema(schema, true);
+      if (success) {
+        setLastSavedTime(Date.now());
+      }
+    }, 2000);
+    
+    // Cleanup on unmount
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
+  }, [schema, isStorageEnabled, lastSavedTime]);
+  
+  // Update "saved time" display every minute
+  useEffect(() => {
+    if (!lastSavedTime) return;
+    
+    const interval = setInterval(() => {
+      // Force re-render to update relative time
+      setLastSavedTime(prev => prev);
+    }, 60000); // Every minute
+    
+    return () => clearInterval(interval);
+  }, [lastSavedTime]);
 
   // Add new table
   const handleAddTable = useCallback(() => {
@@ -115,8 +194,8 @@ export default function SchemaDesignerPage() {
     setSchema(prev => ({
       ...prev,
       tables: [...prev.tables, newTable],
-    }));
-  }, [schema.tables]);
+    }), 'Add table');
+  }, [schema.tables, setSchema]);
 
   // Edit table name
   const handleEditTable = useCallback((tableId: string) => {
@@ -581,12 +660,13 @@ export default function SchemaDesignerPage() {
           })),
         };
         
-        setSchema(normalizedSchema);
+        // Replace schema without adding to undo history (template load is a new starting point)
+        replaceSchema(normalizedSchema);
         setIsTemplatesOpen(false);
         setConfirmDialog(prev => ({ ...prev, isOpen: false }));
       },
     });
-  }, []);
+  }, [replaceSchema]);
 
   // Delete table (with confirmation)
   const handleDeleteTable = useCallback((tableId: string) => {
@@ -707,7 +787,7 @@ export default function SchemaDesignerPage() {
     setConfirmDialog({
       isOpen: true,
       title: 'Reset Schema?',
-      message: 'This will delete all tables and start fresh.\n\nThis action cannot be undone.',
+      message: 'This will delete all tables and start fresh.\n\nThis action cannot be undone. Your saved work and history will also be cleared.',
       onConfirm: () => {
         // Close any open editors to prevent state conflicts
         setIsColumnEditorOpen(false);
@@ -716,15 +796,22 @@ export default function SchemaDesignerPage() {
         setManagingIndexTable(null);
         setIsOptimizingFKs(false); // Reset optimization state
         
-        setSchema({
+        // Replace schema without adding to history
+        replaceSchema({
           name: 'My Database',
           tables: [],
-          relationships: [], // Deprecated: kept for backward compatibility
+          relationships: [],
         });
+        
+        // Clear localStorage and history
+        clearSchema();
+        clearHistory();
+        setLastSavedTime(null);
+        
         setConfirmDialog(prev => ({ ...prev, isOpen: false }));
       },
     });
-  }, []);
+  }, [replaceSchema, clearHistory]);
 
   // Import schema
   const handleImport = useCallback((importedSchema: SchemaState) => {
@@ -738,8 +825,8 @@ export default function SchemaDesignerPage() {
     // Close import modal
     setIsImportModalOpen(false);
     
-    // Replace schema (don't merge - clean import)
-    setSchema({
+    // Replace schema without adding to undo history (import is a new starting point)
+    replaceSchema({
       name: importedSchema.name || 'Imported Schema',
       description: importedSchema.description || '',
       tables: importedSchema.tables,
@@ -765,7 +852,7 @@ export default function SchemaDesignerPage() {
         });
       });
     }
-  }, []);
+  }, [replaceSchema]);
 
   // Auto-layout tables
   const handleAutoLayout = useCallback((algorithm: LayoutAlgorithm = 'hierarchical') => {
@@ -776,8 +863,8 @@ export default function SchemaDesignerPage() {
     setSchema({
       ...schema,
       tables: layoutedTables,
-    });
-  }, [schema]);
+    }, 'Auto-layout');
+  }, [schema, setSchema]);
 
   // Export canvas as image
   const handleExportImage = useCallback(async (format: 'png' | 'svg') => {
@@ -844,6 +931,23 @@ export default function SchemaDesignerPage() {
 
       if (modifier) {
         switch (e.key.toLowerCase()) {
+          case 'z':
+            // Cmd/Ctrl + Z: Undo
+            if (e.shiftKey) {
+              // Cmd/Ctrl + Shift + Z: Redo
+              if (canRedo) {
+                e.preventDefault();
+                redo();
+              }
+            } else {
+              // Cmd/Ctrl + Z: Undo
+              if (canUndo) {
+                e.preventDefault();
+                undo();
+              }
+            }
+            break;
+          
           case 'e':
             // Cmd/Ctrl + E: Export schema
             if (schema.tables.length > 0) {
@@ -885,161 +989,166 @@ export default function SchemaDesignerPage() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [schema.tables, isColumnEditorOpen, isIndexManagerOpen, isExportModalOpen, isImportModalOpen, confirmDialog.isOpen, inputDialog.isOpen, alertDialog.isOpen, handleAddTable, handleReset, handleAutoLayout]);
+  }, [schema.tables, isColumnEditorOpen, isIndexManagerOpen, isExportModalOpen, isImportModalOpen, confirmDialog.isOpen, inputDialog.isOpen, alertDialog.isOpen, canUndo, canRedo, undo, redo, handleAddTable, handleReset, handleAutoLayout]);
 
   return (
     <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12 sm:pb-16">
-      {/* Header */}
+      {/* Header - Industry Standard */}
       <div className="mb-6">
         <div className="flex items-center justify-between mb-4">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-foreground font-mono mb-2">
+          <div className="flex items-center gap-4">
+            <h1 className="text-2xl sm:text-3xl font-bold text-foreground font-mono">
               Schema Designer
             </h1>
-            <p className="text-sm text-foreground/60 font-mono">
-              → visual database design • drag & drop • export to code
-            </p>
+            {/* Auto-save status - integrated with title */}
+            {isStorageEnabled && lastSavedTime && (
+              <div className="flex items-center gap-1.5 text-xs text-foreground/50 font-mono">
+                <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z" />
+                </svg>
+                <span>{formatTimestamp(lastSavedTime)}</span>
+              </div>
+            )}
           </div>
 
-          <div className="flex items-center gap-2">
-            {schema.tables.length > 0 && (
-              <>
               <button
-                onClick={handleReset}
-                className="px-3 py-2 text-sm font-medium text-foreground/70 hover:text-red-600 hover:bg-red-500/10 border border-foreground/10 hover:border-red-500/20 rounded-lg transition-all font-mono flex items-center gap-2"
-                  title="Delete all tables and start fresh"
-                  aria-label="Reset schema"
+            onClick={() => setIsExportModalOpen(true)}
+            disabled={schema.tables.length === 0}
+            className="px-4 py-2 text-sm font-semibold text-white bg-primary hover:bg-primary/90 rounded-lg transition-all font-mono flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed active:scale-95 shadow-sm"
+            title={schema.tables.length === 0 ? 'Add tables to enable export' : 'Export schema (Cmd+E)'}
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
                 </svg>
-                Reset
+            Export
               </button>
-
-                {/* Auto-Index FKs button - only show when FKs need optimization */}
-                {hasFKsWithoutIndexes && (
-                  <button
-                    onClick={handleAutoIndexForeignKeys}
-                    disabled={isOptimizingFKs}
-                    className="px-3 py-2 text-sm font-medium text-purple-600 dark:text-purple-400 hover:text-purple-700 hover:bg-purple-500/10 border border-purple-500/20 hover:border-purple-500/30 rounded-lg transition-all font-mono flex items-center gap-2 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
-                    title={isOptimizingFKs ? 'Creating indexes...' : 'Automatically create indexes for all foreign key columns to optimize JOIN performance'}
-                    aria-label="Auto-create foreign key indexes"
-                    aria-busy={isOptimizingFKs}
-                  >
-                    {isOptimizingFKs ? (
-                      <svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                      </svg>
-                    ) : (
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                      </svg>
-                    )}
-                    <span className="hidden sm:inline">{isOptimizingFKs ? 'Optimizing...' : 'Auto-Index FKs'}</span>
-                    <span className="sm:hidden">{isOptimizingFKs ? '...' : 'Optimize'}</span>
-                  </button>
-                )}
-              </>
-            )}
+        </div>
             
+        {/* Toolbar - Clean and consistent */}
+        <div className="flex items-center justify-between gap-3 px-3 py-2 bg-foreground/[0.03] border border-foreground/10 rounded-lg">
+          <div className="flex items-center gap-1.5">
+            {/* History group */}
+            <div className="flex items-center gap-0.5">
             <button
-              onClick={() => setIsExportModalOpen(true)}
-              disabled={schema.tables.length === 0}
-              className="px-4 py-2 text-sm font-medium text-white bg-primary hover:bg-primary/90 rounded-lg transition-all font-mono flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed active:scale-95"
-              title={schema.tables.length === 0 ? 'Add tables to enable export' : 'Export schema to SQL, Prisma, or JSON'}
+                onClick={undo}
+                disabled={!canUndo}
+                className="p-2 text-foreground/70 hover:text-foreground hover:bg-foreground/10 rounded transition-all disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                title={canUndo ? `Undo (Cmd+Z)` : 'Nothing to undo'}
+                aria-label="Undo"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
               </svg>
-              Export
+              </button>
+              <button
+                onClick={redo}
+                disabled={!canRedo}
+                className="p-2 text-foreground/70 hover:text-foreground hover:bg-foreground/10 rounded transition-all disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                title={canRedo ? 'Redo (Cmd+Shift+Z)' : 'Nothing to redo'}
+                aria-label="Redo"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 10h-10a8 8 0 00-8 8v2M21 10l-6 6m6-6l-6-6" />
+                </svg>
             </button>
-          </div>
         </div>
 
-        {/* Action Bar */}
-        <div className="flex items-center gap-2 flex-wrap">
+            <div className="w-px h-5 bg-foreground/10"></div>
+            
+            {/* Primary action */}
           <button
             onClick={handleAddTable}
-            className="px-4 py-2 text-sm font-medium bg-foreground/10 hover:bg-foreground/15 active:bg-foreground/20 border border-foreground/10 text-foreground rounded-lg transition-all flex items-center gap-2 font-mono active:scale-95"
-            title="Create a new table"
-            aria-label="Add new table"
+              className="px-3 py-1.5 text-sm font-medium bg-primary text-white hover:bg-primary/90 rounded transition-all flex items-center gap-1.5 font-mono active:scale-95"
+              title="Create a new table (Cmd+T)"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
             </svg>
-            Add Table
+              New Table
+            </button>
+            
+            <div className="w-px h-5 bg-foreground/10"></div>
+            
+            {/* File actions group */}
+            <button
+              onClick={() => setIsImportModalOpen(true)}
+              className="px-2 py-1.5 text-foreground/70 hover:text-foreground hover:bg-foreground/10 rounded transition-all flex items-center gap-1.5"
+              title="Import schema (Cmd+I)"
+              aria-label="Import schema"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+              </svg>
+              <span className="text-xs font-medium hidden lg:inline">Import</span>
           </button>
 
           <button
             onClick={() => setIsTemplatesOpen(!isTemplatesOpen)}
-            className="px-4 py-2 text-sm font-medium bg-foreground/5 hover:bg-foreground/10 border border-foreground/10 text-foreground rounded-lg transition-all flex items-center gap-2 font-mono"
-            title={isTemplatesOpen ? 'Close templates' : 'Show pre-built schema templates'}
-            aria-label={isTemplatesOpen ? 'Close templates' : 'Show templates'}
-            aria-expanded={isTemplatesOpen}
+              className="px-2 py-1.5 text-foreground/70 hover:text-foreground hover:bg-foreground/10 rounded transition-all flex items-center gap-1.5"
+              title="Templates"
+              aria-label="Templates"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h4a1 1 0 011 1v7a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM14 5a1 1 0 011-1h4a1 1 0 011 1v7a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 17a1 1 0 011-1h4a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1v-2zM14 17a1 1 0 011-1h4a1 1 0 011 1v2a1 1 0 01-1 1h-4a1 1 0 01-1-1v-2z" />
             </svg>
-            Templates
-            <svg
-              className={`w-3.5 h-3.5 transition-transform ${isTemplatesOpen ? 'rotate-180' : ''}`}
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              aria-hidden="true"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-            </svg>
-          </button>
-
-          <button
-            onClick={() => setIsImportModalOpen(true)}
-            className="px-4 py-2 text-sm font-medium bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 text-blue-600 dark:text-blue-400 rounded-lg transition-all flex items-center gap-2 font-mono active:scale-95"
-            title="Import existing SQL or Prisma schema (Cmd+I)"
-            aria-label="Import schema"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-            </svg>
-            Import
-          </button>
-
-          {schema.tables.length > 1 && (
-            <button
-              onClick={() => handleAutoLayout('hierarchical')}
-              className="px-4 py-2 text-sm font-medium bg-green-500/10 hover:bg-green-500/20 border border-green-500/20 text-green-600 dark:text-green-400 rounded-lg transition-all flex items-center gap-2 font-mono active:scale-95"
-              title="Automatically arrange tables by dependencies (Cmd+L)"
-              aria-label="Auto-layout tables"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h4a1 1 0 011 1v7a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM14 5a1 1 0 011-1h4a1 1 0 011 1v7a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 17a1 1 0 011-1h4a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1v-2zM14 17a1 1 0 011-1h4a1 1 0 011 1v2a1 1 0 01-1 1h-4a1 1 0 01-1-1v-2z" />
-              </svg>
-              <span className="hidden sm:inline">Auto-Layout</span>
-              <span className="sm:hidden">Layout</span>
+              <span className="text-xs font-medium hidden lg:inline">Templates</span>
             </button>
-          )}
-
-          {schema.tables.length > 0 && (() => {
-            // Compute stats once to avoid multiple reduce calls
-            const totalColumns = schema.tables.reduce((sum, t) => sum + t.columns.length, 0);
-            const totalIndexes = schema.tables.reduce((sum, t) => sum + (t.indexes?.length || 0), 0);
             
-            return (
-              <div className="ml-auto flex items-center gap-2 text-xs font-mono text-foreground/60" role="status" aria-live="polite">
-                <span className="px-2 py-1 bg-foreground/10 rounded" aria-label={`${schema.tables.length} tables in schema`}>
-                {schema.tables.length} table{schema.tables.length !== 1 ? 's' : ''}
-              </span>
-                <span className="px-2 py-1 bg-foreground/10 rounded" aria-label={`${totalColumns} columns total`}>
-                  {totalColumns} column{totalColumns !== 1 ? 's' : ''}
-                </span>
-                {totalIndexes > 0 && (
-                  <span className="px-2 py-1 bg-purple-500/10 text-purple-600 dark:text-purple-400 rounded" aria-label={`${totalIndexes} indexes for performance optimization`}>
-                    {totalIndexes} index{totalIndexes !== 1 ? 'es' : ''}
-              </span>
-                )}
+            {schema.tables.length > 1 && (
+              <button
+                onClick={() => handleAutoLayout('hierarchical')}
+                className="px-2 py-1.5 text-foreground/70 hover:text-foreground hover:bg-foreground/10 rounded transition-all flex items-center gap-1.5"
+                title="Auto-arrange tables (Cmd+L)"
+                aria-label="Auto-layout"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h4a1 1 0 011 1v7a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM14 5a1 1 0 011-1h4a1 1 0 011 1v7a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 17a1 1 0 011-1h4a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1v-2zM14 17a1 1 0 011-1h4a1 1 0 011 1v2a1 1 0 01-1 1h-4a1 1 0 01-1-1v-2z" />
+            </svg>
+                <span className="text-xs font-medium hidden lg:inline">Layout</span>
+          </button>
+            )}
+            
+            {hasFKsWithoutIndexes && (
+              <>
+                <div className="w-px h-5 bg-foreground/10"></div>
+                <button
+                  onClick={handleAutoIndexForeignKeys}
+                  disabled={isOptimizingFKs}
+                  className="px-2 py-1.5 text-purple-600 dark:text-purple-400 hover:bg-purple-500/10 rounded transition-all flex items-center gap-1.5 disabled:opacity-50"
+                  title={isOptimizingFKs ? 'Creating indexes...' : 'Auto-create indexes for foreign keys'}
+                  aria-label="Optimize foreign keys"
+                >
+                  {isOptimizingFKs ? (
+                    <svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                  ) : (
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                  )}
+                  <span className="text-xs font-medium hidden lg:inline">{isOptimizingFKs ? 'Optimizing...' : 'Optimize'}</span>
+                </button>
+              </>
+            )}
             </div>
-            );
-          })()}
+          
+          {/* Right side actions */}
+          <div className="flex items-center gap-1.5">
+            {schema.tables.length > 0 && (
+              <button
+                onClick={handleReset}
+                className="px-2 py-1.5 text-foreground/60 hover:text-red-600 hover:bg-red-500/10 rounded transition-all flex items-center gap-1.5"
+                title="Reset schema (Cmd+Shift+R)"
+                aria-label="Reset schema"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+                <span className="text-xs font-medium hidden lg:inline">Reset</span>
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -1092,6 +1201,43 @@ export default function SchemaDesignerPage() {
         </section>
       )}
 
+      {/* Schema Stats Bar (only show if there are tables) */}
+      {schema.tables.length > 0 && (
+        <div className="mb-6 w-full flex items-center justify-between px-4 py-2.5 bg-foreground/5 border border-foreground/10 rounded-lg">
+          <div className="flex items-center gap-2">
+            <svg className="w-4 h-4 text-foreground/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+            </svg>
+            <span className="text-sm text-foreground/60 font-mono">Current Schema:</span>
+          </div>
+          
+          {(() => {
+            const totalColumns = schema.tables.reduce((sum, t) => sum + t.columns.length, 0);
+            const totalIndexes = schema.tables.reduce((sum, t) => sum + (t.indexes?.length || 0), 0);
+            
+            return (
+              <div className="flex items-center gap-3 text-sm font-mono">
+                <span className="text-foreground font-semibold">
+                  {schema.tables.length} {schema.tables.length === 1 ? 'Table' : 'Tables'}
+                </span>
+                <span className="text-foreground/30">•</span>
+                <span className="text-foreground/70">
+                  {totalColumns} {totalColumns === 1 ? 'Column' : 'Columns'}
+                </span>
+                {totalIndexes > 0 && (
+                  <>
+                    <span className="text-foreground/30">•</span>
+                    <span className="text-purple-600 dark:text-purple-400 font-semibold">
+                      {totalIndexes} {totalIndexes === 1 ? 'Index' : 'Indexes'}
+                    </span>
+                  </>
+                )}
+              </div>
+            );
+          })()}
+        </div>
+      )}
+
       {/* Canvas */}
       {schema.tables.length === 0 ? (
         <section className="flex flex-col items-center justify-center py-20 text-center bg-white dark:bg-[#1a1a1a] border border-foreground/10 rounded-lg" role="region" aria-label="Empty schema canvas">
@@ -1133,15 +1279,15 @@ export default function SchemaDesignerPage() {
         <section role="region" aria-label="Schema design canvas">
           <ReactFlowProvider>
         <div ref={(el) => setCanvasRef(el)}>
-          <SchemaCanvas
-            schema={schema}
-            onSchemaChange={setSchema}
-            onEditTable={handleEditTable}
-            onAddColumn={handleAddColumn}
+        <SchemaCanvas
+          schema={schema}
+          onSchemaChange={setSchema}
+          onEditTable={handleEditTable}
+          onAddColumn={handleAddColumn}
             onEditColumn={handleEditColumn}
             onDeleteTable={handleDeleteTable}
             onManageIndexes={handleManageIndexes}
-          />
+        />
         </div>
           </ReactFlowProvider>
         </section>
@@ -1191,7 +1337,7 @@ export default function SchemaDesignerPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                 </svg>
                 <span className="text-xs font-semibold text-foreground/80 font-mono">Editing</span>
-              </div>
+          </div>
               <ul className="text-xs text-foreground/60 font-mono space-y-1.5 leading-relaxed">
                 <li className="flex items-start gap-1.5">
                   <span className="text-foreground/40 flex-shrink-0">•</span>
@@ -1206,7 +1352,7 @@ export default function SchemaDesignerPage() {
                   <span>Use Column Editor for foreign keys</span>
                 </li>
               </ul>
-            </div>
+        </div>
 
             {/* Performance */}
             <div>
@@ -1243,15 +1389,15 @@ export default function SchemaDesignerPage() {
               <ul className="text-xs text-foreground/60 font-mono space-y-1.5 leading-relaxed">
                 <li className="flex items-start gap-1.5">
                   <span className="text-foreground/40 flex-shrink-0">•</span>
-                  <span><kbd className="px-1 py-0.5 bg-foreground/10 rounded text-[10px]">Cmd+I</kbd> Import SQL/Prisma</span>
+                  <span><kbd className="px-1 py-0.5 bg-foreground/10 rounded text-[10px]">Cmd+Z</kbd> Undo changes</span>
+                </li>
+                <li className="flex items-start gap-1.5">
+                  <span className="text-foreground/40 flex-shrink-0">•</span>
+                  <span><kbd className="px-1 py-0.5 bg-foreground/10 rounded text-[10px]">Cmd+I</kbd> Import schema</span>
                 </li>
                 <li className="flex items-start gap-1.5">
                   <span className="text-foreground/40 flex-shrink-0">•</span>
                   <span><kbd className="px-1 py-0.5 bg-foreground/10 rounded text-[10px]">Cmd+L</kbd> Auto-layout</span>
-                </li>
-                <li className="flex items-start gap-1.5">
-                  <span className="text-foreground/40 flex-shrink-0">•</span>
-                  <span><kbd className="px-1 py-0.5 bg-foreground/10 rounded text-[10px]">Cmd+E</kbd> Export</span>
                 </li>
               </ul>
             </div>
