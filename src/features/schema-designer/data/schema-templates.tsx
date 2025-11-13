@@ -403,6 +403,7 @@ export const SCHEMA_TEMPLATES: SchemaTemplate[] = [
           ],
           indexes: [
             { id: 'idx-sl-11', name: 'idx_messages_channel', columns: ['channel_id', 'created_at'], type: 'BTREE', unique: false, comment: 'Channel history pagination' },
+            { id: 'idx-sl-16', name: 'idx_messages_user', columns: ['user_id'], type: 'BTREE', unique: false, comment: 'Foreign key index for user messages' },
             { id: 'idx-sl-12', name: 'idx_messages_thread', columns: ['thread_id'], type: 'BTREE', unique: false, comment: 'Thread replies' },
           ],
         },
@@ -419,6 +420,7 @@ export const SCHEMA_TEMPLATES: SchemaTemplate[] = [
           ],
           indexes: [
             { id: 'idx-sl-13', name: 'idx_reactions_message', columns: ['message_id'], type: 'BTREE', unique: false },
+            { id: 'idx-sl-17', name: 'idx_reactions_user', columns: ['user_id'], type: 'BTREE', unique: false, comment: 'Foreign key index for user reactions' },
             { id: 'idx-sl-14', name: 'idx_reactions_unique', columns: ['message_id', 'user_id', 'emoji'], type: 'BTREE', unique: true, comment: 'One reaction per user per emoji' },
           ],
         },

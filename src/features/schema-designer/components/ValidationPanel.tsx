@@ -153,13 +153,25 @@ function findIssues(schema: SchemaState): ValidationIssue[] {
     const indexes = table.indexes || [];
     
     for (const fkCol of fkColumns) {
-      const hasIndex = indexes.some(idx => 
-        idx.columns.length === 1 && idx.columns[0] === fkCol.name
-      ) || indexes.some(idx => 
-        idx.columns.length > 1 && idx.columns[0] === fkCol.name
-      );
+      // Skip if column is already a PK or UNIQUE (automatically indexed)
+      if (fkCol.primaryKey || fkCol.unique) {
+        continue;
+      }
+      
+      // Check if there's an index on this column (single or composite with this as first column)
+      const hasIndex = indexes.some(idx => {
+        // Single-column index
+        if (idx.columns.length === 1 && idx.columns[0] === fkCol.name) {
+          return true;
+        }
+        // Composite index with FK column as leftmost (benefits FK lookups)
+        if (idx.columns.length > 1 && idx.columns[0] === fkCol.name) {
+          return true;
+        }
+        return false;
+      });
 
-      if (!hasIndex && !fkCol.primaryKey && !fkCol.unique) {
+      if (!hasIndex) {
         issues.push({
           type: 'warning',
           category: 'performance',
@@ -209,15 +221,26 @@ function findIssues(schema: SchemaState): ValidationIssue[] {
       }
     }
 
-    // Check for potential many-to-many relationships
-    if (table.columns.length === 2) {
+    // Check for potential many-to-many relationships that might benefit from metadata
+    // Only suggest for junction tables with activity patterns (likes, follows, joins, members)
+    const activityPatterns = ['like', 'follow', 'member', 'join', 'subscription', 'enrollment', 'participation'];
+    const hasActivityPattern = activityPatterns.some(pattern => table.name.toLowerCase().includes(pattern));
+    
+    if (hasActivityPattern && table.columns.length <= 3) {
       const fks = table.columns.filter(c => c.references);
-      if (fks.length === 2 && !table.columns.some(c => !c.references && !c.primaryKey)) {
+      const hasTimestamp = table.columns.some(c => 
+        c.name.toLowerCase().includes('created_at') || 
+        c.name.toLowerCase().includes('joined_at') ||
+        c.name.toLowerCase().includes('timestamp')
+      );
+      
+      // Suggest adding timestamps only for activity-based junction tables without them
+      if (fks.length >= 2 && !hasTimestamp) {
         issues.push({
           type: 'suggestion',
-          category: 'structure',
+          category: 'best-practice',
           table: table.name,
-          message: 'This looks like a junction table. Consider adding created_at or other metadata columns.',
+          message: 'Consider adding a timestamp column to track when this relationship was created.',
         });
       }
     }
@@ -263,6 +286,7 @@ function findIssues(schema: SchemaState): ValidationIssue[] {
 
 /**
  * Find circular dependencies in foreign keys
+ * Note: Self-referencing tables (tree structures) are NOT circular dependencies
  */
 function findCircularDependencies(tables: SchemaTable[]): string[][] {
   const cycles: string[][] = [];
@@ -274,7 +298,13 @@ function findCircularDependencies(tables: SchemaTable[]): string[][] {
       // Found a cycle
       const cycleStart = path.indexOf(tableName);
       if (cycleStart !== -1) {
-        cycles.push([...path.slice(cycleStart), tableName]);
+        const cycle = [...path.slice(cycleStart), tableName];
+        
+        // Filter out self-references (single table cycles)
+        // Self-references like messages→messages are valid tree structures, not circular dependencies
+        if (cycle.length > 2 || (cycle.length === 2 && cycle[0] !== cycle[1])) {
+          cycles.push(cycle);
+        }
       }
       return;
     }
@@ -297,6 +327,10 @@ function findCircularDependencies(tables: SchemaTable[]): string[][] {
       );
 
       for (const refTable of referencedTables) {
+        // Skip self-references in the traversal (they're not circular dependencies)
+        if (refTable === tableName) {
+          continue;
+        }
         dfs(refTable, [...path]);
       }
     }
@@ -310,6 +344,19 @@ function findCircularDependencies(tables: SchemaTable[]): string[][] {
     }
   }
 
-  return cycles;
+  // Remove duplicate cycles (same cycle found from different starting points)
+  const uniqueCycles: string[][] = [];
+  const seenCycles = new Set<string>();
+  
+  for (const cycle of cycles) {
+    // Normalize cycle by sorting to detect duplicates
+    const normalized = [...cycle].sort().join('→');
+    if (!seenCycles.has(normalized)) {
+      seenCycles.add(normalized);
+      uniqueCycles.push(cycle);
+    }
+  }
+
+  return uniqueCycles;
 }
 
