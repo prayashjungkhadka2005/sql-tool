@@ -83,9 +83,11 @@ export default function ColumnEditor({
     if (column) {
       setFormData(column);
     } else {
-      // Reset for new column
+      // Reset for new column - generate unique ID
+      const timestamp = Date.now();
+      const random = Math.random().toString(36).substring(2, 9);
       setFormData({
-        id: Date.now().toString(),
+        id: `col-${timestamp}-${random}`,
         name: '',
         type: 'VARCHAR',
         length: 255,
@@ -168,14 +170,49 @@ export default function ColumnEditor({
       return;
     }
 
-    // Validation 8: Foreign key must reference existing table/column
+    // Validation 8: Only one AUTO INCREMENT column per table
+    if (formData.autoIncrement) {
+      const currentTable = allTables.find(t => t.name === tableName);
+      const hasOtherAutoIncrement = currentTable?.columns.some(
+        c => c.id !== formData.id && c.autoIncrement
+      );
+      
+      if (hasOtherAutoIncrement) {
+        setValidationError('A table can have only one AUTO INCREMENT column');
+        return;
+      }
+    }
+
+    // Validation 9: Column name max length (for UI and DB compatibility)
+    if (formData.name.length > 64) {
+      setValidationError('Column name must be 64 characters or less');
+      return;
+    }
+
+    // Validation 10: Foreign key must reference existing table/column
     if (formData.references) {
+      // Check for self-reference
+      if (formData.references.table === tableName) {
+        setConfirmDialog({
+          isOpen: true,
+          title: 'Self-Referencing Table',
+          message: `This will create a self-referencing foreign key (table references itself).\n\nCommon for hierarchical data like:\n• Employee → Manager (same table)\n• Category → Parent Category\n• Comment → Reply To\n\nDo you want to continue?`,
+          onConfirm: () => {
+            setValidationError(null);
+            onSave(formData);
+            onClose();
+            setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+          },
+        });
+        return;
+      }
+
       const refTable = allTables.find(t => t.name === formData.references?.table);
       if (!refTable) {
         setValidationError(`Referenced table "${formData.references.table}" does not exist`);
         return;
       }
-      
+
       const refColumn = refTable.columns.find(c => c.name === formData.references?.column);
       if (!refColumn) {
         setValidationError(`Referenced column "${formData.references.table}.${formData.references.column}" does not exist`);
@@ -184,8 +221,19 @@ export default function ColumnEditor({
 
       // Warning: FK should reference primary key or unique column
       if (!refColumn.primaryKey && !refColumn.unique) {
-        // Just a warning, don't block save
-        console.warn(`FK references non-unique column: ${formData.references.table}.${formData.references.column}`);
+        // Show warning dialog but allow save
+        setConfirmDialog({
+          isOpen: true,
+          title: 'Foreign Key Warning',
+          message: `Column "${formData.references.table}.${formData.references.column}" is not a primary key or unique column.\n\nForeign keys should typically reference primary keys or unique columns.\n\nDo you want to continue?`,
+          onConfirm: () => {
+            setValidationError(null);
+            onSave(formData);
+            onClose();
+            setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+          },
+        });
+        return;
       }
     }
 
@@ -242,13 +290,14 @@ export default function ColumnEditor({
                   {isEditing ? 'Edit Column' : 'Add Column'}
                 </h3>
                 <p className="text-xs text-foreground/40 font-mono mt-0.5">
-                  {tableName}
+                  {tableName} <span className="text-foreground/30">• Press Esc to close</span>
                 </p>
               </div>
               <button
                 onClick={onClose}
                 className="p-1.5 hover:bg-foreground/10 rounded-lg transition-all"
                 aria-label="Close"
+                title="Close (Esc)"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -281,13 +330,26 @@ export default function ColumnEditor({
                 </label>
                 <select
                   value={formData.type}
-                  onChange={(e) => setFormData({ ...formData, type: e.target.value as SQLDataType })}
+                  onChange={(e) => {
+                    const newType = e.target.value as SQLDataType;
+                    setFormData({ 
+                      ...formData, 
+                      type: newType,
+                      // Auto-disable AUTO_INCREMENT if type changes from INTEGER
+                      autoIncrement: newType === 'INTEGER' ? formData.autoIncrement : false,
+                    });
+                  }}
                   className="w-full px-3 py-2 bg-[#fafafa] dark:bg-black/40 border border-foreground/10 hover:border-foreground/20 focus:border-foreground/30 rounded text-sm text-foreground focus:outline-none transition-all font-mono"
                 >
                   {DATA_TYPES.map(type => (
                     <option key={type} value={type}>{type}</option>
                   ))}
                 </select>
+                {formData.autoIncrement && formData.type !== 'INTEGER' && (
+                  <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-1 font-mono">
+                    ⚠️ AUTO_INCREMENT was disabled (only valid for INTEGER)
+                  </p>
+                )}
               </div>
 
               {/* Length (for VARCHAR) */}
@@ -442,31 +504,41 @@ export default function ColumnEditor({
                 </label>
 
                 {/* Enable/Disable FK */}
-                <label className="flex items-center gap-2 mb-3 p-2.5 bg-[#fafafa] dark:bg-black/40 border border-foreground/10 rounded cursor-pointer hover:bg-foreground/5">
-                  <input
-                    type="checkbox"
-                    checked={!!formData.references}
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        setFormData({
-                          ...formData,
-                          references: {
-                            table: allTables.filter(t => t.name !== tableName)[0]?.name || '',
-                            column: 'id',
-                            onDelete: 'CASCADE',
-                            onUpdate: 'CASCADE',
-                          },
-                        });
-                      } else {
-                        setFormData({ ...formData, references: undefined });
-                      }
-                    }}
-                    className="w-4 h-4"
-                  />
-                  <span className="text-xs font-mono text-foreground">
-                    This column references another table
-                  </span>
-                </label>
+                {allTables.filter(t => t.name !== tableName).length === 0 ? (
+                  <div className="mb-3 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
+                    <p className="text-xs text-yellow-700 dark:text-yellow-400 font-mono">
+                      No other tables available. Create another table first to add foreign key references.
+                    </p>
+                  </div>
+                ) : (
+                  <label className="flex items-center gap-2 mb-3 p-2.5 bg-[#fafafa] dark:bg-black/40 border border-foreground/10 rounded cursor-pointer hover:bg-foreground/5">
+                    <input
+                      type="checkbox"
+                      checked={!!formData.references}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          const otherTables = allTables.filter(t => t.name !== tableName);
+                          const firstTable = otherTables[0];
+                          setFormData({
+                            ...formData,
+                            references: {
+                              table: firstTable?.name || '',
+                              column: 'id',
+                              onDelete: 'CASCADE',
+                              onUpdate: 'CASCADE',
+                            },
+                          });
+                        } else {
+                          setFormData({ ...formData, references: undefined });
+                        }
+                      }}
+                      className="w-4 h-4"
+                    />
+                    <span className="text-xs font-mono text-foreground">
+                      This column references another table
+                    </span>
+                  </label>
+                )}
 
                 {/* FK Configuration */}
                 {formData.references && (

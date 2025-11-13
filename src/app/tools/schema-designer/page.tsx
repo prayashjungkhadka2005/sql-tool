@@ -6,6 +6,7 @@
 "use client";
 
 import { useState, useCallback } from 'react';
+import { ReactFlowProvider } from 'reactflow';
 import { SchemaState, SchemaTable, SchemaColumn, SchemaTemplate } from '@/features/schema-designer/types';
 import SchemaCanvas from '@/features/schema-designer/components/SchemaCanvas';
 import ColumnEditor from '@/features/schema-designer/components/ColumnEditor';
@@ -18,7 +19,7 @@ export default function SchemaDesignerPage() {
   const [schema, setSchema] = useState<SchemaState>({
     name: 'My Database',
     tables: [],
-    relationships: [],
+    relationships: [], // Deprecated: kept for backward compatibility
   });
 
   const [isColumnEditorOpen, setIsColumnEditorOpen] = useState(false);
@@ -76,12 +77,16 @@ export default function SchemaDesignerPage() {
       tableName = `table_${counter}`;
     }
 
+    // Generate unique IDs to prevent collision
+    const timestamp = Date.now();
+    const random = Math.random().toString(36).substring(2, 9);
+
     const newTable: SchemaTable = {
-      id: `table-${Date.now()}`,
+      id: `table-${timestamp}-${random}`,
       name: tableName,
       columns: [
         {
-          id: `col-${Date.now()}`,
+          id: `col-${timestamp}-${random}`,
           name: 'id',
           type: 'INTEGER',
           nullable: false,
@@ -133,6 +138,16 @@ export default function SchemaDesignerPage() {
           return;
         }
 
+        // Validate: max length (for UI and DB compatibility)
+        if (newName.length > 64) {
+          setAlertDialog({
+            isOpen: true,
+            title: 'Table Name Too Long',
+            message: 'Table name must be 64 characters or less.',
+          });
+          return;
+        }
+
         // Update table name AND all foreign key references
         const oldName = table.name;
         const newNameLower = newName.toLowerCase();
@@ -155,21 +170,14 @@ export default function SchemaDesignerPage() {
               }
               return col;
             });
-            return { ...t, columns: updatedColumns };
-          }
-        });
-
-        // Update relationships
-        const updatedRelationships = schema.relationships.map(rel => ({
-          ...rel,
-          fromTable: rel.fromTable === table.id ? table.id : rel.fromTable,
-          toTable: rel.toTable === table.id ? table.id : rel.toTable,
-        }));
+          return { ...t, columns: updatedColumns };
+        }
+      });
 
         setSchema({
           ...schema,
           tables: updatedTables,
-          relationships: updatedRelationships,
+          // relationships are auto-generated from FK columns, no manual update needed
         });
 
         setInputDialog(prev => ({ ...prev, isOpen: false }));
@@ -286,6 +294,10 @@ export default function SchemaDesignerPage() {
       title: 'Load Template?',
       message: `Load "${template.name}" template?\n\nThis will replace your current schema.`,
       onConfirm: () => {
+        // Close any open editors to prevent state conflicts
+        setIsColumnEditorOpen(false);
+        setEditingColumn(null);
+        
         setSchema(template.schema);
         setIsTemplatesOpen(false);
         setConfirmDialog(prev => ({ ...prev, isOpen: false }));
@@ -298,16 +310,25 @@ export default function SchemaDesignerPage() {
     const table = schema.tables.find(t => t.id === tableId);
     if (!table) return;
 
-    // Count related relationships
-    const relatedCount = schema.relationships.filter(
-      r => r.fromTable === tableId || r.toTable === tableId
-    ).length;
+    // Count FK references TO this table (from other tables)
+    const incomingFKCount = schema.tables.reduce((count, t) => {
+      if (t.id === tableId) return count;
+      return count + t.columns.filter(col => 
+        col.references && col.references.table === table.name
+      ).length;
+    }, 0);
 
     setConfirmDialog({
       isOpen: true,
       title: 'Delete Table?',
-      message: `Delete table "${table.name}"?${relatedCount > 0 ? `\n\nThis will also remove ${relatedCount} relationship${relatedCount > 1 ? 's' : ''}.` : ''}\n\nThis action cannot be undone.`,
+      message: `Delete table "${table.name}"?${incomingFKCount > 0 ? `\n\nThis table is referenced by ${incomingFKCount} foreign key${incomingFKCount > 1 ? 's' : ''} in other tables. These FK references will be removed.` : ''}\n\nThis action cannot be undone.`,
       onConfirm: () => {
+        // Close editor if this table is being edited
+        if (editingColumn?.table.id === tableId) {
+          setIsColumnEditorOpen(false);
+          setEditingColumn(null);
+        }
+
         // Remove table AND clean up all FK references to it
         const deletedTableName = table.name;
         
@@ -325,22 +346,16 @@ export default function SchemaDesignerPage() {
             });
             return { ...t, columns: updatedColumns };
           });
-        
-        // Remove related relationships
-        const updatedRelationships = schema.relationships.filter(
-          r => r.fromTable !== tableId && r.toTable !== tableId
-        );
 
         setSchema({
           ...schema,
           tables: updatedTables,
-          relationships: updatedRelationships,
         });
         
         setConfirmDialog(prev => ({ ...prev, isOpen: false }));
       },
     });
-  }, [schema]);
+  }, [schema, editingColumn]);
 
   // Reset schema
   const handleReset = useCallback(() => {
@@ -349,10 +364,14 @@ export default function SchemaDesignerPage() {
       title: 'Reset Schema?',
       message: 'This will delete all tables and start fresh.\n\nThis action cannot be undone.',
       onConfirm: () => {
+        // Close any open editors to prevent state conflicts
+        setIsColumnEditorOpen(false);
+        setEditingColumn(null);
+        
         setSchema({
           name: 'My Database',
           tables: [],
-          relationships: [],
+          relationships: [], // Deprecated: kept for backward compatibility
         });
         setConfirmDialog(prev => ({ ...prev, isOpen: false }));
       },
@@ -390,6 +409,7 @@ export default function SchemaDesignerPage() {
               onClick={() => setIsExportModalOpen(true)}
               disabled={schema.tables.length === 0}
               className="px-4 py-2 text-sm font-medium text-white bg-primary hover:bg-primary/90 rounded-lg transition-all font-mono flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed active:scale-95"
+              title={schema.tables.length === 0 ? 'Add tables to enable export' : 'Export schema to SQL, Prisma, or JSON'}
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
@@ -445,9 +465,21 @@ export default function SchemaDesignerPage() {
       {/* Templates Grid */}
       {isTemplatesOpen && (
         <div className="mb-6 p-5 sm:p-6 bg-white dark:bg-[#1a1a1a] border border-foreground/10 rounded-lg">
-          <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider mb-4 font-mono">
-            Schema Templates
-          </h3>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider font-mono">
+              Schema Templates
+            </h3>
+            <button
+              onClick={() => setIsTemplatesOpen(false)}
+              className="p-1.5 hover:bg-foreground/10 rounded-lg transition-all"
+              title="Close templates"
+              aria-label="Close templates"
+            >
+              <svg className="w-4 h-4 text-foreground/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {SCHEMA_TEMPLATES.map(template => (
               <button
@@ -513,14 +545,16 @@ export default function SchemaDesignerPage() {
           </div>
         </div>
       ) : (
-        <SchemaCanvas
-          schema={schema}
-          onSchemaChange={setSchema}
-          onEditTable={handleEditTable}
-          onAddColumn={handleAddColumn}
-          onEditColumn={handleEditColumn}
-          onDeleteTable={handleDeleteTable}
-        />
+        <ReactFlowProvider>
+          <SchemaCanvas
+            schema={schema}
+            onSchemaChange={setSchema}
+            onEditTable={handleEditTable}
+            onAddColumn={handleAddColumn}
+            onEditColumn={handleEditColumn}
+            onDeleteTable={handleDeleteTable}
+          />
+        </ReactFlowProvider>
       )}
 
       {/* Help Tips */}
@@ -537,7 +571,8 @@ export default function SchemaDesignerPage() {
                 <li>→ Click on any column to edit it, or use &quot;Add Column&quot; button</li>
                 <li>→ Click &quot;Edit&quot; button in table header to rename table</li>
                 <li>→ Drag from one table to another to create relationships</li>
-                <li>→ Use the mini-map (bottom-right) for navigation</li>
+                <li>→ Scroll normally to navigate page (works over canvas too)</li>
+                <li>→ Use zoom buttons (bottom-left) or pinch to zoom in/out</li>
                 <li>→ Click &quot;Export&quot; to generate SQL, Prisma, or JSON</li>
               </ul>
             </div>

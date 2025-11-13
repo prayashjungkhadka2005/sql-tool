@@ -175,20 +175,25 @@ export default function ExportModal({ isOpen, schema, onClose }: ExportModalProp
   };
 
   return (
-    <AnimatePresence>
-      {isOpen && (
-        <>
-          {/* Backdrop */}
+    <>
+      {/* Backdrop */}
+      <AnimatePresence>
+        {isOpen && (
           <motion.div
+            key="export-backdrop"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
             className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100]"
           />
+        )}
+      </AnimatePresence>
 
-          {/* Modal */}
-          <div className="fixed inset-0 z-[101] flex items-center justify-center p-4">
+      {/* Modal */}
+      <AnimatePresence>
+        {isOpen && (
+          <div key="export-modal-wrapper" className="fixed inset-0 z-[101] flex items-center justify-center p-4">
             <motion.div
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -289,8 +294,8 @@ export default function ExportModal({ isOpen, schema, onClose }: ExportModalProp
               </div>
             </motion.div>
           </div>
-        </>
-      )}
+        )}
+      </AnimatePresence>
       
       {/* Toast Notification */}
       <Toast
@@ -299,7 +304,7 @@ export default function ExportModal({ isOpen, schema, onClose }: ExportModalProp
         isVisible={toast.isVisible}
         onClose={hideToast}
       />
-    </AnimatePresence>
+    </>
   );
 }
 

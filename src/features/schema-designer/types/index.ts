@@ -54,7 +54,8 @@ export interface SchemaTable {
 }
 
 /**
- * Schema Relationship (for visual representation)
+ * Schema Relationship (DEPRECATED - for backward compatibility only)
+ * @deprecated Use column.references instead. Relationships are now auto-generated from FK columns.
  */
 export interface SchemaRelationship {
   id: string;
@@ -72,7 +73,11 @@ export interface SchemaRelationship {
  */
 export interface SchemaState {
   tables: SchemaTable[];
-  relationships: SchemaRelationship[];
+  /**
+   * @deprecated No longer used. Relationships are auto-generated from column.references.
+   * Kept for backward compatibility with existing templates.
+   */
+  relationships?: SchemaRelationship[];
   name: string; // Schema name
   description?: string;
 }

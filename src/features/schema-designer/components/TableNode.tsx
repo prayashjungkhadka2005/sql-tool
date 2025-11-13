@@ -93,14 +93,15 @@ function TableNode({ data, selected }: NodeProps<TableNodeData>) {
       </div>
 
       {/* Columns List */}
-      <div className="px-4 py-3 space-y-1.5 max-h-[400px] overflow-y-auto">
-        {table.columns.length === 0 ? (
-          <div className="text-center py-4">
-            <p className="text-xs text-foreground/40 font-mono">
-              No columns yet
-            </p>
-          </div>
-        ) : (
+      <div className="relative">
+        <div className="px-4 py-3 space-y-1.5 max-h-[400px] overflow-y-auto scrollbar-thin scrollbar-thumb-foreground/20 scrollbar-track-transparent">
+          {table.columns.length === 0 ? (
+            <div className="text-center py-4">
+              <p className="text-xs text-foreground/40 font-mono">
+                No columns yet
+              </p>
+            </div>
+          ) : (
           table.columns.map((column) => (
             <button
               key={column.id}
@@ -179,6 +180,12 @@ function TableNode({ data, selected }: NodeProps<TableNodeData>) {
               </div>
             </button>
           ))
+        )}
+        </div>
+        
+        {/* Scroll indicator for overflow */}
+        {table.columns.length > 8 && (
+          <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-white dark:from-[#1a1a1a] to-transparent pointer-events-none" />
         )}
       </div>
 
