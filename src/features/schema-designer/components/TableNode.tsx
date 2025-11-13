@@ -16,15 +16,23 @@ interface TableNodeData {
   onAddColumn: (tableId: string) => void;
   onEditColumn: (tableId: string, columnId: string) => void;
   onManageIndexes: (tableId: string) => void;
+  isSelected?: boolean;
+  isRelated?: boolean;
+  onSelect?: () => void;
 }
 
 function TableNode({ data, selected }: NodeProps<TableNodeData>) {
-  const { table, onEdit, onDelete, onAddColumn, onEditColumn, onManageIndexes } = data;
+  const { table, onEdit, onDelete, onAddColumn, onEditColumn, onManageIndexes, isSelected, isRelated, onSelect } = data;
 
   return (
     <div
-      className={`relative bg-white dark:bg-[#1a1a1a] border-2 rounded-lg shadow-lg min-w-[280px] transition-all ${
-        selected 
+      onClick={onSelect}
+      className={`relative bg-white dark:bg-[#1a1a1a] border-2 rounded-lg shadow-lg min-w-[280px] transition-all cursor-pointer ${
+        isSelected 
+          ? 'border-blue-500 shadow-xl ring-4 ring-blue-500/30 scale-[1.02]' 
+          : isRelated
+          ? 'border-green-500 shadow-xl ring-2 ring-green-500/20'
+          : selected 
           ? 'border-primary shadow-xl ring-2 ring-primary/20' 
           : 'border-foreground/10 hover:border-foreground/20'
       }`}

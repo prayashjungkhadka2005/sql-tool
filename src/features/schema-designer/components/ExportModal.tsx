@@ -9,6 +9,7 @@ import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { SchemaState, ExportFormat } from '../types';
 import { generateSQL, generatePrismaSchema, generateJSONSchema, validateSchema as validateSchemaUtil } from '../utils/schema-generator';
+import { generateTypeScriptInterfaces, generateZodSchemas } from '../utils/typescript-generator';
 import { useToast } from '@/features/sql-builder/hooks/useToast';
 import Toast from '@/features/sql-builder/components/ui/Toast';
 
@@ -24,6 +25,8 @@ const EXPORT_FORMATS: { value: ExportFormat; label: string; description: string 
   { value: 'sql-mysql', label: 'MySQL', description: 'CREATE TABLE statements for MySQL' },
   { value: 'sql-sqlite', label: 'SQLite', description: 'CREATE TABLE statements for SQLite' },
   { value: 'prisma', label: 'Prisma Schema', description: 'Prisma schema.prisma file' },
+  { value: 'typescript', label: 'TypeScript', description: 'TypeScript interfaces with helper types' },
+  { value: 'zod', label: 'Zod Schemas', description: 'Zod validation schemas for runtime safety' },
   { value: 'json', label: 'JSON', description: 'Schema as JSON (for backup/restore)' },
 ];
 
@@ -96,6 +99,12 @@ export default function ExportModal({ isOpen, schema, onClose, onExportImage }: 
         case 'prisma':
           generatedCode = generatePrismaSchema(schema);
           break;
+        case 'typescript':
+          generatedCode = generateTypeScriptInterfaces(schema);
+          break;
+        case 'zod':
+          generatedCode = generateZodSchemas(schema);
+          break;
         case 'json':
           generatedCode = generateJSONSchema(schema);
           break;
@@ -111,6 +120,10 @@ export default function ExportModal({ isOpen, schema, onClose, onExportImage }: 
         return generateSQL(schema, selectedFormat);
       case 'prisma':
         return generatePrismaSchema(schema);
+      case 'typescript':
+        return generateTypeScriptInterfaces(schema);
+      case 'zod':
+        return generateZodSchemas(schema);
       case 'json':
         return generateJSONSchema(schema);
       default:
@@ -171,6 +184,10 @@ export default function ExportModal({ isOpen, schema, onClose, onExportImage }: 
         filename = 'schema.prisma';
       } else if (selectedFormat === 'json') {
         filename = `${filename}.json`;
+      } else if (selectedFormat === 'typescript') {
+        filename = `${filename}.types.ts`;
+      } else if (selectedFormat === 'zod') {
+        filename = `${filename}.schema.ts`;
       } else {
         filename = `${filename}.sql`;
       }
@@ -287,23 +304,24 @@ export default function ExportModal({ isOpen, schema, onClose, onExportImage }: 
               })()}
 
               {/* Format Selection */}
-              <div className="px-6 py-4 border-b border-foreground/10">
-                <label className="block text-xs font-mono font-semibold text-foreground/60 uppercase tracking-wider mb-3">
+              <div className="px-6 py-3 border-b border-foreground/10">
+                <label className="block text-xs font-mono font-semibold text-foreground/60 uppercase tracking-wider mb-2">
                   Select Format
                 </label>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
                   {EXPORT_FORMATS.map(format => (
                     <button
                       key={format.value}
                       onClick={() => setSelectedFormat(format.value)}
-                      className={`p-3 border rounded-lg transition-all text-left active:scale-95 ${
+                      className={`px-2.5 py-2 border rounded-lg transition-all text-left active:scale-95 ${
                         selectedFormat === format.value
                           ? 'bg-primary text-white border-primary'
                           : 'bg-foreground/5 text-foreground border-foreground/10 hover:bg-foreground/10'
                       }`}
+                      title={format.description}
                     >
-                      <div className="text-sm font-semibold font-mono mb-0.5">{format.label}</div>
-                      <div className="text-[10px] font-mono opacity-80">{format.description}</div>
+                      <div className="text-xs font-semibold font-mono truncate">{format.label}</div>
+                      <div className="text-[9px] font-mono opacity-70 truncate mt-0.5">{format.description}</div>
                     </button>
                   ))}
                 </div>
@@ -325,26 +343,24 @@ export default function ExportModal({ isOpen, schema, onClose, onExportImage }: 
 
               {/* Footer Actions */}
               <div className="px-6 py-4 border-t border-foreground/10 bg-white dark:bg-[#1a1a1a]">
-                {/* Image Export Section */}
-                {onExportImage && (
-                  <div className="mb-3 pb-3 border-b border-foreground/10">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-2">
-                        <svg className="w-4 h-4 text-foreground/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div className="flex items-center justify-between gap-4">
+                  {/* Left: Image Export */}
+                  {onExportImage && (
+                    <div className="flex items-center gap-3">
+                      <span className="text-[10px] font-semibold text-foreground/50 font-mono uppercase tracking-wider flex items-center gap-1.5">
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                         </svg>
-                        <span className="text-xs font-semibold text-foreground/60 font-mono uppercase tracking-wider">
-                          Export as Image
-                        </span>
-                      </div>
+                        Export as Image
+                      </span>
                       <div className="flex items-center gap-2">
                         <button
                           onClick={() => {
                             onExportImage?.('png');
-                            onClose(); // Close modal to show clean canvas for export
+                            onClose();
                           }}
                           className="px-3 py-1.5 text-xs font-medium text-foreground bg-foreground/5 hover:bg-foreground/10 border border-foreground/10 rounded-lg transition-all font-mono flex items-center gap-1.5 active:scale-95"
-                          title="Export diagram as PNG image (high resolution)"
+                          title="Export diagram as PNG (high resolution)"
                         >
                           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -354,7 +370,7 @@ export default function ExportModal({ isOpen, schema, onClose, onExportImage }: 
                         <button
                           onClick={() => {
                             onExportImage?.('svg');
-                            onClose(); // Close modal to show clean canvas for export
+                            onClose();
                           }}
                           className="px-3 py-1.5 text-xs font-medium text-foreground bg-foreground/5 hover:bg-foreground/10 border border-foreground/10 rounded-lg transition-all font-mono flex items-center gap-1.5 active:scale-95"
                           title="Export diagram as SVG (vector, editable)"
@@ -366,37 +382,37 @@ export default function ExportModal({ isOpen, schema, onClose, onExportImage }: 
                         </button>
                       </div>
                     </div>
+                  )}
+                  
+                  {/* Right: Code Export */}
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={handleDownload}
+                      disabled={hasValidationError}
+                      className="px-4 py-2 text-sm font-medium text-foreground bg-foreground/5 hover:bg-foreground/10 border border-foreground/10 rounded-lg transition-all font-mono flex items-center gap-2 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-foreground/5"
+                      title={hasValidationError ? 'Fix validation errors first' : 'Download code as file'}
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                      </svg>
+                      Download
+                    </button>
+                    <button
+                      onClick={handleCopy}
+                      disabled={hasValidationError}
+                      className={`px-4 py-2 text-sm font-medium rounded-lg transition-all font-mono flex items-center gap-2 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed ${
+                        copied
+                          ? 'bg-green-500 text-white'
+                          : 'bg-primary text-white hover:bg-primary/90'
+                      }`}
+                      title={hasValidationError ? 'Fix validation errors first' : copied ? 'Code copied to clipboard' : 'Copy code to clipboard'}
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m-4 4H12a2 2 0 01-2-2v-4a2 2 0 012-2h4a2 2 0 012 2v4a2 2 0 01-2 2z" />
+                      </svg>
+                      {copied ? 'Copied!' : 'Copy'}
+                    </button>
                   </div>
-                )}
-                
-                {/* Code Export Section */}
-                <div className="flex items-center justify-end gap-3">
-                  <button
-                    onClick={handleDownload}
-                    disabled={hasValidationError}
-                    className="px-4 py-2 text-sm font-medium text-foreground bg-foreground/5 hover:bg-foreground/10 border border-foreground/10 rounded-lg transition-all font-mono flex items-center gap-2 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-foreground/5"
-                    title={hasValidationError ? 'Fix validation errors first' : 'Download code as file'}
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                    </svg>
-                    Download
-                  </button>
-                  <button
-                    onClick={handleCopy}
-                    disabled={hasValidationError}
-                    className={`px-4 py-2 text-sm font-medium rounded-lg transition-all font-mono flex items-center gap-2 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed ${
-                      copied
-                        ? 'bg-green-500 text-white'
-                        : 'bg-primary text-white hover:bg-primary/90'
-                    }`}
-                    title={hasValidationError ? 'Fix validation errors first' : copied ? 'Code copied to clipboard' : 'Copy code to clipboard'}
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m-4 4H12a2 2 0 01-2-2v-4a2 2 0 012-2h4a2 2 0 012 2v4a2 2 0 01-2 2z" />
-                    </svg>
-                    {copied ? 'Copied!' : 'Copy'}
-                  </button>
                 </div>
               </div>
             </motion.div>

@@ -49,6 +49,9 @@ export default function SchemaCanvas({
   // Pan mode state (hand tool)
   const [isPanMode, setIsPanMode] = useState(false);
   
+  // Selected table for relationship highlighting
+  const [selectedTableId, setSelectedTableId] = useState<string | null>(null);
+  
   // Keyboard shortcut: Hold Space to enable pan mode
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -79,8 +82,37 @@ export default function SchemaCanvas({
     tableNode: TableNode 
   }), []);
 
+  // Get related table IDs for highlighting
+  const getRelatedTables = useCallback((tableId: string): Set<string> => {
+    const related = new Set<string>();
+    const table = schema.tables.find(t => t.id === tableId);
+    
+    if (!table) return related;
+    
+    // Add tables that this table references (outgoing FKs)
+    table.columns.forEach(col => {
+      if (col.references) {
+        const refTable = schema.tables.find(t => t.name === col.references?.table);
+        if (refTable) related.add(refTable.id);
+      }
+    });
+    
+    // Add tables that reference this table (incoming FKs)
+    schema.tables.forEach(t => {
+      t.columns.forEach(col => {
+        if (col.references && col.references.table === table.name) {
+          related.add(t.id);
+        }
+      });
+    });
+    
+    return related;
+  }, [schema.tables]);
+
   // Convert schema tables to React Flow nodes
   const convertToNodes = useCallback((tables: SchemaTable[]): Node[] => {
+    const relatedTables = selectedTableId ? getRelatedTables(selectedTableId) : new Set<string>();
+    
     return tables
       .filter(table => table.id) // Filter out tables without IDs
       .map((table, index) => ({
@@ -94,9 +126,15 @@ export default function SchemaCanvas({
           onAddColumn,
           onEditColumn,
           onManageIndexes,
+          isSelected: selectedTableId === table.id,
+          isRelated: relatedTables.has(table.id),
+          onSelect: () => {
+            // Toggle selection
+            setSelectedTableId(prev => prev === table.id ? null : table.id);
+          },
         },
       }));
-  }, [onEditTable, onDeleteTable, onAddColumn, onEditColumn, onManageIndexes]);
+  }, [onEditTable, onDeleteTable, onAddColumn, onEditColumn, onManageIndexes, selectedTableId, getRelatedTables]);
 
   // Convert FK columns to React Flow edges (auto-generate from schema)
   const convertToEdges = useCallback((tables: SchemaTable[]): Edge[] => {

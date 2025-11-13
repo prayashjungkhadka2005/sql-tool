@@ -14,6 +14,7 @@ import ExportModal from '@/features/schema-designer/components/ExportModal';
 import ImportModal from '@/features/schema-designer/components/ImportModal';
 import { MigrationModal } from '@/features/schema-designer/components/MigrationModal';
 import IndexManager from '@/features/schema-designer/components/IndexManager';
+import { ValidationPanel } from '@/features/schema-designer/components/ValidationPanel';
 import { SCHEMA_TEMPLATES } from '@/features/schema-designer/data/schema-templates';
 import { autoLayoutTables, LayoutAlgorithm } from '@/features/schema-designer/utils/auto-layout';
 import { exportCanvasAsImage, getSuggestedFilename } from '@/features/schema-designer/utils/image-export';
@@ -1340,6 +1341,13 @@ export default function SchemaDesignerPage() {
             ))}
           </div>
         </section>
+      )}
+
+      {/* Validation Panel */}
+      {schema.tables.length > 0 && (
+        <div className="mb-4">
+          <ValidationPanel schema={schema} />
+        </div>
       )}
 
       {/* Canvas */}

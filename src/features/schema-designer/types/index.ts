@@ -135,6 +135,8 @@ export type ExportFormat =
   | 'typeorm'
   | 'sequelize'
   | 'drizzle'
+  | 'typescript'
+  | 'zod'
   | 'json';
 
 /**
