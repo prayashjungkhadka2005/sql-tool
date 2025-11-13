@@ -232,10 +232,10 @@ export default function ValidationBanner({ queryState, onAutoFix }: ValidationBa
 
                 {/* Content */}
                 <div className="flex-1 min-w-0">
-                  <div className={`text-sm font-bold mb-1 ${issue.type === "error" ? "text-red-700 dark:text-red-300" : "text-blue-700 dark:text-blue-300"}`}>
+                  <div className={`text-sm font-bold mb-1 break-words ${issue.type === "error" ? "text-red-700 dark:text-red-300" : "text-blue-700 dark:text-blue-300"}`}>
                     {issue.title}
                   </div>
-                  <div className={`text-xs leading-relaxed ${issue.type === "error" ? "text-red-600 dark:text-red-400" : "text-blue-600 dark:text-blue-400"}`}>
+                  <div className={`text-xs leading-relaxed break-words ${issue.type === "error" ? "text-red-600 dark:text-red-400" : "text-blue-600 dark:text-blue-400"}`}>
                     {issue.message}
                   </div>
                 </div>

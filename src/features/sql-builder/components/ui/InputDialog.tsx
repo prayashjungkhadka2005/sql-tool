@@ -69,13 +69,13 @@ export default function InputDialog({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onCancel}
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] cursor-pointer"
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[110] cursor-pointer"
             aria-label="Close dialog"
           />
 
           {/* Dialog Container */}
           <div 
-            className="fixed inset-0 z-[101] flex items-center justify-center p-4 pointer-events-none"
+            className="fixed inset-0 z-[111] flex items-center justify-center p-4 pointer-events-none"
           >
             {/* Dialog */}
             <motion.div
@@ -102,7 +102,7 @@ export default function InputDialog({
 
                 {/* Body */}
                 <div className="px-6 py-4">
-                  <p className="text-sm text-foreground/70 font-mono mb-4">
+                  <p className="text-sm text-foreground/70 font-mono mb-4 break-words">
                     {message}
                   </p>
                   <input

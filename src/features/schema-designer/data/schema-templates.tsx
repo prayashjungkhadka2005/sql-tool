@@ -35,6 +35,7 @@ export const SCHEMA_TEMPLATES: SchemaTemplate[] = [
             { id: '5', name: 'role', type: 'VARCHAR', length: 50, nullable: false, unique: false, primaryKey: false, autoIncrement: false, defaultValue: 'user' },
             { id: '6', name: 'created_at', type: 'TIMESTAMP', nullable: false, unique: false, primaryKey: false, autoIncrement: false, defaultValue: 'NOW()' },
           ],
+          indexes: [],
         },
         {
           id: 'sessions-1',
@@ -46,6 +47,9 @@ export const SCHEMA_TEMPLATES: SchemaTemplate[] = [
             { id: '3', name: 'token', type: 'VARCHAR', length: 255, nullable: false, unique: true, primaryKey: false, autoIncrement: false },
             { id: '4', name: 'expires_at', type: 'TIMESTAMP', nullable: false, unique: false, primaryKey: false, autoIncrement: false },
             { id: '5', name: 'created_at', type: 'TIMESTAMP', nullable: false, unique: false, primaryKey: false, autoIncrement: false, defaultValue: 'NOW()' },
+          ],
+          indexes: [
+            { id: 'idx-1', name: 'idx_sessions_user_id', columns: ['user_id'], type: 'BTREE', unique: false, comment: 'Foreign key index for optimal JOIN performance' },
           ],
         },
       ],
@@ -91,6 +95,7 @@ export const SCHEMA_TEMPLATES: SchemaTemplate[] = [
             { id: '4', name: 'bio', type: 'TEXT', nullable: true, unique: false, primaryKey: false, autoIncrement: false },
             { id: '5', name: 'created_at', type: 'TIMESTAMP', nullable: false, unique: false, primaryKey: false, autoIncrement: false, defaultValue: 'NOW()' },
           ],
+          indexes: [],
         },
         {
           id: 'posts-blog',
@@ -105,6 +110,9 @@ export const SCHEMA_TEMPLATES: SchemaTemplate[] = [
             { id: '6', name: 'views', type: 'INTEGER', nullable: false, unique: false, primaryKey: false, autoIncrement: false, defaultValue: '0' },
             { id: '7', name: 'created_at', type: 'TIMESTAMP', nullable: false, unique: false, primaryKey: false, autoIncrement: false, defaultValue: 'NOW()' },
           ],
+          indexes: [
+            { id: 'idx-2', name: 'idx_posts_user_id', columns: ['user_id'], type: 'BTREE', unique: false, comment: 'Foreign key index for optimal JOIN performance' },
+          ],
         },
         {
           id: 'comments-blog',
@@ -116,6 +124,10 @@ export const SCHEMA_TEMPLATES: SchemaTemplate[] = [
             { id: '3', name: 'user_id', type: 'INTEGER', nullable: false, unique: false, primaryKey: false, autoIncrement: false, references: { table: 'users', column: 'id', onDelete: 'CASCADE' } },
             { id: '4', name: 'content', type: 'TEXT', nullable: false, unique: false, primaryKey: false, autoIncrement: false },
             { id: '5', name: 'created_at', type: 'TIMESTAMP', nullable: false, unique: false, primaryKey: false, autoIncrement: false, defaultValue: 'NOW()' },
+          ],
+          indexes: [
+            { id: 'idx-3', name: 'idx_comments_post_id', columns: ['post_id'], type: 'BTREE', unique: false, comment: 'Foreign key index for optimal JOIN performance' },
+            { id: 'idx-4', name: 'idx_comments_user_id', columns: ['user_id'], type: 'BTREE', unique: false, comment: 'Foreign key index for optimal JOIN performance' },
           ],
         },
       ],
@@ -181,6 +193,7 @@ export const SCHEMA_TEMPLATES: SchemaTemplate[] = [
             { id: '6', name: 'category', type: 'VARCHAR', length: 100, nullable: false, unique: false, primaryKey: false, autoIncrement: false },
             { id: '7', name: 'is_active', type: 'BOOLEAN', nullable: false, unique: false, primaryKey: false, autoIncrement: false, defaultValue: 'true' },
           ],
+          indexes: [],
         },
         {
           id: 'customers-ec',
@@ -193,6 +206,7 @@ export const SCHEMA_TEMPLATES: SchemaTemplate[] = [
             { id: '4', name: 'address', type: 'TEXT', nullable: true, unique: false, primaryKey: false, autoIncrement: false },
             { id: '5', name: 'created_at', type: 'TIMESTAMP', nullable: false, unique: false, primaryKey: false, autoIncrement: false, defaultValue: 'NOW()' },
           ],
+          indexes: [],
         },
         {
           id: 'orders-ec',
@@ -206,6 +220,10 @@ export const SCHEMA_TEMPLATES: SchemaTemplate[] = [
             { id: '5', name: 'total', type: 'DECIMAL', precision: 10, scale: 2, nullable: false, unique: false, primaryKey: false, autoIncrement: false },
             { id: '6', name: 'status', type: 'VARCHAR', length: 50, nullable: false, unique: false, primaryKey: false, autoIncrement: false, defaultValue: 'pending' },
             { id: '7', name: 'created_at', type: 'TIMESTAMP', nullable: false, unique: false, primaryKey: false, autoIncrement: false, defaultValue: 'NOW()' },
+          ],
+          indexes: [
+            { id: 'idx-5', name: 'idx_orders_customer_id', columns: ['customer_id'], type: 'BTREE', unique: false, comment: 'Foreign key index for optimal JOIN performance' },
+            { id: 'idx-6', name: 'idx_orders_product_id', columns: ['product_id'], type: 'BTREE', unique: false, comment: 'Foreign key index for optimal JOIN performance' },
           ],
         },
       ],
@@ -261,6 +279,7 @@ export const SCHEMA_TEMPLATES: SchemaTemplate[] = [
             { id: '5', name: 'avatar_url', type: 'VARCHAR', length: 500, nullable: true, unique: false, primaryKey: false, autoIncrement: false },
             { id: '6', name: 'created_at', type: 'TIMESTAMP', nullable: false, unique: false, primaryKey: false, autoIncrement: false, defaultValue: 'NOW()' },
           ],
+          indexes: [],
         },
         {
           id: 'posts-social',
@@ -274,6 +293,9 @@ export const SCHEMA_TEMPLATES: SchemaTemplate[] = [
             { id: '5', name: 'likes_count', type: 'INTEGER', nullable: false, unique: false, primaryKey: false, autoIncrement: false, defaultValue: '0' },
             { id: '6', name: 'created_at', type: 'TIMESTAMP', nullable: false, unique: false, primaryKey: false, autoIncrement: false, defaultValue: 'NOW()' },
           ],
+          indexes: [
+            { id: 'idx-7', name: 'idx_posts_user_id', columns: ['user_id'], type: 'BTREE', unique: false, comment: 'Foreign key index for optimal JOIN performance' },
+          ],
         },
         {
           id: 'follows-social',
@@ -284,6 +306,10 @@ export const SCHEMA_TEMPLATES: SchemaTemplate[] = [
             { id: '2', name: 'follower_id', type: 'INTEGER', nullable: false, unique: false, primaryKey: false, autoIncrement: false, references: { table: 'users', column: 'id', onDelete: 'CASCADE' } },
             { id: '3', name: 'following_id', type: 'INTEGER', nullable: false, unique: false, primaryKey: false, autoIncrement: false, references: { table: 'users', column: 'id', onDelete: 'CASCADE' } },
             { id: '4', name: 'created_at', type: 'TIMESTAMP', nullable: false, unique: false, primaryKey: false, autoIncrement: false, defaultValue: 'NOW()' },
+          ],
+          indexes: [
+            { id: 'idx-8', name: 'idx_follows_follower_id', columns: ['follower_id'], type: 'BTREE', unique: false, comment: 'Foreign key index for optimal JOIN performance' },
+            { id: 'idx-9', name: 'idx_follows_following_id', columns: ['following_id'], type: 'BTREE', unique: false, comment: 'Foreign key index for optimal JOIN performance' },
           ],
         },
       ],

@@ -30,6 +30,7 @@ interface SchemaCanvasProps {
   onAddColumn: (tableId: string) => void;
   onEditColumn: (tableId: string, columnId: string) => void;
   onDeleteTable: (tableId: string) => void;
+  onManageIndexes: (tableId: string) => void;
 }
 
 export default function SchemaCanvas({ 
@@ -38,7 +39,8 @@ export default function SchemaCanvas({
   onEditTable,
   onAddColumn,
   onEditColumn,
-  onDeleteTable
+  onDeleteTable,
+  onManageIndexes
 }: SchemaCanvasProps) {
   const { zoomIn, zoomOut, fitView } = useReactFlow();
   
@@ -61,9 +63,10 @@ export default function SchemaCanvas({
           onDelete: onDeleteTable,
           onAddColumn,
           onEditColumn,
+          onManageIndexes,
         },
       }));
-  }, [onEditTable, onDeleteTable, onAddColumn, onEditColumn]);
+  }, [onEditTable, onDeleteTable, onAddColumn, onEditColumn, onManageIndexes]);
 
   // Convert FK columns to React Flow edges (auto-generate from schema)
   const convertToEdges = useCallback((tables: SchemaTable[]): Edge[] => {
@@ -134,11 +137,17 @@ export default function SchemaCanvas({
       if (removedEdges.length > 0) {
         const removedIds = removedEdges.map((change: any) => change.id);
         
+        // Track which columns are losing FK references
+        const removedFKColumns: { tableId: string; columnName: string }[] = [];
+        
         // Update schema: remove FK references for deleted edges
         const updatedTables = schema.tables.map(table => {
           const updatedColumns = table.columns.map(col => {
             const edgeId = `fk-${table.id}-${col.id}`;
             if (removedIds.includes(edgeId) && col.references) {
+              // Track this column for index cleanup
+              removedFKColumns.push({ tableId: table.id, columnName: col.name });
+              
               // Remove FK reference from this column
               const { references, ...columnWithoutRef } = col;
               return columnWithoutRef;
@@ -146,7 +155,29 @@ export default function SchemaCanvas({
             return col;
           });
           
-          return { ...table, columns: updatedColumns };
+          // CRITICAL: Clean up indexes that were created for the removed FK
+          // We remove single-column indexes with comment "Auto-created for foreign key performance"
+          const updatedIndexes = (table.indexes || []).filter(idx => {
+            // Keep non-FK indexes
+            if (!idx.comment?.includes('Auto-created for foreign key performance')) {
+              return true;
+            }
+            
+            // Keep composite indexes (user-created, not auto-generated)
+            if (idx.columns.length > 1) {
+              return true;
+            }
+            
+            // Remove single-column auto-created index if that column lost its FK
+            const colName = idx.columns[0];
+            const fkRemoved = removedFKColumns.some(
+              removed => removed.tableId === table.id && removed.columnName === colName
+            );
+            
+            return !fkRemoved;
+          });
+          
+          return { ...table, columns: updatedColumns, indexes: updatedIndexes };
         });
         
         if (JSON.stringify(updatedTables) !== JSON.stringify(schema.tables)) {
@@ -187,7 +218,7 @@ export default function SchemaCanvas({
   const onConnect = useCallback(() => {
     // Do nothing - connections are created via Column Editor
     // Edges are auto-generated from FK columns
-    console.info('Use Column Editor to add foreign key relationships');
+    // Visual feedback handled by temporary animated edge (if needed in future)
   }, []);
 
   return (

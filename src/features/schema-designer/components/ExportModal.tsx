@@ -152,26 +152,39 @@ export default function ExportModal({ isOpen, schema, onClose }: ExportModalProp
       return;
     }
 
-    const blob = new Blob([code], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    
-    // Determine filename based on format
-    let filename = schema.name || 'schema';
-    if (selectedFormat === 'prisma') {
-      filename = 'schema.prisma';
-    } else if (selectedFormat === 'json') {
-      filename = `${filename}.json`;
-    } else {
-      filename = `${filename}.sql`;
+    try {
+      const blob = new Blob([code], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      
+      // Determine filename based on format
+      // Sanitize schema name to prevent path traversal and special characters
+      const sanitizedName = (schema.name || 'schema')
+        .replace(/[^a-zA-Z0-9_-]/g, '_')  // Replace special chars with underscore
+        .replace(/^\.+/, '')               // Remove leading dots
+        .substring(0, 64);                 // Limit length
+      
+      let filename = sanitizedName || 'schema';
+      if (selectedFormat === 'prisma') {
+        filename = 'schema.prisma';
+      } else if (selectedFormat === 'json') {
+        filename = `${filename}.json`;
+      } else {
+        filename = `${filename}.sql`;
+      }
+      
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      showToast('File downloaded successfully!', 'success');
+    } catch (err) {
+      console.error('Download failed:', err);
+      showToast('Failed to download file', 'error');
     }
-    
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
   };
 
   return (
@@ -201,15 +214,18 @@ export default function ExportModal({ isOpen, schema, onClose }: ExportModalProp
               transition={{ type: 'spring', damping: 25, stiffness: 300 }}
               className="w-full max-w-4xl bg-white dark:bg-[#1a1a1a] border-2 border-foreground/20 rounded-xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col"
               onClick={(e) => e.stopPropagation()}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="export-modal-title"
             >
               {/* Header */}
               <div className="px-6 py-4 border-b border-foreground/10 flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <svg className="w-5 h-5 text-foreground/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-5 h-5 text-foreground/60" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
                   </svg>
                   <div>
-                    <h3 className="text-lg font-semibold text-foreground font-mono">
+                    <h3 id="export-modal-title" className="text-lg font-semibold text-foreground font-mono">
                       Export Schema
                     </h3>
                     <p className="text-xs text-foreground/40 font-mono mt-0.5">
@@ -227,6 +243,47 @@ export default function ExportModal({ isOpen, schema, onClose }: ExportModalProp
                   </svg>
                 </button>
               </div>
+
+              {/* FK Optimization Banner */}
+              {(() => {
+                const validation = validateSchemaUtil(schema);
+                const hasFKWarnings = validation.warnings.some(warn => 
+                  warn.includes('Foreign key column') && warn.includes('should have an index')
+                );
+                
+                if (hasFKWarnings && validation.isValid) {
+                  return (
+                    <div className="px-6 py-4 bg-yellow-500/5 border-b border-yellow-500/20">
+                      <div className="flex items-start gap-3">
+                        <svg className="w-5 h-5 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                        </svg>
+                        <div className="flex-1">
+                          <h4 className="text-sm font-semibold text-yellow-700 dark:text-yellow-400 font-mono mb-1">
+                            ⚡ Performance Optimization Available
+                          </h4>
+                          <p className="text-xs text-yellow-600 dark:text-yellow-500 font-mono leading-relaxed mb-2">
+                            Some foreign key columns don't have indexes, which can significantly slow down JOIN queries in production.
+                          </p>
+                          <button
+                            onClick={() => {
+                              onClose();
+                              // The main page will show the Auto-Index FKs button
+                            }}
+                            className="text-xs font-mono font-semibold text-yellow-700 dark:text-yellow-400 hover:text-yellow-800 dark:hover:text-yellow-300 hover:bg-yellow-500/10 px-2 py-1 rounded transition-all inline-flex items-center gap-1"
+                          >
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                            </svg>
+                            Close and use "Auto-Index FKs" button
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                }
+                return null;
+              })()}
 
               {/* Format Selection */}
               <div className="px-6 py-4 border-b border-foreground/10">

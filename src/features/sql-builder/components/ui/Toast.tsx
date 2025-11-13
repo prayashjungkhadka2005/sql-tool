@@ -65,11 +65,11 @@ export default function Toast({
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: -20, scale: 0.95 }}
           transition={{ duration: 0.2 }}
-          className="fixed top-4 right-4 z-[100] max-w-sm"
+          className="fixed top-4 right-4 z-[120] max-w-sm"
         >
-          <div className={`${colors[type]} text-white px-4 py-3 rounded-xl shadow-2xl backdrop-blur-sm flex items-center gap-3`}>
-            <div className="flex-shrink-0">{icons[type]}</div>
-            <p className="text-sm font-medium flex-1">{message}</p>
+          <div className={`${colors[type]} text-white px-4 py-3 rounded-xl shadow-2xl backdrop-blur-sm flex items-start gap-3`}>
+            <div className="flex-shrink-0 mt-0.5">{icons[type]}</div>
+            <p className="text-sm font-medium flex-1 break-words">{message}</p>
             <button
               onClick={onClose}
               className="flex-shrink-0 hover:bg-white/20 active:bg-white/30 active:scale-90 rounded-lg p-1 transition-all"

@@ -4,18 +4,59 @@
  */
 
 export type SQLDataType = 
-  | 'INTEGER' 
-  | 'VARCHAR' 
-  | 'TEXT' 
-  | 'BOOLEAN' 
-  | 'DATE' 
-  | 'TIMESTAMP'
-  | 'DECIMAL'
-  | 'FLOAT';
+  // Integers
+  | 'SMALLINT'    // -32,768 to 32,767
+  | 'INTEGER'     // -2,147,483,648 to 2,147,483,647
+  | 'BIGINT'      // Large integers (common for IDs, timestamps)
+  // Strings
+  | 'VARCHAR'     // Variable-length string
+  | 'TEXT'        // Unlimited text
+  | 'CHAR'        // Fixed-length string
+  // Numbers
+  | 'DECIMAL'     // Exact decimal (for money)
+  | 'FLOAT'       // Floating point
+  | 'DOUBLE'      // Double precision floating point
+  | 'REAL'        // Real number
+  // Date/Time
+  | 'DATE'        // Date only
+  | 'TIME'        // Time only
+  | 'TIMESTAMP'   // Date + time
+  | 'TIMESTAMPTZ' // Timestamp with timezone (PostgreSQL)
+  // Boolean
+  | 'BOOLEAN'
+  // Binary
+  | 'BYTEA'       // Binary data (PostgreSQL)
+  | 'BLOB'        // Binary large object (MySQL)
+  // JSON
+  | 'JSON'        // JSON data (MySQL, PostgreSQL)
+  | 'JSONB'       // Binary JSON with indexing (PostgreSQL)
+  // PostgreSQL specific
+  | 'UUID'        // Universally unique identifier
+  | 'INET'        // IP address
+  | 'CIDR'        // Network address
+  | 'ARRAY'       // Array type (PostgreSQL)
+  // Full-text search
+  | 'TSVECTOR';   // Text search vector (PostgreSQL)
 
 export type RelationshipType = '1:1' | '1:N' | 'N:N';
 
 export type CascadeAction = 'CASCADE' | 'SET NULL' | 'RESTRICT' | 'NO ACTION';
+
+export type IndexType = 'BTREE' | 'HASH' | 'GIN' | 'GIST' | 'BRIN';
+
+/**
+ * Schema Index Definition
+ * Indexes improve query performance by creating optimized data structures
+ */
+export interface SchemaIndex {
+  id: string;
+  name: string;
+  columns: string[]; // Column names (supports composite indexes)
+  type: IndexType;
+  unique: boolean;
+  where?: string; // Partial index condition (e.g., "status = 'active'")
+  comment?: string;
+}
 
 /**
  * Schema Column Definition
@@ -49,6 +90,7 @@ export interface SchemaTable {
   id: string;
   name: string;
   columns: SchemaColumn[];
+  indexes?: SchemaIndex[]; // Performance optimization via indexes
   position: { x: number; y: number }; // For React Flow
   comment?: string;
 }

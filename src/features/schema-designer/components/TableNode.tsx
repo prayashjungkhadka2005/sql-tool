@@ -15,10 +15,11 @@ interface TableNodeData {
   onDelete: (tableId: string) => void;
   onAddColumn: (tableId: string) => void;
   onEditColumn: (tableId: string, columnId: string) => void;
+  onManageIndexes: (tableId: string) => void;
 }
 
 function TableNode({ data, selected }: NodeProps<TableNodeData>) {
-  const { table, onEdit, onDelete, onAddColumn, onEditColumn } = data;
+  const { table, onEdit, onDelete, onAddColumn, onEditColumn, onManageIndexes } = data;
 
   return (
     <div
@@ -65,6 +66,7 @@ function TableNode({ data, selected }: NodeProps<TableNodeData>) {
               }}
               className="px-2 py-1 text-[10px] font-mono bg-primary/10 hover:bg-primary/20 text-primary rounded transition-all flex items-center gap-1"
               title="Edit table name"
+              aria-label={`Edit table ${table.name}`}
             >
               <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -78,17 +80,26 @@ function TableNode({ data, selected }: NodeProps<TableNodeData>) {
               }}
               className="p-1 hover:bg-red-500/10 hover:text-red-500 rounded transition-all"
               title="Delete table"
+              aria-label={`Delete table ${table.name}`}
             >
-              <svg className="w-3.5 h-3.5 text-foreground/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-3.5 h-3.5 text-foreground/40 hover:text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
               </svg>
             </button>
           </div>
         </div>
         
-        {/* Column count */}
-        <div className="text-[10px] text-foreground/40 font-mono mt-1">
-          {table.columns.length} column{table.columns.length !== 1 ? 's' : ''}
+        {/* Column and Index count */}
+        <div className="flex items-center gap-2 text-[10px] text-foreground/40 font-mono mt-1">
+          <span>{table.columns.length} column{table.columns.length !== 1 ? 's' : ''}</span>
+          {table.indexes && table.indexes.length > 0 && (
+            <>
+              <span>•</span>
+              <span className="text-purple-600 dark:text-purple-400">
+                {table.indexes.length} index{table.indexes.length !== 1 ? 'es' : ''}
+              </span>
+            </>
+          )}
         </div>
       </div>
 
@@ -139,6 +150,20 @@ function TableNode({ data, selected }: NodeProps<TableNodeData>) {
                   </svg>
                 </span>
               )}
+              
+              {/* Index Icon */}
+              {table.indexes?.some(idx => idx.columns.includes(column.name)) && (
+                <span title="Indexed column (optimized for performance)">
+                  <svg 
+                    className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400 flex-shrink-0" 
+                    fill="none" 
+                    stroke="currentColor" 
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                </span>
+              )}
 
               {/* Column Name */}
               <span className={`flex-1 min-w-0 truncate ${column.primaryKey ? 'font-bold' : ''} text-foreground`}>
@@ -148,7 +173,8 @@ function TableNode({ data, selected }: NodeProps<TableNodeData>) {
               {/* Data Type */}
               <span className="text-foreground/50 text-[10px]">
                 {column.type}
-                {column.type === 'VARCHAR' && column.length ? `(${column.length})` : ''}
+                {(column.type === 'VARCHAR' || column.type === 'CHAR') && column.length ? `(${column.length})` : ''}
+                {column.type === 'DECIMAL' && column.precision ? `(${column.precision}${column.scale ? `,${column.scale}` : ''})` : ''}
               </span>
 
               {/* Constraints Badges */}
@@ -189,19 +215,40 @@ function TableNode({ data, selected }: NodeProps<TableNodeData>) {
         )}
       </div>
 
-      {/* Add Column Button */}
-      <div className="px-4 py-3 border-t border-foreground/10">
+      {/* Action Buttons */}
+      <div className="px-4 py-3 border-t border-foreground/10 grid grid-cols-2 gap-2">
         <button
           onClick={(e) => {
             e.stopPropagation();
             onAddColumn(table.id);
           }}
-          className="w-full py-2 text-xs font-mono text-foreground/60 hover:text-foreground hover:bg-foreground/5 active:bg-foreground/10 rounded transition-all flex items-center justify-center gap-1.5"
+          className="py-2 text-xs font-mono text-foreground/60 hover:text-foreground hover:bg-foreground/5 active:bg-foreground/10 rounded transition-all flex items-center justify-center gap-1.5"
+          title="Add column to table"
+          aria-label={`Add column to ${table.name} table`}
         >
           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
           </svg>
           Add Column
+        </button>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onManageIndexes(table.id);
+          }}
+          className="py-2 text-xs font-mono text-purple-600 dark:text-purple-400 hover:text-purple-700 hover:bg-purple-500/10 active:bg-purple-500/20 rounded transition-all flex items-center justify-center gap-1.5 relative"
+          title="Manage indexes for performance optimization"
+          aria-label={`Manage indexes for ${table.name} table. Currently ${table.indexes?.length || 0} indexes.`}
+        >
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+          </svg>
+          Indexes
+          {table.indexes && table.indexes.length > 0 && (
+            <span className="absolute -top-1 -right-1 w-4 h-4 bg-purple-600 text-white text-[9px] rounded-full flex items-center justify-center font-bold">
+              {table.indexes.length}
+            </span>
+          )}
         </button>
       </div>
     </div>

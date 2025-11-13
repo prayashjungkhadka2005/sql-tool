@@ -332,9 +332,9 @@ export default function CSVUploader({ onUploadSuccess, onDelete }: CSVUploaderPr
             transition={{ duration: 0.2, ease: "easeOut" }}
             className="mt-3 p-3 bg-red-500/10 border border-red-500/20 rounded-lg"
           >
-            <div className="flex items-center gap-2">
+            <div className="flex items-start gap-2">
               <svg
-                className="w-4 h-4 text-red-500 flex-shrink-0"
+                className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -346,7 +346,7 @@ export default function CSVUploader({ onUploadSuccess, onDelete }: CSVUploaderPr
                   d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
                 />
               </svg>
-              <p className="text-xs text-red-600 dark:text-red-400 font-mono flex-1">
+              <p className="text-xs text-red-600 dark:text-red-400 font-mono flex-1 break-words">
                 {error}
               </p>
               <button

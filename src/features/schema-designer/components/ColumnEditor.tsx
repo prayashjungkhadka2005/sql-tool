@@ -21,14 +21,38 @@ interface ColumnEditorProps {
 }
 
 const DATA_TYPES: SQLDataType[] = [
+  // Integers (most common first)
   'INTEGER',
+  'BIGINT',
+  'SMALLINT',
+  // Strings (most common first)
   'VARCHAR',
   'TEXT',
-  'BOOLEAN',
-  'DATE',
-  'TIMESTAMP',
+  'CHAR',
+  // Numbers
   'DECIMAL',
   'FLOAT',
+  'DOUBLE',
+  'REAL',
+  // Date/Time
+  'DATE',
+  'TIME',
+  'TIMESTAMP',
+  'TIMESTAMPTZ',
+  // Boolean
+  'BOOLEAN',
+  // Binary
+  'BYTEA',
+  'BLOB',
+  // JSON (modern apps)
+  'JSON',
+  'JSONB',
+  // PostgreSQL specific
+  'UUID',
+  'INET',
+  'CIDR',
+  'ARRAY',
+  'TSVECTOR',
 ];
 
 const CASCADE_ACTIONS: CascadeAction[] = [
@@ -98,7 +122,31 @@ export default function ColumnEditor({
         defaultValue: '',
       });
     }
-  }, [column]);
+    // Clear validation error when column changes
+    setValidationError(null);
+  }, [column, isOpen]); // Reset when drawer opens/closes
+
+  // Clear validation error when form data changes (real-time feedback)
+  useEffect(() => {
+    if (validationError) {
+      setValidationError(null);
+    }
+  }, [formData.primaryKey, formData.autoIncrement, formData.type, formData.name]);
+
+  // Auto-disable AUTO_INCREMENT when composite PK is detected
+  useEffect(() => {
+    if (!formData.primaryKey || !formData.autoIncrement) return;
+    
+    const currentTable = allTables.find(t => t.name === tableName);
+    const otherPKColumns = currentTable?.columns.filter(
+      c => c.id !== (column?.id || formData.id) && c.primaryKey
+    ) || [];
+    
+    // If this is a composite PK, auto-disable AUTO_INCREMENT
+    if (otherPKColumns.length > 0) {
+      setFormData(prev => ({ ...prev, autoIncrement: false }));
+    }
+  }, [formData.primaryKey, allTables, tableName, column, formData.id]);
 
   // Handle Escape key
   useEffect(() => {
@@ -152,27 +200,56 @@ export default function ColumnEditor({
       return;
     }
 
-    // Validation 5: VARCHAR needs length
-    if (formData.type === 'VARCHAR' && (!formData.length || formData.length <= 0)) {
-      setValidationError('VARCHAR type requires a length (e.g., 255)');
+    // Validation 5: VARCHAR and CHAR need length
+    if ((formData.type === 'VARCHAR' || formData.type === 'CHAR') && (!formData.length || formData.length <= 0)) {
+      setValidationError(`${formData.type} type requires a length (e.g., 255 for VARCHAR, 10 for CHAR)`);
       return;
     }
 
-    // Validation 6: DECIMAL needs precision
-    if (formData.type === 'DECIMAL' && (!formData.precision || formData.precision <= 0)) {
-      setValidationError('DECIMAL type requires precision (e.g., 10,2)');
+    // Validation 5b: VARCHAR/CHAR length limits
+    if (formData.type === 'VARCHAR' && formData.length) {
+      if (formData.length < 1 || formData.length > 65535) {
+        setValidationError('VARCHAR length must be between 1 and 65,535 characters');
+        return;
+      }
+    }
+    
+    if (formData.type === 'CHAR' && formData.length) {
+      if (formData.length < 1 || formData.length > 255) {
+        setValidationError('CHAR length must be between 1 and 255 characters. Use VARCHAR or TEXT for longer strings.');
+        return;
+      }
+    }
+
+    // Validation 6: DECIMAL needs precision and scale validation
+    if (formData.type === 'DECIMAL') {
+      if (!formData.precision || formData.precision <= 0 || formData.precision > 65) {
+        setValidationError('DECIMAL precision must be between 1 and 65');
+        return;
+      }
+      if (formData.scale !== undefined) {
+        if (formData.scale < 0 || formData.scale > 30 || formData.scale > formData.precision) {
+          setValidationError(`DECIMAL scale must be between 0 and ${formData.precision} (cannot exceed precision)`);
+          return;
+        }
+      }
+    }
+
+    // Validation 7: AUTO INCREMENT only for integer types
+    const AUTO_INCREMENT_TYPES = ['SMALLINT', 'INTEGER', 'BIGINT'];
+    if (formData.autoIncrement && !AUTO_INCREMENT_TYPES.includes(formData.type)) {
+      setValidationError('AUTO INCREMENT is only valid for integer types (SMALLINT, INTEGER, BIGINT)');
       return;
     }
 
-    // Validation 7: AUTO INCREMENT only for INTEGER
-    if (formData.autoIncrement && formData.type !== 'INTEGER') {
-      setValidationError('AUTO INCREMENT is only valid for INTEGER type');
-      return;
-    }
-
-    // Validation 8: Only one AUTO INCREMENT column per table
+    // Validation 8: Check AUTO_INCREMENT constraints
+    const currentTable = allTables.find(t => t.name === tableName);
+    const otherPKColumns = currentTable?.columns.filter(
+      c => c.id !== formData.id && c.primaryKey
+    ) || [];
+    
     if (formData.autoIncrement) {
-      const currentTable = allTables.find(t => t.name === tableName);
+      // Only one AUTO INCREMENT per table
       const hasOtherAutoIncrement = currentTable?.columns.some(
         c => c.id !== formData.id && c.autoIncrement
       );
@@ -181,15 +258,31 @@ export default function ColumnEditor({
         setValidationError('A table can have only one AUTO INCREMENT column');
         return;
       }
+
+      // AUTO INCREMENT not allowed with composite PK
+      if (otherPKColumns.length > 0 && formData.primaryKey) {
+        setValidationError('AUTO INCREMENT cannot be used with composite primary keys');
+        return;
+      }
     }
 
-    // Validation 9: Column name max length (for UI and DB compatibility)
+    // Validation 9: Composite PK cannot have AUTO_INCREMENT (reverse check)
+    if (formData.primaryKey && otherPKColumns.length > 0) {
+      // Check if any other PK column has AUTO_INCREMENT
+      const hasAutoIncrementPK = otherPKColumns.some(c => c.autoIncrement);
+      if (hasAutoIncrementPK) {
+        setValidationError('Cannot add to composite primary key when an AUTO INCREMENT column exists');
+        return;
+      }
+    }
+
+    // Validation 10: Column name max length (for UI and DB compatibility)
     if (formData.name.length > 64) {
       setValidationError('Column name must be 64 characters or less');
       return;
     }
 
-    // Validation 10: Foreign key must reference existing table/column
+    // Validation 11: Foreign key must reference existing table/column
     if (formData.references) {
       // Check for self-reference
       if (formData.references.table === tableName) {
@@ -216,6 +309,47 @@ export default function ColumnEditor({
       const refColumn = refTable.columns.find(c => c.name === formData.references?.column);
       if (!refColumn) {
         setValidationError(`Referenced column "${formData.references.table}.${formData.references.column}" does not exist`);
+        return;
+      }
+
+      // Check: Cannot reference the same column (self-reference within same column is meaningless)
+      if (formData.references.table === tableName && formData.references.column === formData.name) {
+        setValidationError('Column cannot reference itself');
+        return;
+      }
+
+      // Check: Data type compatibility (FK and referenced column should have compatible types)
+      const COMPATIBLE_TYPES = {
+        numeric: ['SMALLINT', 'INTEGER', 'BIGINT'],
+        float: ['FLOAT', 'DOUBLE', 'REAL'],
+        decimal: ['DECIMAL'],
+        string: ['VARCHAR', 'TEXT', 'CHAR'],
+        date: ['DATE'],
+        time: ['TIME'],
+        timestamp: ['TIMESTAMP', 'TIMESTAMPTZ'],
+        boolean: ['BOOLEAN'],
+        uuid: ['UUID'],
+        json: ['JSON', 'JSONB'],
+        binary: ['BYTEA', 'BLOB'],
+        network: ['INET', 'CIDR'],
+        array: ['ARRAY'],
+        tsvector: ['TSVECTOR'],
+      };
+
+      let isCompatible = formData.type === refColumn.type;
+      
+      // Check if both types are in the same compatibility group
+      if (!isCompatible) {
+        for (const group of Object.values(COMPATIBLE_TYPES)) {
+          if (group.includes(formData.type) && group.includes(refColumn.type)) {
+            isCompatible = true;
+            break;
+          }
+        }
+      }
+
+      if (!isCompatible) {
+        setValidationError(`Data type mismatch: ${formData.type} cannot reference ${refColumn.type}. Foreign key and referenced column must have compatible types.`);
         return;
       }
 
@@ -282,15 +416,18 @@ export default function ColumnEditor({
             exit={{ opacity: 0, x: 400 }}
             transition={{ type: 'spring', damping: 25, stiffness: 300 }}
             className="fixed top-0 right-0 bottom-0 w-full sm:w-[450px] bg-white dark:bg-[#1a1a1a] border-l border-foreground/10 z-[91] flex flex-col shadow-2xl"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="column-editor-title"
           >
             {/* Header */}
             <div className="px-6 py-4 border-b border-foreground/10 flex items-center justify-between">
               <div>
-                <h3 className="text-lg font-semibold text-foreground font-mono">
+                <h3 id="column-editor-title" className="text-lg font-semibold text-foreground font-mono">
                   {isEditing ? 'Edit Column' : 'Add Column'}
                 </h3>
                 <p className="text-xs text-foreground/40 font-mono mt-0.5">
-                  {tableName} <span className="text-foreground/30">• Press Esc to close</span>
+                  {tableName} <span className="text-foreground/30">• Press <kbd className="px-1 py-0.5 bg-foreground/10 rounded text-[9px]">Esc</kbd> to close</span>
                 </p>
               </div>
               <button
@@ -332,11 +469,17 @@ export default function ColumnEditor({
                   value={formData.type}
                   onChange={(e) => {
                     const newType = e.target.value as SQLDataType;
+                    const AUTO_INCREMENT_TYPES = ['SMALLINT', 'INTEGER', 'BIGINT'];
+                    
                     setFormData({ 
                       ...formData, 
                       type: newType,
-                      // Auto-disable AUTO_INCREMENT if type changes from INTEGER
-                      autoIncrement: newType === 'INTEGER' ? formData.autoIncrement : false,
+                      // Auto-disable AUTO_INCREMENT if type is not integer-based
+                      autoIncrement: AUTO_INCREMENT_TYPES.includes(newType) ? formData.autoIncrement : false,
+                      // Set default length for VARCHAR/CHAR
+                      length: newType === 'VARCHAR' ? (formData.length || 255) : 
+                              newType === 'CHAR' ? (formData.length || 10) :
+                              undefined,
                     });
                   }}
                   className="w-full px-3 py-2 bg-[#fafafa] dark:bg-black/40 border border-foreground/10 hover:border-foreground/20 focus:border-foreground/30 rounded text-sm text-foreground focus:outline-none transition-all font-mono"
@@ -345,27 +488,35 @@ export default function ColumnEditor({
                     <option key={type} value={type}>{type}</option>
                   ))}
                 </select>
-                {formData.autoIncrement && formData.type !== 'INTEGER' && (
-                  <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-1 font-mono">
-                    ⚠️ AUTO_INCREMENT was disabled (only valid for INTEGER)
-                  </p>
+                {formData.autoIncrement && !['SMALLINT', 'INTEGER', 'BIGINT'].includes(formData.type) && (
+                  <div className="flex items-center gap-1.5 mt-2 p-2 bg-yellow-500/10 border border-yellow-500/20 rounded">
+                    <svg className="w-3.5 h-3.5 text-yellow-600 dark:text-yellow-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                    <p className="text-xs text-yellow-600 dark:text-yellow-400 font-mono">
+                      AUTO_INCREMENT was disabled (only valid for integer types)
+                    </p>
+                  </div>
                 )}
               </div>
 
-              {/* Length (for VARCHAR) */}
-              {formData.type === 'VARCHAR' && (
+              {/* Length (for VARCHAR and CHAR) */}
+              {(formData.type === 'VARCHAR' || formData.type === 'CHAR') && (
                 <div>
                   <label className="block text-sm font-medium text-foreground mb-2 font-mono">
-                    Length
+                    Length <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="number"
-                    value={formData.length || 255}
-                    onChange={(e) => setFormData({ ...formData, length: parseInt(e.target.value) || 255 })}
+                    value={formData.length || (formData.type === 'VARCHAR' ? 255 : 10)}
+                    onChange={(e) => setFormData({ ...formData, length: parseInt(e.target.value) || (formData.type === 'VARCHAR' ? 255 : 10) })}
                     min="1"
-                    max="65535"
+                    max={formData.type === 'VARCHAR' ? 65535 : 255}
                     className="w-full px-3 py-2 bg-[#fafafa] dark:bg-black/40 border border-foreground/10 hover:border-foreground/20 focus:border-foreground/30 rounded text-sm text-foreground focus:outline-none transition-all font-mono"
                   />
+                  <p className="text-xs text-foreground/40 font-mono mt-1">
+                    {formData.type === 'VARCHAR' ? 'Max 65,535 characters' : 'Max 255 characters (use VARCHAR or TEXT for longer strings)'}
+                  </p>
                 </div>
               )}
 
@@ -406,22 +557,77 @@ export default function ColumnEditor({
                 <label className="block text-sm font-medium text-foreground mb-3 font-mono">
                   Constraints
                 </label>
+                
+                {/* Composite PK Info */}
+                {(() => {
+                  const currentTable = allTables.find(t => t.name === tableName);
+                  const otherPKColumns = currentTable?.columns.filter(
+                    c => c.id !== (column?.id || formData.id) && c.primaryKey
+                  ) || [];
+                  
+                  // Only show if this column IS a PK AND there are other PK columns
+                  if (formData.primaryKey && otherPKColumns.length > 0) {
+                    return (
+                      <div className="mb-3 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+                        <div className="flex items-start gap-2">
+                          <svg className="w-4 h-4 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          <div className="flex-1">
+                            <p className="text-xs font-semibold text-blue-700 dark:text-blue-400 font-mono">
+                              Composite Primary Key
+                            </p>
+                            <p className="text-xs text-blue-600 dark:text-blue-500 font-mono mt-1">
+                              Columns: {[...otherPKColumns.map(c => c.name), formData.name].sort().join(', ')}
+                            </p>
+                            <p className="text-xs text-blue-600 dark:text-blue-500 font-mono mt-1">
+                              Multiple columns form a single primary key. AUTO_INCREMENT is not available.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
+                
                 <div className="space-y-2.5">
                   <label className="flex items-center gap-3 p-3 bg-[#fafafa] dark:bg-black/40 border border-foreground/10 rounded hover:bg-foreground/5 transition-all cursor-pointer">
                     <input
                       type="checkbox"
                       checked={formData.primaryKey}
-                      onChange={(e) => setFormData({ 
-                        ...formData, 
-                        primaryKey: e.target.checked,
-                        nullable: e.target.checked ? false : formData.nullable, // PK can't be null
-                        unique: e.target.checked ? true : formData.unique, // PK is always unique
-                      })}
+                      onChange={(e) => {
+                        const currentTable = allTables.find(t => t.name === tableName);
+                        const otherPKColumns = currentTable?.columns.filter(
+                          c => c.id !== (column?.id || formData.id) && c.primaryKey
+                        ) || [];
+                        
+                        // If checking PK and other PKs exist (composite), auto-disable AUTO_INCREMENT
+                        const willBeCompositePK = e.target.checked && otherPKColumns.length > 0;
+                        
+                        setFormData({ 
+                          ...formData, 
+                          primaryKey: e.target.checked,
+                          nullable: e.target.checked ? false : formData.nullable, // PK can't be null
+                          unique: e.target.checked ? true : formData.unique, // PK is always unique
+                          autoIncrement: willBeCompositePK ? false : formData.autoIncrement, // Clear AI for composite
+                        });
+                      }}
                       className="w-4 h-4 text-primary"
                     />
                     <div className="flex-1">
                       <div className="text-sm font-medium text-foreground font-mono">Primary Key</div>
-                      <div className="text-xs text-foreground/50 font-mono">Unique identifier for rows</div>
+                      <div className="text-xs text-foreground/50 font-mono">
+                        {(() => {
+                          const currentTable = allTables.find(t => t.name === tableName);
+                          const otherPKColumns = currentTable?.columns.filter(
+                            c => c.id !== (column?.id || formData.id) && c.primaryKey
+                          ) || [];
+                          return otherPKColumns.length > 0 
+                            ? 'Part of composite primary key' 
+                            : 'Unique identifier for rows';
+                        })()}
+                      </div>
                     </div>
                   </label>
 
@@ -455,24 +661,35 @@ export default function ColumnEditor({
                     </div>
                   </label>
 
-                  {formData.type === 'INTEGER' && (
-                    <label className="flex items-center gap-3 p-3 bg-[#fafafa] dark:bg-black/40 border border-foreground/10 rounded hover:bg-foreground/5 transition-all cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={formData.autoIncrement}
-                        onChange={(e) => setFormData({ 
-                          ...formData, 
-                          autoIncrement: e.target.checked,
-                          nullable: e.target.checked ? false : formData.nullable, // AI requires NOT NULL
-                        })}
-                        className="w-4 h-4 text-primary"
-                      />
-                      <div className="flex-1">
-                        <div className="text-sm font-medium text-foreground font-mono">AUTO INCREMENT</div>
-                        <div className="text-xs text-foreground/50 font-mono">Automatically increments (forces NOT NULL)</div>
-                      </div>
-                    </label>
-                  )}
+                  {['SMALLINT', 'INTEGER', 'BIGINT'].includes(formData.type) && (() => {
+                    const currentTable = allTables.find(t => t.name === tableName);
+                    const otherPKColumns = currentTable?.columns.filter(
+                      c => c.id !== (column?.id || formData.id) && c.primaryKey
+                    ) || [];
+                    const isCompositePK = otherPKColumns.length > 0 && formData.primaryKey;
+                    
+                    return (
+                      <label className="flex items-center gap-3 p-3 bg-[#fafafa] dark:bg-black/40 border border-foreground/10 rounded hover:bg-foreground/5 transition-all cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={formData.autoIncrement}
+                          onChange={(e) => setFormData({ 
+                            ...formData, 
+                            autoIncrement: e.target.checked,
+                            nullable: e.target.checked ? false : formData.nullable, // AI requires NOT NULL
+                          })}
+                          disabled={isCompositePK}
+                          className="w-4 h-4 text-primary disabled:opacity-50"
+                        />
+                        <div className="flex-1">
+                          <div className="text-sm font-medium text-foreground font-mono">AUTO INCREMENT</div>
+                          <div className="text-xs text-foreground/50 font-mono">
+                            {isCompositePK ? 'Not available (composite PK)' : 'Automatically increments (forces NOT NULL)'}
+                          </div>
+                        </div>
+                      </label>
+                    );
+                  })()}
                 </div>
               </div>
 
@@ -661,9 +878,14 @@ export default function ColumnEditor({
             {validationError && (
               <div className="px-6 pb-4">
                 <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
-                  <p className="text-sm text-red-600 dark:text-red-400 font-mono">
-                    {validationError}
-                  </p>
+                  <div className="flex items-start gap-2">
+                    <svg className="w-4 h-4 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <p className="text-sm text-red-600 dark:text-red-400 font-mono flex-1 break-words">
+                      {validationError}
+                    </p>
+                  </div>
                 </div>
               </div>
             )}
