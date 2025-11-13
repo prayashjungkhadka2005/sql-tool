@@ -5,7 +5,7 @@
 
 "use client";
 
-import { useCallback, useMemo, useEffect } from 'react';
+import { useCallback, useMemo, useEffect, useState } from 'react';
 import ReactFlow, {
   Node,
   Edge,
@@ -17,6 +17,8 @@ import ReactFlow, {
   Connection,
   MarkerType,
   useReactFlow,
+  MiniMap,
+  Controls,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 
@@ -43,6 +45,34 @@ export default function SchemaCanvas({
   onManageIndexes
 }: SchemaCanvasProps) {
   const { zoomIn, zoomOut, fitView } = useReactFlow();
+  
+  // Pan mode state (hand tool)
+  const [isPanMode, setIsPanMode] = useState(false);
+  
+  // Keyboard shortcut: Hold Space to enable pan mode
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.code === 'Space' && !e.repeat && e.target === document.body) {
+        e.preventDefault();
+        setIsPanMode(true);
+      }
+    };
+    
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.code === 'Space') {
+        e.preventDefault();
+        setIsPanMode(false);
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, []);
   
   // Custom node types
   const nodeTypes = useMemo(() => ({ 
@@ -227,6 +257,27 @@ export default function SchemaCanvas({
         .react-flow__attribution {
           display: none !important;
         }
+        /* Default mode: normal cursors on elements, grab on canvas */
+        .react-flow:not(.pan-mode) .react-flow__pane {
+          cursor: grab !important;
+        }
+        .react-flow:not(.pan-mode) .react-flow__pane:active {
+          cursor: grabbing !important;
+        }
+        .react-flow:not(.pan-mode) .react-flow__node {
+          cursor: pointer !important;
+        }
+        /* Pan mode: hand cursors everywhere (tables locked) */
+        .react-flow.pan-mode .react-flow__pane {
+          cursor: grab !important;
+        }
+        .react-flow.pan-mode .react-flow__pane:active {
+          cursor: grabbing !important;
+        }
+        .react-flow.pan-mode .react-flow__node {
+          cursor: grab !important;
+          pointer-events: none !important;
+        }
       `}</style>
       <ReactFlow
         nodes={nodes}
@@ -236,20 +287,24 @@ export default function SchemaCanvas({
         onNodeDragStop={handleNodeDragStop}
         onConnect={onConnect}
         nodeTypes={nodeTypes}
-        fitView
-        minZoom={0.5}
-        maxZoom={1.5}
+        nodesDraggable={!isPanMode}
+        nodesConnectable={!isPanMode}
+        elementsSelectable={!isPanMode}
+        defaultViewport={{ x: 0, y: 0, zoom: 0.8 }}
+        minZoom={0.3}
+        maxZoom={2}
         zoomOnScroll={false}
         zoomOnPinch={true}
-        zoomOnDoubleClick={false}
-        panOnScroll={false}
+        zoomOnDoubleClick={true}
+        panOnScroll={isPanMode}
+        panOnScrollSpeed={0.5}
         panOnDrag={true}
         preventScrolling={false}
         defaultEdgeOptions={{
           type: 'smoothstep',
           animated: false,
         }}
-        className="bg-[#fafafa] dark:bg-black/20"
+        className={`bg-[#fafafa] dark:bg-black/20 ${isPanMode ? 'pan-mode' : ''}`}
         proOptions={{ hideAttribution: true }}
       >
         <Background 
@@ -258,10 +313,38 @@ export default function SchemaCanvas({
           size={0.5}
           className="!stroke-foreground/5"
         />
+        
+        {/* Minimap for navigation */}
+        <MiniMap
+          nodeStrokeWidth={3}
+          zoomable
+          pannable
+          className="!bg-white/80 dark:!bg-black/60 !border !border-foreground/10 !rounded-lg"
+          maskColor="rgba(0, 0, 0, 0.1)"
+        />
       </ReactFlow>
 
-      {/* Custom Zoom Controls */}
+      {/* Custom Navigation Controls */}
       <div className="absolute bottom-4 left-4 flex flex-col gap-2 z-10">
+        {/* Hand Tool (Pan Mode) */}
+        <button
+          onClick={() => setIsPanMode(!isPanMode)}
+          className={`w-9 h-9 border rounded-lg flex items-center justify-center transition-all ${
+            isPanMode 
+              ? 'bg-primary text-white border-primary shadow-lg scale-105' 
+              : 'bg-white dark:bg-black/80 border-foreground/10 text-foreground hover:bg-foreground/5'
+          }`}
+          title={isPanMode ? "Hand Tool Active (Hold Space)" : "Hand Tool (Hold Space)"}
+          aria-label="Hand Tool"
+          aria-pressed={isPanMode}
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 11.5V14m0-2.5v-6a1.5 1.5 0 113 0m-3 6a1.5 1.5 0 00-3 0v2a7.5 7.5 0 0015 0v-5a1.5 1.5 0 00-3 0m-6-3V11m0-5.5v-1a1.5 1.5 0 013 0v1m0 0V11m0-5.5a1.5 1.5 0 013 0v3m0 0V11" />
+          </svg>
+        </button>
+        
+        <div className="w-9 h-px bg-foreground/10"></div>
+        
         <button
           onClick={() => zoomIn({ duration: 200 })}
           className="w-9 h-9 bg-white dark:bg-black/80 border border-foreground/10 rounded-lg flex items-center justify-center hover:bg-foreground/5 transition-colors"

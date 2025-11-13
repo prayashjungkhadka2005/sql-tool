@@ -1016,7 +1016,10 @@ export default function SchemaDesignerPage() {
                 <li>→ Click <span className="text-purple-600 dark:text-purple-400">&quot;Auto-Index FKs&quot;</span> button to instantly optimize all foreign keys</li>
                 <li>→ <span className="text-purple-600 dark:text-purple-400">Lightning icon</span> next to columns indicates they are indexed</li>
                 <li>→ Press <kbd className="px-1.5 py-0.5 bg-foreground/10 rounded text-[10px]">Cmd+T</kbd> to add table, <kbd className="px-1.5 py-0.5 bg-foreground/10 rounded text-[10px]">Cmd+E</kbd> to export</li>
-                <li>→ Use zoom buttons (bottom-left) or pinch to zoom in/out</li>
+                <li>→ <span className="text-foreground/70">Drag canvas</span> to pan (shows hand cursor ✋), drag tables to move them</li>
+                <li>→ Click <span className="text-primary">Hand Tool</span> or hold <kbd className="px-1.5 py-0.5 bg-foreground/10 rounded text-[10px]">Space</kbd> to lock tables and pan anywhere</li>
+                <li>→ <span className="text-foreground/70">Use zoom buttons</span> or <span className="text-foreground/70">minimap</span> (bottom-right) to navigate large schemas</li>
+                <li>→ <span className="text-foreground/70">Double-click</span> canvas to zoom, click <span className="text-foreground/70">&quot;Fit View&quot;</span> to center all tables</li>
                 <li>→ Press <kbd className="px-1.5 py-0.5 bg-foreground/10 rounded text-[10px]">Esc</kbd> to close dialogs</li>
               </ul>
             </div>
