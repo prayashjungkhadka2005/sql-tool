@@ -11,8 +11,11 @@ import { SchemaState, SchemaTable, SchemaColumn, SchemaTemplate, SchemaIndex } f
 import SchemaCanvas from '@/features/schema-designer/components/SchemaCanvas';
 import ColumnEditor from '@/features/schema-designer/components/ColumnEditor';
 import ExportModal from '@/features/schema-designer/components/ExportModal';
+import ImportModal from '@/features/schema-designer/components/ImportModal';
 import IndexManager from '@/features/schema-designer/components/IndexManager';
 import { SCHEMA_TEMPLATES } from '@/features/schema-designer/data/schema-templates';
+import { autoLayoutTables, LayoutAlgorithm } from '@/features/schema-designer/utils/auto-layout';
+import { exportCanvasAsImage, getSuggestedFilename } from '@/features/schema-designer/utils/image-export';
 import ConfirmDialog from '@/features/sql-builder/components/ui/ConfirmDialog';
 import InputDialog from '@/features/sql-builder/components/ui/InputDialog';
 
@@ -33,8 +36,10 @@ export default function SchemaDesignerPage() {
   const [managingIndexTable, setManagingIndexTable] = useState<SchemaTable | null>(null);
 
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isTemplatesOpen, setIsTemplatesOpen] = useState(false);
   const [isOptimizingFKs, setIsOptimizingFKs] = useState(false);
+  const [canvasRef, setCanvasRef] = useState<HTMLElement | null>(null);
 
   const [confirmDialog, setConfirmDialog] = useState<{
     isOpen: boolean;
@@ -400,17 +405,17 @@ export default function SchemaDesignerPage() {
 
     setSchema(prev => {
       const updatedTables = prev.tables.map(table => {
-        if (table.id === editingColumn.table.id) {
-          // Check if editing existing column or adding new
-          const existingIndex = table.columns.findIndex(c => c.id === column.id);
-          
-          if (existingIndex >= 0) {
-            // Update existing column
+      if (table.id === editingColumn.table.id) {
+        // Check if editing existing column or adding new
+        const existingIndex = table.columns.findIndex(c => c.id === column.id);
+        
+        if (existingIndex >= 0) {
+          // Update existing column
             const oldColumn = table.columns[existingIndex];
             const oldColumnName = oldColumn.name;
             const newColumnName = column.name;
-            const updatedColumns = [...table.columns];
-            updatedColumns[existingIndex] = column;
+          const updatedColumns = [...table.columns];
+          updatedColumns[existingIndex] = column;
             
             // Track if FK reference was removed
             const fkWasRemoved = oldColumn.references && !column.references;
@@ -445,17 +450,17 @@ export default function SchemaDesignerPage() {
             }
             
             return { ...table, columns: updatedColumns, indexes: updatedIndexes };
-          } else {
-            // Add new column
-            return { ...table, columns: [...table.columns, column] };
-          }
+        } else {
+          // Add new column
+          return { ...table, columns: [...table.columns, column] };
         }
-        return table;
-      });
+      }
+      return table;
+    });
 
       return {
-        ...prev,
-        tables: updatedTables,
+      ...prev,
+      tables: updatedTables,
       };
     });
 
@@ -491,7 +496,7 @@ export default function SchemaDesignerPage() {
       });
 
       const updatedTables = prev.tables.map(table => {
-        if (table.id === editingColumn.table.id) {
+      if (table.id === editingColumn.table.id) {
           // Remove column from this table
           const updatedColumns = table.columns.filter(c => c.id !== columnId);
           
@@ -500,8 +505,8 @@ export default function SchemaDesignerPage() {
             !idx.columns.includes(deletedColumnName)
           ) || [];
           
-          return {
-            ...table,
+        return {
+          ...table,
             columns: updatedColumns,
             indexes: updatedIndexes,
           };
@@ -544,8 +549,8 @@ export default function SchemaDesignerPage() {
       });
 
       return {
-        ...prev,
-        tables: updatedTables,
+      ...prev,
+      tables: updatedTables,
       };
     });
 
@@ -721,7 +726,106 @@ export default function SchemaDesignerPage() {
     });
   }, []);
 
-  // Keyboard shortcuts (Cmd+E for Export, Cmd+T for Add Table, Cmd+Shift+R for Reset)
+  // Import schema
+  const handleImport = useCallback((importedSchema: SchemaState) => {
+    // Close any open editors to prevent state conflicts
+    setIsColumnEditorOpen(false);
+    setEditingColumn(null);
+    setIsIndexManagerOpen(false);
+    setManagingIndexTable(null);
+    setIsOptimizingFKs(false);
+    
+    // Close import modal
+    setIsImportModalOpen(false);
+    
+    // Replace schema (don't merge - clean import)
+    setSchema({
+      name: importedSchema.name || 'Imported Schema',
+      description: importedSchema.description || '',
+      tables: importedSchema.tables,
+      relationships: [], // Deprecated: relationships auto-generated from FKs
+    });
+    
+    // Suggest auto-layout if many tables were imported
+    if (importedSchema.tables.length >= 5) {
+      queueMicrotask(() => {
+        setConfirmDialog({
+          isOpen: true,
+          title: 'Import Successful!',
+          message: `Imported ${importedSchema.tables.length} tables.\n\nWould you like to auto-arrange them by dependencies for better visualization?`,
+          onConfirm: () => {
+            // Apply auto-layout
+            const layoutedTables = autoLayoutTables(importedSchema.tables, 'hierarchical');
+            setSchema(prev => ({
+              ...prev,
+              tables: layoutedTables,
+            }));
+            setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+          },
+        });
+      });
+    }
+  }, []);
+
+  // Auto-layout tables
+  const handleAutoLayout = useCallback((algorithm: LayoutAlgorithm = 'hierarchical') => {
+    if (schema.tables.length === 0) return;
+    
+    const layoutedTables = autoLayoutTables(schema.tables, algorithm);
+    
+    setSchema({
+      ...schema,
+      tables: layoutedTables,
+    });
+  }, [schema]);
+
+  // Export canvas as image
+  const handleExportImage = useCallback(async (format: 'png' | 'svg') => {
+    if (!canvasRef) {
+      setAlertDialog({
+        isOpen: true,
+        title: 'Export Failed',
+        message: 'Canvas reference not found. Please try again or refresh the page.',
+      });
+      return;
+    }
+
+    if (schema.tables.length === 0) {
+      setAlertDialog({
+        isOpen: true,
+        title: 'Nothing to Export',
+        message: 'Your schema is empty. Add some tables first before exporting as an image.',
+      });
+      return;
+    }
+
+    try {
+      const filename = getSuggestedFilename(schema.name, format);
+      await exportCanvasAsImage(canvasRef, schema.tables, {
+        format,
+        filename,
+        backgroundColor: '#ffffff', // Always white for clean export
+        quality: 0.95,
+        pixelRatio: 2,
+      });
+      
+      // Success feedback
+      setAlertDialog({
+        isOpen: true,
+        title: `${format.toUpperCase()} Exported Successfully!`,
+        message: `Your schema diagram has been downloaded as "${filename}".\n\nPerfect for documentation, presentations, or sharing on social media!`,
+      });
+    } catch (error) {
+      console.error('Image export failed:', error);
+      setAlertDialog({
+        isOpen: true,
+        title: 'Export Failed',
+        message: error instanceof Error ? error.message : 'Failed to export canvas as image. Please try again.',
+      });
+    }
+  }, [canvasRef, schema.name, schema.tables]);
+
+  // Keyboard shortcuts (Cmd+E for Export, Cmd+T for Add Table, Cmd+Shift+R for Reset, Cmd+I for Import)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Don't trigger shortcuts when typing in inputs or when dialogs are open
@@ -731,7 +835,7 @@ export default function SchemaDesignerPage() {
       }
       
       // Don't trigger when any dialog/drawer is open
-      if (isColumnEditorOpen || isIndexManagerOpen || isExportModalOpen || confirmDialog.isOpen || inputDialog.isOpen || alertDialog.isOpen) {
+      if (isColumnEditorOpen || isIndexManagerOpen || isExportModalOpen || isImportModalOpen || confirmDialog.isOpen || inputDialog.isOpen || alertDialog.isOpen) {
         return;
       }
 
@@ -748,10 +852,24 @@ export default function SchemaDesignerPage() {
             }
             break;
           
+          case 'i':
+            // Cmd/Ctrl + I: Import schema
+            e.preventDefault();
+            setIsImportModalOpen(true);
+            break;
+          
           case 't':
             // Cmd/Ctrl + T: Add new table
             e.preventDefault();
             handleAddTable();
+            break;
+          
+          case 'l':
+            // Cmd/Ctrl + L: Auto-layout
+            if (schema.tables.length > 0) {
+              e.preventDefault();
+              handleAutoLayout('hierarchical');
+            }
             break;
           
           case 'r':
@@ -767,7 +885,7 @@ export default function SchemaDesignerPage() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [schema.tables, isColumnEditorOpen, isIndexManagerOpen, isExportModalOpen, confirmDialog.isOpen, inputDialog.isOpen, alertDialog.isOpen, handleAddTable, handleReset]);
+  }, [schema.tables, isColumnEditorOpen, isIndexManagerOpen, isExportModalOpen, isImportModalOpen, confirmDialog.isOpen, inputDialog.isOpen, alertDialog.isOpen, handleAddTable, handleReset, handleAutoLayout]);
 
   return (
     <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12 sm:pb-16">
@@ -786,17 +904,17 @@ export default function SchemaDesignerPage() {
           <div className="flex items-center gap-2">
             {schema.tables.length > 0 && (
               <>
-                <button
-                  onClick={handleReset}
-                  className="px-3 py-2 text-sm font-medium text-foreground/70 hover:text-red-600 hover:bg-red-500/10 border border-foreground/10 hover:border-red-500/20 rounded-lg transition-all font-mono flex items-center gap-2"
+              <button
+                onClick={handleReset}
+                className="px-3 py-2 text-sm font-medium text-foreground/70 hover:text-red-600 hover:bg-red-500/10 border border-foreground/10 hover:border-red-500/20 rounded-lg transition-all font-mono flex items-center gap-2"
                   title="Delete all tables and start fresh"
                   aria-label="Reset schema"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                  </svg>
-                  Reset
-                </button>
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+                Reset
+              </button>
 
                 {/* Auto-Index FKs button - only show when FKs need optimization */}
                 {hasFKsWithoutIndexes && (
@@ -874,6 +992,33 @@ export default function SchemaDesignerPage() {
             </svg>
           </button>
 
+          <button
+            onClick={() => setIsImportModalOpen(true)}
+            className="px-4 py-2 text-sm font-medium bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 text-blue-600 dark:text-blue-400 rounded-lg transition-all flex items-center gap-2 font-mono active:scale-95"
+            title="Import existing SQL or Prisma schema (Cmd+I)"
+            aria-label="Import schema"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+            </svg>
+            Import
+          </button>
+
+          {schema.tables.length > 1 && (
+            <button
+              onClick={() => handleAutoLayout('hierarchical')}
+              className="px-4 py-2 text-sm font-medium bg-green-500/10 hover:bg-green-500/20 border border-green-500/20 text-green-600 dark:text-green-400 rounded-lg transition-all flex items-center gap-2 font-mono active:scale-95"
+              title="Automatically arrange tables by dependencies (Cmd+L)"
+              aria-label="Auto-layout tables"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h4a1 1 0 011 1v7a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM14 5a1 1 0 011-1h4a1 1 0 011 1v7a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 17a1 1 0 011-1h4a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1v-2zM14 17a1 1 0 011-1h4a1 1 0 011 1v2a1 1 0 01-1 1h-4a1 1 0 01-1-1v-2z" />
+              </svg>
+              <span className="hidden sm:inline">Auto-Layout</span>
+              <span className="sm:hidden">Layout</span>
+            </button>
+          )}
+
           {schema.tables.length > 0 && (() => {
             // Compute stats once to avoid multiple reduce calls
             const totalColumns = schema.tables.reduce((sum, t) => sum + t.columns.length, 0);
@@ -882,17 +1027,17 @@ export default function SchemaDesignerPage() {
             return (
               <div className="ml-auto flex items-center gap-2 text-xs font-mono text-foreground/60" role="status" aria-live="polite">
                 <span className="px-2 py-1 bg-foreground/10 rounded" aria-label={`${schema.tables.length} tables in schema`}>
-                  {schema.tables.length} table{schema.tables.length !== 1 ? 's' : ''}
-                </span>
+                {schema.tables.length} table{schema.tables.length !== 1 ? 's' : ''}
+              </span>
                 <span className="px-2 py-1 bg-foreground/10 rounded" aria-label={`${totalColumns} columns total`}>
                   {totalColumns} column{totalColumns !== 1 ? 's' : ''}
                 </span>
                 {totalIndexes > 0 && (
                   <span className="px-2 py-1 bg-purple-500/10 text-purple-600 dark:text-purple-400 rounded" aria-label={`${totalIndexes} indexes for performance optimization`}>
                     {totalIndexes} index{totalIndexes !== 1 ? 'es' : ''}
-                  </span>
+              </span>
                 )}
-              </div>
+            </div>
             );
           })()}
         </div>
@@ -903,8 +1048,8 @@ export default function SchemaDesignerPage() {
         <section className="mb-6 p-5 sm:p-6 bg-white dark:bg-[#1a1a1a] border border-foreground/10 rounded-lg" role="region" aria-label="Schema templates">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider font-mono">
-              Schema Templates
-            </h3>
+            Schema Templates
+          </h3>
             <button
               onClick={() => setIsTemplatesOpen(false)}
               className="p-1.5 hover:bg-foreground/10 rounded-lg transition-all"
@@ -987,40 +1132,127 @@ export default function SchemaDesignerPage() {
       ) : (
         <section role="region" aria-label="Schema design canvas">
           <ReactFlowProvider>
-            <SchemaCanvas
-              schema={schema}
-              onSchemaChange={setSchema}
-              onEditTable={handleEditTable}
-              onAddColumn={handleAddColumn}
-              onEditColumn={handleEditColumn}
-              onDeleteTable={handleDeleteTable}
-              onManageIndexes={handleManageIndexes}
-            />
+        <div ref={(el) => setCanvasRef(el)}>
+          <SchemaCanvas
+            schema={schema}
+            onSchemaChange={setSchema}
+            onEditTable={handleEditTable}
+            onAddColumn={handleAddColumn}
+            onEditColumn={handleEditColumn}
+            onDeleteTable={handleDeleteTable}
+            onManageIndexes={handleManageIndexes}
+          />
+        </div>
           </ReactFlowProvider>
         </section>
       )}
 
       {/* Help Tips */}
       {schema.tables.length > 0 && (
-        <aside className="mt-6 p-4 bg-blue-500/5 border border-blue-500/20 rounded-lg" role="complementary" aria-label="Quick tips and keyboard shortcuts">
-          <div className="flex items-start gap-3">
-            <svg className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <aside className="mt-6 bg-gradient-to-br from-blue-500/5 to-purple-500/5 border border-blue-500/20 rounded-lg overflow-hidden" role="complementary" aria-label="Quick tips and keyboard shortcuts">
+          <div className="px-4 py-3 bg-foreground/5 border-b border-foreground/10 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            <div className="flex-1">
-              <h4 className="text-sm font-semibold text-foreground mb-1 font-mono">Quick Tips</h4>
-              <ul className="text-xs text-foreground/70 font-mono space-y-1 leading-relaxed" role="list">
-                <li>→ Drag tables to reposition them on canvas</li>
-                <li>→ Click on any column to edit it, or use &quot;Add Column&quot; button</li>
-                <li>→ Click &quot;Indexes&quot; button on tables to manually manage indexes</li>
-                <li>→ Click <span className="text-purple-600 dark:text-purple-400">&quot;Auto-Index FKs&quot;</span> button to instantly optimize all foreign keys</li>
-                <li>→ <span className="text-purple-600 dark:text-purple-400">Lightning icon</span> next to columns indicates they are indexed</li>
-                <li>→ Press <kbd className="px-1.5 py-0.5 bg-foreground/10 rounded text-[10px]">Cmd+T</kbd> to add table, <kbd className="px-1.5 py-0.5 bg-foreground/10 rounded text-[10px]">Cmd+E</kbd> to export</li>
-                <li>→ <span className="text-foreground/70">Drag canvas</span> to pan (shows hand cursor ✋), drag tables to move them</li>
-                <li>→ Click <span className="text-primary">Hand Tool</span> or hold <kbd className="px-1.5 py-0.5 bg-foreground/10 rounded text-[10px]">Space</kbd> to lock tables and pan anywhere</li>
-                <li>→ <span className="text-foreground/70">Use zoom buttons</span> or <span className="text-foreground/70">minimap</span> (bottom-right) to navigate large schemas</li>
-                <li>→ <span className="text-foreground/70">Double-click</span> canvas to zoom, click <span className="text-foreground/70">&quot;Fit View&quot;</span> to center all tables</li>
-                <li>→ Press <kbd className="px-1.5 py-0.5 bg-foreground/10 rounded text-[10px]">Esc</kbd> to close dialogs</li>
+              <h4 className="text-sm font-semibold text-foreground font-mono">Quick Guide</h4>
+            </div>
+          </div>
+          
+          <div className="p-4 grid sm:grid-cols-2 gap-3">
+            {/* Navigation */}
+            <div>
+              <div className="flex items-center gap-1.5 mb-2">
+                <svg className="w-3.5 h-3.5 text-foreground/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 11.5V14m0-2.5v-6a1.5 1.5 0 113 0m-3 6a1.5 1.5 0 00-3 0v2a7.5 7.5 0 0015 0v-5a1.5 1.5 0 00-3 0m-6-3V11m0-5.5v-1a1.5 1.5 0 013 0v1m0 0V11m0-5.5a1.5 1.5 0 013 0v3m0 0V11" />
+                </svg>
+                <span className="text-xs font-semibold text-foreground/80 font-mono">Navigation</span>
+              </div>
+              <ul className="text-xs text-foreground/60 font-mono space-y-1.5 leading-relaxed">
+                <li className="flex items-start gap-1.5">
+                  <span className="text-foreground/40 flex-shrink-0">•</span>
+                  <span>Drag empty canvas to pan</span>
+                </li>
+                <li className="flex items-start gap-1.5">
+                  <span className="text-foreground/40 flex-shrink-0">•</span>
+                  <span>Hold <kbd className="px-1 py-0.5 bg-foreground/10 rounded text-[10px]">Space</kbd> to lock tables</span>
+                </li>
+                <li className="flex items-start gap-1.5">
+                  <span className="text-foreground/40 flex-shrink-0">•</span>
+                  <span>Use minimap or zoom buttons</span>
+                </li>
+              </ul>
+            </div>
+
+            {/* Editing */}
+            <div>
+              <div className="flex items-center gap-1.5 mb-2">
+                <svg className="w-3.5 h-3.5 text-foreground/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+                <span className="text-xs font-semibold text-foreground/80 font-mono">Editing</span>
+              </div>
+              <ul className="text-xs text-foreground/60 font-mono space-y-1.5 leading-relaxed">
+                <li className="flex items-start gap-1.5">
+                  <span className="text-foreground/40 flex-shrink-0">•</span>
+                  <span>Drag tables to reposition them</span>
+                </li>
+                <li className="flex items-start gap-1.5">
+                  <span className="text-foreground/40 flex-shrink-0">•</span>
+                  <span>Click columns to edit properties</span>
+                </li>
+                <li className="flex items-start gap-1.5">
+                  <span className="text-foreground/40 flex-shrink-0">•</span>
+                  <span>Use Column Editor for foreign keys</span>
+                </li>
+              </ul>
+            </div>
+
+            {/* Performance */}
+            <div>
+              <div className="flex items-center gap-1.5 mb-2">
+                <svg className="w-3.5 h-3.5 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+                <span className="text-xs font-semibold text-foreground/80 font-mono">Performance</span>
+              </div>
+              <ul className="text-xs text-foreground/60 font-mono space-y-1.5 leading-relaxed">
+                <li className="flex items-start gap-1.5">
+                  <span className="text-foreground/40 flex-shrink-0">•</span>
+                  <span><span className="text-purple-600 dark:text-purple-400">Auto-Index FKs</span> optimizes JOINs</span>
+                </li>
+                <li className="flex items-start gap-1.5">
+                  <span className="text-foreground/40 flex-shrink-0">•</span>
+                  <span>Lightning icon = indexed column</span>
+                </li>
+                <li className="flex items-start gap-1.5">
+                  <span className="text-foreground/40 flex-shrink-0">•</span>
+                  <span>Manage indexes per table</span>
+                </li>
+              </ul>
+            </div>
+
+            {/* Shortcuts */}
+            <div>
+              <div className="flex items-center gap-1.5 mb-2">
+                <svg className="w-3.5 h-3.5 text-foreground/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+                </svg>
+                <span className="text-xs font-semibold text-foreground/80 font-mono">Shortcuts</span>
+              </div>
+              <ul className="text-xs text-foreground/60 font-mono space-y-1.5 leading-relaxed">
+                <li className="flex items-start gap-1.5">
+                  <span className="text-foreground/40 flex-shrink-0">•</span>
+                  <span><kbd className="px-1 py-0.5 bg-foreground/10 rounded text-[10px]">Cmd+I</kbd> Import SQL/Prisma</span>
+                </li>
+                <li className="flex items-start gap-1.5">
+                  <span className="text-foreground/40 flex-shrink-0">•</span>
+                  <span><kbd className="px-1 py-0.5 bg-foreground/10 rounded text-[10px]">Cmd+L</kbd> Auto-layout</span>
+                </li>
+                <li className="flex items-start gap-1.5">
+                  <span className="text-foreground/40 flex-shrink-0">•</span>
+                  <span><kbd className="px-1 py-0.5 bg-foreground/10 rounded text-[10px]">Cmd+E</kbd> Export</span>
+                </li>
               </ul>
             </div>
           </div>
@@ -1062,6 +1294,15 @@ export default function SchemaDesignerPage() {
         isOpen={isExportModalOpen}
         schema={schema}
         onClose={() => setIsExportModalOpen(false)}
+        onExportImage={handleExportImage}
+      />
+
+      {/* Import Modal */}
+      <ImportModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        onImport={handleImport}
+        hasExistingTables={schema.tables.length > 0}
       />
 
       {/* Confirmation Dialog */}

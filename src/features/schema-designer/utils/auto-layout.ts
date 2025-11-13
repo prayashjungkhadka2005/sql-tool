@@ -1,0 +1,192 @@
+/**
+ * Auto-Layout Utility
+ * Automatically arranges tables using graph algorithms
+ */
+
+import dagre from 'dagre';
+import { SchemaTable } from '../types';
+
+export type LayoutAlgorithm = 'hierarchical' | 'grid' | 'circular';
+
+/**
+ * Auto-layout tables using the specified algorithm
+ */
+export function autoLayoutTables(
+  tables: SchemaTable[],
+  algorithm: LayoutAlgorithm = 'hierarchical',
+  forExport: boolean = false
+): SchemaTable[] {
+  if (tables.length === 0) return tables;
+  
+  switch (algorithm) {
+    case 'hierarchical':
+      return hierarchicalLayout(tables, forExport);
+    case 'grid':
+      return gridLayout(tables);
+    case 'circular':
+      return circularLayout(tables);
+    default:
+      return hierarchicalLayout(tables, forExport);
+  }
+}
+
+/**
+ * Calculate dynamic table width for layout
+ */
+function getTableWidthForLayout(table: SchemaTable): number {
+  let maxWidth = 280;
+  
+  // Validate table name exists
+  if (!table.name) return 280;
+  
+  const tableName = table.name.length > 40 ? table.name.substring(0, 40) : table.name;
+  const tableNameWidth = tableName.length * 8.5 + 40;
+  maxWidth = Math.max(maxWidth, tableNameWidth);
+  
+  // Check each column (if exists)
+  if (table.columns && table.columns.length > 0) {
+    table.columns.forEach(column => {
+      if (!column.name) return;
+      
+      const columnName = column.name.length > 28 ? column.name.substring(0, 28) : column.name;
+      const columnNameWidth = columnName.length * 7.5;
+      const dataTypeText = (column.type || 'VARCHAR') + 
+        ((column.type === 'VARCHAR' || column.type === 'CHAR') && column.length ? `(${column.length})` : '') +
+        (column.type === 'DECIMAL' && column.precision ? `(${column.precision}${column.scale ? `,${column.scale}` : ''})` : '');
+      const dataTypeWidth = dataTypeText.length * 6.5;
+      const constraintsWidth = 
+        (!column.nullable && !column.primaryKey ? 25 : 0) +
+        (column.unique && !column.primaryKey ? 25 : 0) +
+        (column.autoIncrement ? 22 : 0);
+      
+      const totalWidth = columnNameWidth + dataTypeWidth + constraintsWidth + 40;
+      maxWidth = Math.max(maxWidth, totalWidth);
+    });
+  }
+  
+  return Math.min(Math.max(maxWidth, 280), 500);
+}
+
+/**
+ * Hierarchical layout using Dagre
+ * Tables with dependencies flow from top to bottom
+ */
+function hierarchicalLayout(tables: SchemaTable[], forExport: boolean = false): SchemaTable[] {
+  const g = new dagre.graphlib.Graph();
+  
+  // Configure graph - wider spacing and center alignment for exports
+  g.setGraph({
+    rankdir: 'TB', // Top to bottom
+    align: forExport ? undefined : 'UL', // Center for export, upper-left for canvas
+    nodesep: forExport ? 180 : 100, // Maximum horizontal spacing for export
+    ranksep: forExport ? 250 : 200, // More vertical spacing for export
+    marginx: forExport ? 80 : 50,
+    marginy: forExport ? 80 : 50,
+  });
+  
+  g.setDefaultEdgeLabel(() => ({}));
+  
+  // Add nodes with dynamic widths
+  tables.forEach(table => {
+    // Skip tables without ID
+    if (!table.id) return;
+    
+    const tableWidth = getTableWidthForLayout(table);
+    const columnCount = table.columns?.length || 0;
+    
+    g.setNode(table.id, {
+      label: table.name || 'Unnamed',
+      width: tableWidth, // Dynamic width
+      height: Math.max(150, 70 + (columnCount * 32) + 20), // Accurate height
+    });
+  });
+  
+  // Add edges (foreign key relationships)
+  // Edge direction: parent → child (referenced table → referencing table)
+  tables.forEach(table => {
+    // Skip tables without ID or columns
+    if (!table.id || !table.columns) return;
+    
+    table.columns.forEach(col => {
+      // Validate references exist and have required fields
+      if (!col.references || !col.references.table) return;
+      
+      const targetTable = tables.find(t => t.name === col.references?.table);
+      
+      // Skip if target not found or has no ID
+      if (!targetTable || !targetTable.id) return;
+      
+      // Skip self-references (would create loop in hierarchy)
+      if (targetTable.id === table.id) return;
+      
+      // Correct direction: parent (referenced) → child (has FK)
+      // This ensures parent tables are positioned above child tables
+      g.setEdge(targetTable.id, table.id);
+    });
+  });
+  
+  // Run layout
+  dagre.layout(g);
+  
+  // Apply new positions
+  return tables.map(table => {
+    // Skip if table has no ID or wasn't added to graph
+    if (!table.id) return table;
+    
+    const node = g.node(table.id);
+    
+    // If node wasn't laid out (shouldn't happen), keep original position
+    if (!node) {
+      console.warn(`Table ${table.name} was not laid out`);
+      return table;
+    }
+    
+    return {
+      ...table,
+      position: {
+        x: Math.max(0, node.x - node.width / 2), // Ensure non-negative
+        y: Math.max(0, node.y - node.height / 2), // Ensure non-negative
+      },
+    };
+  });
+}
+
+/**
+ * Grid layout - simple organized rows and columns
+ */
+function gridLayout(tables: SchemaTable[]): SchemaTable[] {
+  const columns = 3;
+  const cellWidth = 400;
+  const cellHeight = 300;
+  
+  return tables.map((table, index) => ({
+    ...table,
+    position: {
+      x: 100 + (index % columns) * cellWidth,
+      y: 100 + Math.floor(index / columns) * cellHeight,
+    },
+  }));
+}
+
+/**
+ * Circular layout - arrange tables in a circle
+ * Good for showing relationships without hierarchy
+ */
+function circularLayout(tables: SchemaTable[]): SchemaTable[] {
+  const centerX = 600;
+  const centerY = 400;
+  const radius = Math.max(300, tables.length * 50);
+  
+  return tables.map((table, index) => {
+    const angle = (2 * Math.PI * index) / tables.length - Math.PI / 2; // Start from top
+    
+    return {
+      ...table,
+      position: {
+        x: centerX + radius * Math.cos(angle) - 140, // Center node
+        y: centerY + radius * Math.sin(angle) - 100,
+      },
+    };
+  });
+}
+
