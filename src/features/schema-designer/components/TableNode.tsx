@@ -16,17 +16,35 @@ interface TableNodeData {
   onAddColumn: (tableId: string) => void;
   onEditColumn: (tableId: string, columnId: string) => void;
   onManageIndexes: (tableId: string) => void;
+  onContextMenu?: (tableId: string, x: number, y: number) => void;
   isSelected?: boolean;
   isRelated?: boolean;
   onSelect?: () => void;
+  onCloseContextMenu?: () => void;
 }
 
 function TableNode({ data, selected }: NodeProps<TableNodeData>) {
-  const { table, onEdit, onDelete, onAddColumn, onEditColumn, onManageIndexes, isSelected, isRelated, onSelect } = data;
+  const { table, onEdit, onDelete, onAddColumn, onEditColumn, onManageIndexes, onContextMenu, isSelected, isRelated, onSelect, onCloseContextMenu } = data;
+
+  const handleContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (onContextMenu) {
+      onContextMenu(table.id, e.clientX, e.clientY);
+    }
+  };
+
+  const handleClick = (e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent canvas click from firing
+    if (onSelect) {
+      onSelect();
+    }
+  };
 
   return (
     <div
-      onClick={onSelect}
+      onClick={handleClick}
+      onContextMenu={handleContextMenu}
       className={`relative bg-white dark:bg-[#1a1a1a] border-2 rounded-lg shadow-lg min-w-[280px] transition-all cursor-pointer ${
         isSelected 
           ? 'border-blue-500 shadow-xl ring-4 ring-blue-500/30 scale-[1.02]' 
@@ -126,6 +144,10 @@ function TableNode({ data, selected }: NodeProps<TableNodeData>) {
               key={column.id}
               onClick={(e) => {
                 e.stopPropagation();
+                // Close context menu if open
+                if (onCloseContextMenu) {
+                  onCloseContextMenu();
+                }
                 onEditColumn(table.id, column.id);
               }}
               className="flex items-center gap-2 text-xs font-mono group hover:bg-foreground/10 px-2 py-1.5 rounded transition-all cursor-pointer w-full text-left active:scale-[0.98]"

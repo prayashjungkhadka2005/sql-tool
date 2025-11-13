@@ -17,6 +17,7 @@ import { MigrationModal } from '@/features/schema-designer/components/MigrationM
 import IndexManager from '@/features/schema-designer/components/IndexManager';
 import { ValidationPanel } from '@/features/schema-designer/components/ValidationPanel';
 import CommandPalette, { Command } from '@/features/schema-designer/components/CommandPalette';
+import ContextMenu, { ContextMenuItem } from '@/features/schema-designer/components/ContextMenu';
 import { SCHEMA_TEMPLATES } from '@/features/schema-designer/data/schema-templates';
 import { autoLayoutTables, LayoutAlgorithm } from '@/features/schema-designer/utils/auto-layout';
 import { exportCanvasAsImage, getSuggestedFilename } from '@/features/schema-designer/utils/image-export';
@@ -61,6 +62,15 @@ export default function SchemaDesignerPage() {
   const [canvasRef, setCanvasRef] = useState<HTMLElement | null>(null);
   const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
+  const [contextMenu, setContextMenu] = useState<{
+    isOpen: boolean;
+    position: { x: number; y: number };
+    tableId: string | null;
+  }>({
+    isOpen: false,
+    position: { x: 0, y: 0 },
+    tableId: null,
+  });
   
   // LocalStorage persistence state
   const [lastSavedTime, setLastSavedTime] = useState<number | null>(null);
@@ -674,6 +684,8 @@ export default function SchemaDesignerPage() {
         setIsIndexManagerOpen(false);
         setManagingIndexTable(null);
         setIsOptimizingFKs(false); // Reset optimization state
+        // Close context menu if open
+        setContextMenu(prev => ({ ...prev, isOpen: false }));
         
         // Ensure all tables have indexes array initialized
         const normalizedSchema = {
@@ -720,6 +732,10 @@ export default function SchemaDesignerPage() {
         if (managingIndexTable?.id === tableId) {
           setIsIndexManagerOpen(false);
           setManagingIndexTable(null);
+        }
+        // Close context menu if open for this table
+        if (contextMenu.isOpen && contextMenu.tableId === tableId) {
+          setContextMenu(prev => ({ ...prev, isOpen: false }));
         }
 
         // Remove table AND clean up all FK references to it
@@ -783,7 +799,7 @@ export default function SchemaDesignerPage() {
         setConfirmDialog(prev => ({ ...prev, isOpen: false }));
       },
     });
-  }, [schema, editingColumn, managingIndexTable]);
+  }, [schema, editingColumn, managingIndexTable, contextMenu.isOpen, contextMenu.tableId]);
 
   // Memoize button visibility check for performance
   const hasFKsWithoutIndexes = useMemo(() => {
@@ -826,6 +842,8 @@ export default function SchemaDesignerPage() {
         setIsIndexManagerOpen(false);
         setManagingIndexTable(null);
         setIsOptimizingFKs(false); // Reset optimization state
+        // Close context menu if open
+        setContextMenu(prev => ({ ...prev, isOpen: false }));
         
         // Replace schema without adding to history
         replaceSchema({
@@ -852,6 +870,8 @@ export default function SchemaDesignerPage() {
     setIsIndexManagerOpen(false);
     setManagingIndexTable(null);
     setIsOptimizingFKs(false);
+    // Close context menu if open
+    setContextMenu(prev => ({ ...prev, isOpen: false }));
     
     // Close import modal
     setIsImportModalOpen(false);
@@ -983,6 +1003,160 @@ export default function SchemaDesignerPage() {
       });
     }
   }, [canvasRef, schema.name, schema.tables]);
+
+  // Handle table context menu (right-click)
+  const handleTableContextMenu = useCallback((tableId: string, x: number, y: number) => {
+    // Close Command Palette if open (context menu takes priority)
+    if (isCommandPaletteOpen) {
+      setIsCommandPaletteOpen(false);
+    }
+    
+    // Close existing context menu and open new one (handles rapid right-clicks)
+    setContextMenu({
+      isOpen: true,
+      position: { x, y },
+      tableId,
+    });
+  }, [isCommandPaletteOpen]);
+
+  // Handle canvas click (close context menu)
+  const handleCanvasClick = useCallback(() => {
+    if (contextMenu.isOpen) {
+      setContextMenu(prev => ({ ...prev, isOpen: false }));
+    }
+  }, [contextMenu.isOpen]);
+
+  // Close context menu handler
+  const handleCloseContextMenu = useCallback(() => {
+    if (contextMenu.isOpen) {
+      setContextMenu(prev => ({ ...prev, isOpen: false }));
+    }
+  }, [contextMenu.isOpen]);
+
+  // Auto-close context menu if table is deleted
+  useEffect(() => {
+    if (contextMenu.isOpen && contextMenu.tableId) {
+      const table = schema.tables.find(t => t.id === contextMenu.tableId);
+      if (!table) {
+        // Table was deleted - close menu
+        setContextMenu(prev => ({ ...prev, isOpen: false }));
+      }
+    }
+  }, [contextMenu.isOpen, contextMenu.tableId, schema.tables]);
+
+  // Generate context menu items for the selected table
+  const contextMenuItems = useMemo<ContextMenuItem[]>(() => {
+    if (!contextMenu.tableId) return [];
+
+    const table = schema.tables.find(t => t.id === contextMenu.tableId);
+    if (!table) return [];
+
+    return [
+      {
+        id: 'add-column',
+        label: 'Add Column',
+        icon: (
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+          </svg>
+        ),
+        action: () => handleAddColumn(table.id),
+      },
+      {
+        id: 'edit-table',
+        label: 'Rename Table',
+        icon: (
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+          </svg>
+        ),
+        action: () => handleEditTable(table.id),
+      },
+      {
+        id: 'manage-indexes',
+        label: 'Manage Indexes',
+        icon: (
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+          </svg>
+        ),
+        action: () => handleManageIndexes(table.id),
+      },
+      {
+        id: 'separator-1',
+        label: '',
+        separator: true,
+        action: () => {},
+      },
+      {
+        id: 'duplicate-table',
+        label: 'Duplicate Table',
+        icon: (
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+          </svg>
+        ),
+        action: () => {
+          // Generate unique table name
+          let newName = `${table.name}_copy`;
+          let counter = 1;
+          while (schema.tables.some(t => t.name === newName)) {
+            counter++;
+            newName = `${table.name}_copy${counter}`;
+          }
+
+          // Duplicate table with new position and unique IDs
+          const newTable: SchemaTable = {
+            ...table,
+            id: `${table.name}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            name: newName,
+            position: {
+              x: table.position.x + 50,
+              y: table.position.y + 50,
+            },
+            columns: table.columns.map((col, idx) => ({
+              ...col,
+              id: `${col.name}_${Date.now()}_${idx}_${Math.random().toString(36).substr(2, 9)}`,
+              // Remove FK references (don't copy relationships)
+              references: undefined,
+            })),
+            indexes: table.indexes
+              ?.filter(idx => {
+                // Only copy indexes that don't reference FK columns
+                const fkColumnNames = table.columns
+                  .filter(c => c.references)
+                  .map(c => c.name);
+                return !idx.columns.some(col => fkColumnNames.includes(col));
+              })
+              .map((idx, i) => ({
+                ...idx,
+                id: `${idx.name}_${Date.now()}_${i}_copy`,
+                name: `${idx.name}_copy${counter > 1 ? counter : ''}`,
+              })),
+          };
+          
+          setSchema({ ...schema, tables: [...schema.tables, newTable] }, 'Duplicate table');
+        },
+      },
+      {
+        id: 'separator-2',
+        label: '',
+        separator: true,
+        action: () => {},
+      },
+      {
+        id: 'delete-table',
+        label: 'Delete Table',
+        icon: (
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+          </svg>
+        ),
+        variant: 'danger',
+        action: () => handleDeleteTable(table.id),
+      },
+    ];
+  }, [contextMenu.tableId, schema.tables, setSchema, handleAddColumn, handleEditTable, handleManageIndexes, handleDeleteTable]);
 
   // Generate commands for command palette
   const commands = useMemo<Command[]>(() => {
@@ -1128,7 +1302,7 @@ export default function SchemaDesignerPage() {
     });
 
     return cmds;
-  }, [schema.tables, canUndo, canRedo, lastActionName, undo, redo]);
+  }, [schema.tables, canUndo, canRedo, lastActionName, undo, redo, handleAddTable, handleAutoLayout, handleReset]);
 
   // Keyboard shortcut overlay (? key)
   useEffect(() => {
@@ -1164,7 +1338,7 @@ export default function SchemaDesignerPage() {
       }
       
       // Don't trigger when any dialog/drawer is open (except command palette opening with Cmd+K)
-      if (isColumnEditorOpen || isIndexManagerOpen || isExportModalOpen || isImportModalOpen || isMigrationModalOpen || confirmDialog.isOpen || inputDialog.isOpen || alertDialog.isOpen || isShortcutsOpen || isCommandPaletteOpen) {
+      if (isColumnEditorOpen || isIndexManagerOpen || isExportModalOpen || isImportModalOpen || isMigrationModalOpen || confirmDialog.isOpen || inputDialog.isOpen || alertDialog.isOpen || isShortcutsOpen || isCommandPaletteOpen || contextMenu.isOpen) {
         return;
       }
 
@@ -1243,7 +1417,7 @@ export default function SchemaDesignerPage() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [schema.tables, isColumnEditorOpen, isIndexManagerOpen, isExportModalOpen, isImportModalOpen, isMigrationModalOpen, confirmDialog.isOpen, inputDialog.isOpen, alertDialog.isOpen, isShortcutsOpen, canUndo, canRedo, undo, redo, handleAddTable, handleReset, handleAutoLayout]);
+  }, [schema.tables, isColumnEditorOpen, isIndexManagerOpen, isExportModalOpen, isImportModalOpen, isMigrationModalOpen, confirmDialog.isOpen, inputDialog.isOpen, alertDialog.isOpen, isShortcutsOpen, isCommandPaletteOpen, contextMenu.isOpen, canUndo, canRedo, undo, redo, handleAddTable, handleReset, handleAutoLayout]);
 
   return (
     <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12 sm:pb-16">
@@ -1283,19 +1457,19 @@ export default function SchemaDesignerPage() {
               </div>
             )}
           </div>
-
-          <button
-            onClick={() => setIsExportModalOpen(true)}
-            disabled={schema.tables.length === 0}
+            
+            <button
+              onClick={() => setIsExportModalOpen(true)}
+              disabled={schema.tables.length === 0}
             className="px-4 py-2 text-sm font-semibold text-white bg-primary hover:bg-primary/90 rounded-lg transition-all font-mono flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed active:scale-95 shadow-sm"
             title={schema.tables.length === 0 ? 'Add tables to enable export' : 'Export schema (Cmd+E)'}
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
-            </svg>
-            Export
-          </button>
-        </div>
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+              </svg>
+              Export
+            </button>
+          </div>
             
         {/* Toolbar - Clean and consistent */}
         <div className="flex items-center justify-between gap-3 px-3 py-2 bg-foreground/[0.03] border border-foreground/10 rounded-lg">
@@ -1554,6 +1728,9 @@ export default function SchemaDesignerPage() {
             onEditColumn={handleEditColumn}
             onDeleteTable={handleDeleteTable}
             onManageIndexes={handleManageIndexes}
+            onTableContextMenu={handleTableContextMenu}
+            onCanvasClick={handleCanvasClick}
+            onCloseContextMenu={handleCloseContextMenu}
         />
         </div>
           </ReactFlowProvider>
@@ -1583,11 +1760,11 @@ export default function SchemaDesignerPage() {
                 <div className="flex items-center gap-3">
                   <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
-                  </svg>
+            </svg>
                   <h3 id="shortcuts-title" className="text-lg font-bold text-foreground font-mono">
                     Keyboard Shortcuts
                   </h3>
-                </div>
+            </div>
                 <button
                   onClick={() => setIsShortcutsOpen(false)}
                   className="p-1.5 hover:bg-foreground/10 rounded-lg transition-all active:scale-95"
@@ -1597,7 +1774,7 @@ export default function SchemaDesignerPage() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                   </svg>
                 </button>
-              </div>
+          </div>
 
               {/* Content */}
               <div className="px-6 py-5 grid sm:grid-cols-2 gap-6">
@@ -1608,7 +1785,7 @@ export default function SchemaDesignerPage() {
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-foreground/80 font-mono">Command palette</span>
                       <kbd className="px-2 py-1 bg-foreground/10 border border-foreground/20 rounded text-xs font-mono">Cmd+K</kbd>
-                    </div>
+        </div>
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-foreground/80 font-mono">New table</span>
                       <kbd className="px-2 py-1 bg-foreground/10 border border-foreground/20 rounded text-xs font-mono">Cmd+T</kbd>
@@ -1732,6 +1909,14 @@ export default function SchemaDesignerPage() {
           />
         )}
       </AnimatePresence>
+
+      {/* Context Menu */}
+      <ContextMenu
+        isOpen={contextMenu.isOpen}
+        position={contextMenu.position}
+        items={contextMenuItems}
+        onClose={() => setContextMenu(prev => ({ ...prev, isOpen: false }))}
+      />
 
       {/* Confirmation Dialog */}
       <ConfirmDialog

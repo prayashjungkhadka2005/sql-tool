@@ -79,7 +79,8 @@ export default function CommandPalette({ isOpen, onClose, schema, commands }: Co
     if (isOpen) {
       setSearch('');
       setSelectedIndex(0);
-      setTimeout(() => inputRef.current?.focus(), 50);
+      const timeoutId = setTimeout(() => inputRef.current?.focus(), 50);
+      return () => clearTimeout(timeoutId); // Cleanup timeout
     }
   }, [isOpen]);
 
@@ -88,6 +89,11 @@ export default function CommandPalette({ isOpen, onClose, schema, commands }: Co
     if (!isOpen) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Stop propagation to prevent conflicts with other shortcuts
+      if (['Escape', 'ArrowDown', 'ArrowUp', 'Enter'].includes(e.key)) {
+        e.stopPropagation();
+      }
+
       if (e.key === 'Escape') {
         e.preventDefault();
         onClose();
@@ -184,6 +190,9 @@ export default function CommandPalette({ isOpen, onClose, schema, commands }: Co
           transition={{ type: 'spring', damping: 25, stiffness: 300 }}
           className="w-full max-w-2xl bg-white dark:bg-[#1a1a1a] border-2 border-foreground/20 rounded-xl shadow-2xl overflow-hidden"
           onClick={(e) => e.stopPropagation()}
+          role="dialog"
+          aria-label="Command palette"
+          aria-modal="true"
         >
           {/* Search Input */}
           <div className="px-4 py-3 border-b border-foreground/10">
@@ -241,7 +250,10 @@ export default function CommandPalette({ isOpen, onClose, schema, commands }: Co
                             onClose();
                           }}
                           onMouseEnter={() => setSelectedIndex(globalIndex)}
-                          className={`w-full px-4 py-2.5 flex items-center justify-between gap-3 transition-colors text-left ${
+                          role="option"
+                          aria-selected={isSelected}
+                          aria-label={cmd.label}
+                          className={`w-full px-4 py-2.5 flex items-center justify-between gap-3 transition-colors text-left active:scale-95 ${
                             isSelected
                               ? 'bg-primary/10 border-l-2 border-primary'
                               : 'border-l-2 border-transparent hover:bg-foreground/5'

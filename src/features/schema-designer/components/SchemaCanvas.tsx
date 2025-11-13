@@ -33,6 +33,9 @@ interface SchemaCanvasProps {
   onEditColumn: (tableId: string, columnId: string) => void;
   onDeleteTable: (tableId: string) => void;
   onManageIndexes: (tableId: string) => void;
+  onTableContextMenu?: (tableId: string, x: number, y: number) => void;
+  onCanvasClick?: () => void;
+  onCloseContextMenu?: () => void;
 }
 
 export default function SchemaCanvas({ 
@@ -42,7 +45,10 @@ export default function SchemaCanvas({
   onAddColumn,
   onEditColumn,
   onDeleteTable,
-  onManageIndexes
+  onManageIndexes,
+  onTableContextMenu,
+  onCanvasClick,
+  onCloseContextMenu
 }: SchemaCanvasProps) {
   const { zoomIn, zoomOut, fitView } = useReactFlow();
   
@@ -129,12 +135,18 @@ export default function SchemaCanvas({
           isSelected: selectedTableId === table.id,
           isRelated: relatedTables.has(table.id),
           onSelect: () => {
+            // Close context menu if open
+            if (onCloseContextMenu) {
+              onCloseContextMenu();
+            }
             // Toggle selection
             setSelectedTableId(prev => prev === table.id ? null : table.id);
           },
+          onContextMenu: onTableContextMenu,
+          onCloseContextMenu,
         },
       }));
-  }, [onEditTable, onDeleteTable, onAddColumn, onEditColumn, onManageIndexes, selectedTableId, getRelatedTables]);
+  }, [onEditTable, onDeleteTable, onAddColumn, onEditColumn, onManageIndexes, onTableContextMenu, onCloseContextMenu, selectedTableId, getRelatedTables]);
 
   // Convert FK columns to React Flow edges (auto-generate from schema)
   const convertToEdges = useCallback((tables: SchemaTable[]): Edge[] => {
@@ -324,6 +336,7 @@ export default function SchemaCanvas({
         onEdgesChange={handleEdgesChange}
         onNodeDragStop={handleNodeDragStop}
         onConnect={onConnect}
+        onPaneClick={onCanvasClick}
         nodeTypes={nodeTypes}
         nodesDraggable={!isPanMode}
         nodesConnectable={!isPanMode}
