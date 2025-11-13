@@ -56,8 +56,8 @@ export default function SQLFormatter({ onClose }: SQLFormatterProps) {
         return;
       }
       
-      // Ctrl/Cmd + K to clear
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+      // Ctrl/Cmd + Shift + K to clear (changed to avoid conflict with Command Palette)
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'K') {
         e.preventDefault();
         handleClear();
         return;
@@ -198,7 +198,7 @@ export default function SQLFormatter({ onClose }: SQLFormatterProps) {
             <button
               onClick={handleClear}
               className="text-xs px-2 py-1 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 rounded font-mono text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 transition-all"
-              title="Clear all (⌘K)"
+              title="Clear all (⌘⇧K / Ctrl+Shift+K)"
             >
               Clear
             </button>

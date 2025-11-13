@@ -4,9 +4,10 @@ import Link from "next/link";
 
 export default function Footer() {
   return (
-    <footer className="mt-auto border-t border-foreground/10 bg-white/50 dark:bg-[#0a0a0a]/50 backdrop-blur-sm">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
-        <div className="grid md:grid-cols-3 gap-6 mb-6">
+    <footer className="mt-auto px-4 sm:px-6 lg:px-8">
+      <div className="max-w-7xl mx-auto border-t border-l border-r border-foreground/10 bg-white/50 dark:bg-[#0a0a0a]/50 backdrop-blur-sm rounded-t-lg">
+        <div className="px-4 sm:px-6 py-6 sm:py-8">
+          <div className="grid md:grid-cols-3 gap-6 mb-6">
           {/* Brand Section */}
           <div>
             <Link href="/" className="flex items-center gap-2 mb-3 hover:opacity-80 transition-opacity w-fit">
@@ -96,17 +97,18 @@ export default function Footer() {
           </div>
         </div>
 
-        {/* Bottom Bar */}
-        <div className="pt-4 border-t border-foreground/10">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-foreground/50 font-mono">
-            <p>
-              © {new Date().getFullYear()} Built by{" "}
-              <span className="text-foreground/70">
-                Prayash Jung Khadka
-              </span>
-            </p>
-            <div className="flex items-center gap-4">
-              <span>Next.js · TypeScript · Tailwind</span>
+          {/* Bottom Bar */}
+          <div className="pt-4 border-t border-foreground/10">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-foreground/50 font-mono">
+              <p>
+                © {new Date().getFullYear()} Built by{" "}
+                <span className="text-foreground/70">
+                  Prayash Jung Khadka
+                </span>
+              </p>
+              <div className="flex items-center gap-4">
+                <span>Next.js · TypeScript · Tailwind</span>
+              </div>
             </div>
           </div>
         </div>

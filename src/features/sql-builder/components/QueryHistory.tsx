@@ -26,11 +26,15 @@ export default function QueryHistory({ onLoadQuery, isOpen: externalIsOpen, onCl
     isOpen: boolean;
     title: string;
     message: string;
+    confirmLabel?: string;
+    confirmVariant?: "danger" | "primary";
     onConfirm: () => void;
   }>({
     isOpen: false,
     title: "",
     message: "",
+    confirmLabel: "Delete",
+    confirmVariant: "danger",
     onConfirm: () => {},
   });
 
@@ -85,9 +89,13 @@ export default function QueryHistory({ onLoadQuery, isOpen: externalIsOpen, onCl
       isOpen: true,
       title: "Delete Query?",
       message: "Remove this query from history?\n\nThis action cannot be undone.",
+      confirmLabel: "Delete",
+      confirmVariant: "danger",
       onConfirm: () => {
         deleteHistoryItem(id);
-        refreshHistory();
+        // Force immediate refresh by directly fetching from localStorage
+        const updatedHistory = getHistory();
+        setHistory(updatedHistory);
         setConfirmDialog(prev => ({ ...prev, isOpen: false }));
       },
     });
@@ -98,9 +106,13 @@ export default function QueryHistory({ onLoadQuery, isOpen: externalIsOpen, onCl
       isOpen: true,
       title: "Clear All History?",
       message: `Delete all ${history.length} saved queries?\n\nThis action cannot be undone.`,
+      confirmLabel: "Clear All",
+      confirmVariant: "danger",
       onConfirm: () => {
         clearHistory();
-        setHistory([]);
+        // Force immediate refresh
+        const updatedHistory = getHistory();
+        setHistory(updatedHistory);
         setConfirmDialog(prev => ({ ...prev, isOpen: false }));
       },
     });
@@ -112,10 +124,14 @@ export default function QueryHistory({ onLoadQuery, isOpen: externalIsOpen, onCl
       setConfirmDialog({
         isOpen: true,
         title: "CSV Data Not Available",
-        message: `This query used CSV table "${item.tableName}" which is no longer loaded.\n\nThe query will load but you'll need to upload the CSV again to see results.`,
+        message: `This query used CSV table "${item.tableName}" which is no longer loaded.\n\nWould you like to delete this query from history? (The query is no longer useful without the CSV data)`,
+        confirmLabel: "Delete Query",
+        confirmVariant: "danger",
         onConfirm: () => {
-          onLoadQuery(item);
-          handleClose();
+          deleteHistoryItem(item.id);
+          // Force immediate refresh
+          const updatedHistory = getHistory();
+          setHistory(updatedHistory);
           setConfirmDialog(prev => ({ ...prev, isOpen: false }));
         },
       });
@@ -277,7 +293,7 @@ export default function QueryHistory({ onLoadQuery, isOpen: externalIsOpen, onCl
                               e.stopPropagation();
                               handleDelete(item.id);
                             }}
-                            className="opacity-0 sm:group-hover:opacity-100 sm:opacity-100 p-1 text-foreground/40 hover:text-red-500 hover:bg-red-500/10 rounded transition-all"
+                            className="opacity-100 p-1 text-foreground/40 hover:text-red-500 hover:bg-red-500/10 rounded transition-all flex-shrink-0"
                             aria-label="Delete query"
                             title="Delete this query"
                           >
@@ -328,9 +344,9 @@ export default function QueryHistory({ onLoadQuery, isOpen: externalIsOpen, onCl
         isOpen={confirmDialog.isOpen}
         title={confirmDialog.title}
         message={confirmDialog.message}
-        confirmLabel="Delete"
+        confirmLabel={confirmDialog.confirmLabel || "Confirm"}
         cancelLabel="Cancel"
-        confirmVariant="danger"
+        confirmVariant={confirmDialog.confirmVariant || "danger"}
         onConfirm={confirmDialog.onConfirm}
         onCancel={() => setConfirmDialog(prev => ({ ...prev, isOpen: false }))}
       />

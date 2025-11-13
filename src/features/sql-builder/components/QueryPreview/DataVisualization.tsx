@@ -10,8 +10,8 @@ interface DataVisualizationProps {
 }
 
 export default function DataVisualization({ data, hasAggregates, hasGroupBy }: DataVisualizationProps) {
-  // Only show charts for GROUP BY queries with aggregates
-  const shouldShowChart = hasAggregates && hasGroupBy && data.length > 0 && data.length <= 50;
+  // Only show charts for GROUP BY queries with aggregates (limit to 100 groups for performance)
+  const shouldShowChart = hasAggregates && hasGroupBy && data.length > 0 && data.length <= 100;
 
   // Detect if we have numeric aggregate data
   const chartData = useMemo(() => {
@@ -45,10 +45,10 @@ export default function DataVisualization({ data, hasAggregates, hasGroupBy }: D
       aggregateKeywords.some(keyword => col.toLowerCase().includes(keyword))
     ) || numericColumns[0] || null;
 
-    // Group column is the first non-numeric column
-    groupColumn = nonNumericColumns[0] || null;
+    // Group column: prefer non-numeric, but allow numeric if that's all we have
+    groupColumn = nonNumericColumns[0] || numericColumns.find(col => col !== valueColumn) || columns[0] || null;
 
-    if (!groupColumn || !valueColumn) return null;
+    if (!groupColumn || !valueColumn || groupColumn === valueColumn) return null;
 
     // Extract data for chart
     const chartPoints = data.map(row => ({

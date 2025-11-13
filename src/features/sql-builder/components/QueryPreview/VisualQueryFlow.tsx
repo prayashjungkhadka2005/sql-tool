@@ -43,17 +43,7 @@ export default function VisualQueryFlow({
       });
     }
 
-    // Step 2: DISTINCT (if enabled)
-    if (queryState.distinct) {
-      flowSteps.push({
-        label: "DISTINCT",
-        description: "Remove duplicate rows",
-        rows: totalRows, // Before WHERE, so use totalRows
-        color: "teal"
-      });
-    }
-
-    // Step 3: WHERE (if exists)
+    // Step 2: WHERE (if exists)
     if (queryState.whereConditions.length > 0) {
       const conditions = queryState.whereConditions.length;
       flowSteps.push({
@@ -93,6 +83,16 @@ export default function VisualQueryFlow({
         description: "Filter grouped results",
         rows: finalRows,
         color: "red"
+      });
+    }
+
+    // Step 6.5: DISTINCT (if enabled) - Applied during SELECT phase
+    if (queryState.distinct) {
+      flowSteps.push({
+        label: "DISTINCT",
+        description: "Remove duplicate rows",
+        rows: finalRows, // After all filtering/grouping
+        color: "teal"
       });
     }
 

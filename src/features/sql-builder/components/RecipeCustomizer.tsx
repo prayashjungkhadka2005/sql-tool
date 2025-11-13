@@ -43,25 +43,40 @@ export default function RecipeCustomizer({ recipe, currentTable, onClose, onLoad
 
   // Get columns for selected table (memoized and reactive to table changes)
   const columns = useMemo(() => {
-    if (!params.table) return [];
+    // Use params.table if available, otherwise try to infer from recipe's generateQuery
+    let tableName = params.table;
+    
+    // If no table param, try to get table from recipe's default query
+    if (!tableName && !("table" in recipe.parameters)) {
+      // Generate a sample query to see what table it uses
+      try {
+        const sampleQuery = recipe.generateQuery({});
+        tableName = sampleQuery.table || '';
+      } catch {
+        // Fallback
+        tableName = '';
+      }
+    }
+    
+    if (!tableName) return [];
     
     // Check CSV first
-    const csvData = getCSVData(params.table);
+    const csvData = getCSVData(tableName);
     if (csvData) {
       return csvData.columns.map(c => c.name);
     }
     // Then check demo tables
-    const demoTable = SAMPLE_TABLES.find(t => t.name === params.table);
+    const demoTable = SAMPLE_TABLES.find(t => t.name === tableName);
     if (demoTable) {
       return demoTable.columns.map(c => c.name);
     }
     // Fallback
     return [];
-  }, [params.table]); // Re-run when table changes!
+  }, [params.table, recipe]); // Re-run when table or recipe changes!
   
   // Reset column parameters when table changes (with safeguard against infinite loop)
   useEffect(() => {
-    if (params.table && columns.length > 0) {
+    if (columns.length > 0) {
       // Check which column parameters this recipe actually has
       const hasGroupByColumn = "groupByColumn" in recipe.parameters;
       const hasOrderByColumn = "orderByColumn" in recipe.parameters;
@@ -80,8 +95,21 @@ export default function RecipeCustomizer({ recipe, currentTable, onClose, onLoad
       if (needsUpdate) {
         const updates: Record<string, any> = {};
         
+        // Helper: Find best categorical column (avoid IDs, prefer status/category/type/role)
+        const findBestGroupByColumn = () => {
+          // Prefer common categorical column names
+          const preferredNames = ['status', 'category', 'type', 'role', 'city', 'country', 'department', 'payment_method'];
+          for (const name of preferredNames) {
+            const match = columns.find(c => c.toLowerCase() === name);
+            if (match) return match;
+          }
+          // Avoid ID columns
+          const nonIdColumns = columns.filter(c => !c.toLowerCase().includes('id') && !c.toLowerCase().includes('_at'));
+          return nonIdColumns[0] || columns[0];
+        };
+        
         if (hasGroupByColumn && (!params.groupByColumn || !columns.includes(params.groupByColumn))) {
-          updates.groupByColumn = columns[0];
+          updates.groupByColumn = findBestGroupByColumn();
         }
         if (hasOrderByColumn && (!params.orderByColumn || !columns.includes(params.orderByColumn))) {
           updates.orderByColumn = columns[0];

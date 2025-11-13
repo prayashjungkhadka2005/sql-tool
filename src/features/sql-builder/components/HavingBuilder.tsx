@@ -6,10 +6,11 @@ import HelpTooltip from "./HelpTooltip";
 interface HavingBuilderProps {
   table: string;
   having: HavingCondition[];
+  groupBy: string[];
   onChange: (having: HavingCondition[]) => void;
 }
 
-export default function HavingBuilder({ table, having, onChange }: HavingBuilderProps) {
+export default function HavingBuilder({ table, having, groupBy, onChange }: HavingBuilderProps) {
   const tableSchema = useMemo(() => {
     const csvData = getCSVData(table);
     if (csvData) {
@@ -49,7 +50,7 @@ export default function HavingBuilder({ table, having, onChange }: HavingBuilder
   const functions: AggregateFunction[] = ["COUNT", "SUM", "AVG", "MIN", "MAX"];
   const operators: OperatorType[] = ["=", "!=", ">", "<", ">=", "<="];
 
-  const hasGroupBy = !!tableSchema && typeof window !== 'undefined' && (document.querySelector('[data-group-by-active="true"]') || true);
+  const hasGroupBy = groupBy && groupBy.length > 0;
 
   return (
     <div>

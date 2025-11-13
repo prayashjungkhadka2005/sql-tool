@@ -26,8 +26,11 @@ export default function QuickStats({ queryState, totalRows, displayedRows }: Qui
     }
     if (!tableSchema) return tips;
 
-    // Suggestion 1: Add WHERE if none exists (most common next step)
-    if (queryState.whereConditions.length === 0) {
+    // Suggestion 1: Add WHERE if none exists (but deprioritize for aggregate queries)
+    const hasCompleteAggregateQuery = (queryState.aggregates && queryState.aggregates.length > 0) && 
+                                      (queryState.groupBy && queryState.groupBy.length > 0);
+    
+    if (queryState.whereConditions.length === 0 && !hasCompleteAggregateQuery) {
       const statusCol = tableSchema.columns.find(c => c.name === 'status');
       const ageCol = tableSchema.columns.find(c => c.name === 'age');
       
@@ -61,14 +64,26 @@ export default function QuickStats({ queryState, totalRows, displayedRows }: Qui
 
     // Suggestion 4: Add ORDER BY if none exists (polish the query)
     else if (queryState.orderBy.length === 0) {
-      const createdCol = tableSchema.columns.find(c => c.name === 'created_at');
-      const idCol = tableSchema.columns.find(c => c.name === 'id');
-      
-      if (createdCol) {
-        tips.push("Try ORDER BY created_at DESC to see newest first");
-      } else if (idCol) {
-        tips.push("Try ORDER BY to sort your results");
+      // For aggregate queries, suggest ordering by aggregate
+      if (hasCompleteAggregateQuery && queryState.aggregates && queryState.aggregates.length > 0) {
+        const firstAggregate = queryState.aggregates[0];
+        const aggName = `${firstAggregate.function}_${firstAggregate.column}`;
+        tips.push(`Try ORDER BY ${aggName} DESC to see top results`);
+      } else {
+        const createdCol = tableSchema.columns.find(c => c.name === 'created_at');
+        const idCol = tableSchema.columns.find(c => c.name === 'id');
+        
+        if (createdCol) {
+          tips.push("Try ORDER BY created_at DESC to see newest first");
+        } else if (idCol) {
+          tips.push("Try ORDER BY to sort your results");
+        }
       }
+    }
+    
+    // Suggestion 5: Add HAVING for aggregate filtering (advanced tip)
+    else if (hasCompleteAggregateQuery && (!queryState.having || queryState.having.length === 0)) {
+      tips.push("Try HAVING to filter aggregated results (e.g., COUNT > 5)");
     }
 
     // Return max 2 suggestions

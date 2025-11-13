@@ -409,7 +409,9 @@ export default function QueryPreview({ queryState, onAutoFix, onRowCountsChange,
   };
 
   return (
-    <div className="relative bg-white dark:bg-[#1a1a1a] border border-foreground/10 rounded-lg p-5 sm:p-6">
+    <div className={`relative bg-white dark:bg-[#1a1a1a] border border-foreground/10 rounded-lg p-5 sm:p-6 flex flex-col ${
+      !queryState.table ? 'h-fit' : ''
+    }`}>
       {/* Header */}
       <div className="flex items-center justify-between mb-5 pb-4 border-b border-foreground/10">
         <div className="flex items-center gap-2.5">
@@ -536,13 +538,13 @@ export default function QueryPreview({ queryState, onAutoFix, onRowCountsChange,
         </>
       ) : (
         /* Empty State */
-        <div className="flex flex-col items-center justify-center py-16 text-center">
-          <div className="mb-6 p-6 bg-foreground/5 rounded-lg border border-foreground/10">
-            <svg className="w-12 h-12 text-foreground/30 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="flex flex-col items-center justify-center py-10 text-center">
+          <div className="mb-3 p-3 bg-foreground/5 rounded-lg border border-foreground/10">
+            <svg className="w-8 h-8 text-foreground/30 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" />
             </svg>
           </div>
-          <h3 className="text-sm font-semibold text-foreground mb-2 font-mono uppercase tracking-wider">
+          <h3 className="text-sm font-semibold text-foreground mb-1.5 font-mono uppercase tracking-wider">
             No Query Yet
           </h3>
           <p className="text-xs text-foreground/40 font-mono">

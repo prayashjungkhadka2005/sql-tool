@@ -413,6 +413,14 @@ function generateTypeORMCode(state: QueryState): string {
       
       lines.push(`})`);
     }
+  } else if (state.queryType === 'INSERT') {
+    lines.push(`const new${className} = ${repoName}.create({`);
+    Object.entries(state.insertValues).forEach(([key, value]) => {
+      const formattedValue = !isNaN(Number(value)) && value.trim() !== '' ? value : `'${value}'`;
+      lines.push(`  ${key}: ${formattedValue},`);
+    });
+    lines.push(`});`);
+    lines.push(`await ${repoName}.save(new${className})`);
   }
   
   return lines.join('\n');
@@ -539,6 +547,13 @@ function generateSequelizeCode(state: QueryState): string {
     }
     
     lines.push(`})`);
+  } else if (state.queryType === 'INSERT') {
+    lines.push(`await ${modelName}.create({`);
+    Object.entries(state.insertValues).forEach(([key, value]) => {
+      const formattedValue = !isNaN(Number(value)) && value.trim() !== '' ? value : `'${value}'`;
+      lines.push(`  ${key}: ${formattedValue},`);
+    });
+    lines.push(`})`);
   }
   
   return lines.join('\n');
@@ -588,6 +603,14 @@ function generateMongooseCode(state: QueryState): string {
     if (state.offset) {
       lines.push(`.skip(${state.offset})`);
     }
+  } else if (state.queryType === 'INSERT') {
+    lines.push(`const new${modelName} = new ${modelName}({`);
+    Object.entries(state.insertValues).forEach(([key, value]) => {
+      const formattedValue = !isNaN(Number(value)) && value.trim() !== '' ? value : `'${value}'`;
+      lines.push(`  ${key}: ${formattedValue},`);
+    });
+    lines.push(`});`);
+    lines.push(`await new${modelName}.save()`);
   }
   
   return lines.join('\n');
@@ -647,6 +670,12 @@ function generateDrizzleCode(state: QueryState): string {
     if (state.offset) {
       lines.push(`.offset(${state.offset})`);
     }
+  } else if (state.queryType === 'INSERT') {
+    lines.push(`await db.insert(${tableName}).values({`);
+    Object.entries(state.insertValues).forEach(([key, value]) => {
+      lines.push(`  ${key}: ${formatDrizzleValue(value)},`);
+    });
+    lines.push(`})`);
   }
   
   return lines.join('\n');

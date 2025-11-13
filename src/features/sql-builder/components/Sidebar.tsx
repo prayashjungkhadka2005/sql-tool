@@ -6,12 +6,10 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
 interface SidebarProps {
-  historyCount?: number;
-  onOpenHistory?: () => void;
   onCollapseChange?: (isCollapsed: boolean) => void;
 }
 
-export default function Sidebar({ historyCount = 0, onOpenHistory, onCollapseChange }: SidebarProps) {
+export default function Sidebar({ onCollapseChange }: SidebarProps) {
   const pathname = usePathname();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
@@ -65,19 +63,8 @@ export default function Sidebar({ historyCount = 0, onOpenHistory, onCollapseCha
     },
   ];
 
-  const actions = [
-    {
-      id: "query-history",
-      name: "Query History",
-      icon: (
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-      ),
-      action: onOpenHistory,
-      badge: historyCount > 0 ? historyCount : null,
-    },
-  ];
+  // No actions in sidebar - QueryHistory is handled by individual pages
+  const actions: any[] = [];
 
   return (
     <>
@@ -186,11 +173,13 @@ export default function Sidebar({ historyCount = 0, onOpenHistory, onCollapseCha
               );
             })}
 
-            {/* Divider */}
-            <div className="my-3 border-t border-foreground/10" />
-
-            {/* Actions Section */}
-            {actions.map((actionItem, idx) => {
+            {/* Divider and Actions Section - Only show if actions exist */}
+            {actions.length > 0 && (
+              <>
+                <div className="my-3 border-t border-foreground/10" />
+                
+                {/* Actions Section */}
+                {actions.map((actionItem, idx) => {
               if (!actionItem.action) return null;
               return (
                 <button
@@ -226,6 +215,8 @@ export default function Sidebar({ historyCount = 0, onOpenHistory, onCollapseCha
                 </button>
               );
             })}
+              </>
+            )}
           </nav>
 
           {/* Footer - Home Link */}

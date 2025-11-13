@@ -95,7 +95,6 @@ export default function Home() {
         localStorage.setItem('sql-builder-visited', 'true');
       } catch (error) {
         // LocalStorage blocked - tutorial won't persist, but that's okay
-        console.log('Could not save tutorial preference');
       }
     }
     setShowTutorial(false);
@@ -230,13 +229,20 @@ export default function Home() {
         break;
       
       case "remove-empty-where":
-        // Remove WHERE conditions with empty values
-        const validConditions = queryState.whereConditions.filter(c => c.value && c.value.trim() !== '');
+        // Remove WHERE conditions with empty values (except IS NULL/IS NOT NULL which don't need values)
+        const validConditions = queryState.whereConditions.filter(c => {
+          // IS NULL and IS NOT NULL are valid without a value
+          if (c.operator === 'IS NULL' || c.operator === 'IS NOT NULL') {
+            return true;
+          }
+          // All other operators require a value
+          return c.value && c.value.trim() !== '';
+        });
         updateWhereConditions(validConditions);
         break;
       
       case "remove-empty-having":
-        // Remove HAVING conditions with empty values
+        // Remove HAVING conditions with empty values (though HAVING doesn't support IS NULL)
         const validHaving = queryState.having.filter(h => h.value && h.value.trim() !== '');
         updateHaving(validHaving);
         break;
@@ -566,6 +572,7 @@ export default function Home() {
                               <HavingBuilder
                                 table={queryState.table}
                                 having={queryState.having}
+                                groupBy={queryState.groupBy || []}
                                 onChange={updateHaving}
                               />
                             </div>

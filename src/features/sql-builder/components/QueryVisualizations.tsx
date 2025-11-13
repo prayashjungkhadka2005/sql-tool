@@ -87,10 +87,10 @@ export default function QueryVisualizations({
       />
 
       {/* Query Flow Visualization */}
-      <div className="relative bg-white dark:bg-[#1a1a1a] border border-foreground/10 rounded-lg p-5 sm:p-6">
+      <div className="relative bg-white dark:bg-[#1a1a1a] border border-foreground/10 rounded-lg">
         <button
           onClick={() => setIsQueryFlowOpen(!isQueryFlowOpen)}
-          className="w-full flex items-center justify-between hover:bg-foreground/5 active:bg-foreground/10 transition-colors -mx-5 sm:-mx-6 px-5 sm:px-6 py-4 -mt-5 sm:-mt-6 mb-4"
+          className="w-full flex items-center justify-between hover:bg-foreground/5 active:bg-foreground/10 transition-colors px-5 sm:px-6 py-4"
         >
           <div className="flex items-center gap-3">
             <svg className="w-5 h-5 text-foreground/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -122,6 +122,7 @@ export default function QueryVisualizations({
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
               transition={{ duration: 0.2, ease: "easeOut" }}
+              className="px-5 sm:px-6 pb-5 sm:pb-6"
             >
               <VisualQueryFlow
                 queryState={queryState}
@@ -137,10 +138,10 @@ export default function QueryVisualizations({
 
       {/* Data Visualization Charts - Only show if query has GROUP BY + aggregates */}
       {queryState.aggregates && queryState.aggregates.length > 0 && queryState.groupBy && queryState.groupBy.length > 0 && (
-      <div className="relative bg-white dark:bg-[#1a1a1a] border border-foreground/10 rounded-lg p-5 sm:p-6">
+      <div className="relative bg-white dark:bg-[#1a1a1a] border border-foreground/10 rounded-lg">
         <button
           onClick={() => setIsChartsOpen(!isChartsOpen)}
-          className="w-full flex items-center justify-between hover:bg-foreground/5 active:bg-foreground/10 transition-colors -mx-5 sm:-mx-6 px-5 sm:px-6 py-4 -mt-5 sm:-mt-6 mb-4"
+          className="w-full flex items-center justify-between hover:bg-foreground/5 active:bg-foreground/10 transition-colors px-5 sm:px-6 py-4"
         >
           <div className="flex items-center gap-3">
             <svg className="w-5 h-5 text-foreground/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -172,6 +173,7 @@ export default function QueryVisualizations({
               animate={{ height: "auto", opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
               transition={{ duration: 0.3 }}
+              className="px-5 sm:px-6 pb-5 sm:pb-6"
             >
               <DataVisualization
                 data={mockResults}

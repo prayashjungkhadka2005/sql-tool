@@ -5,47 +5,14 @@ import Navbar from "@/features/sql-builder/components/Navbar";
 import Footer from "@/features/sql-builder/components/Footer";
 import Sidebar from "@/features/sql-builder/components/Sidebar";
 import CommandPalette from "@/features/sql-builder/components/CommandPalette";
-import QueryHistory from "@/features/sql-builder/components/QueryHistory";
 
 interface ToolsLayoutProps {
   children: React.ReactNode;
 }
 
 export default function ToolsLayout({ children }: ToolsLayoutProps) {
-  const [historyCount, setHistoryCount] = useState(0);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
-  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-
-  // Update history count on mount and periodically
-  useEffect(() => {
-    const updateCount = () => {
-      if (typeof window !== 'undefined') {
-        try {
-          const stored = localStorage.getItem('sql-builder-history');
-          if (stored) {
-            const parsed = JSON.parse(stored);
-            setHistoryCount(Array.isArray(parsed) ? parsed.length : 0);
-          }
-        } catch {
-          setHistoryCount(0);
-        }
-      }
-    };
-
-    updateCount();
-    
-    // Listen for storage events (when history changes in same tab)
-    window.addEventListener('storage', updateCount);
-    
-    // Poll every 2 seconds as fallback
-    const interval = setInterval(updateCount, 2000);
-    
-    return () => {
-      window.removeEventListener('storage', updateCount);
-      clearInterval(interval);
-    };
-  }, []);
 
   // Command Palette keyboard shortcut (Cmd+K / Ctrl+K)
   useEffect(() => {
@@ -67,8 +34,6 @@ export default function ToolsLayout({ children }: ToolsLayoutProps) {
 
       {/* Sidebar */}
       <Sidebar 
-        historyCount={historyCount}
-        onOpenHistory={() => setIsHistoryOpen(true)}
         onCollapseChange={setIsSidebarCollapsed}
       />
 
@@ -88,7 +53,8 @@ export default function ToolsLayout({ children }: ToolsLayoutProps) {
           <style dangerouslySetInnerHTML={{
             __html: `
               @media (min-width: 1024px) {
-                main.max-w-7xl {
+                main.max-w-7xl,
+                footer .max-w-7xl {
                   max-width: 90rem !important;
                 }
               }
@@ -100,17 +66,6 @@ export default function ToolsLayout({ children }: ToolsLayoutProps) {
         {/* Footer */}
         <Footer />
       </div>
-
-      {/* Query History Panel */}
-      <QueryHistory 
-        isOpen={isHistoryOpen}
-        onClose={() => setIsHistoryOpen(false)}
-        onLoadQuery={(item) => {
-          // This will be handled by individual pages
-          setIsHistoryOpen(false);
-        }}
-        onHistoryChange={(count) => setHistoryCount(count)}
-      />
 
       {/* Command Palette */}
       <CommandPalette

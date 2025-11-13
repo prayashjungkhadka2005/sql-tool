@@ -69,9 +69,16 @@ export default function ValidationBanner({ queryState, onAutoFix }: ValidationBa
     }
 
     // PRIORITY 2 - ERROR: Empty WHERE values
-    // Check for WHERE conditions with empty values
+    // Check for WHERE conditions with empty values (except IS NULL / IS NOT NULL which don't need values)
     if (queryState.whereConditions && queryState.whereConditions.length > 0) {
-      const emptyConditions = queryState.whereConditions.filter(c => !c.value || c.value.trim() === '');
+      const emptyConditions = queryState.whereConditions.filter(c => {
+        // IS NULL and IS NOT NULL don't require a value
+        if (c.operator === 'IS NULL' || c.operator === 'IS NOT NULL') {
+          return false;
+        }
+        // All other operators require a value
+        return !c.value || c.value.trim() === '';
+      });
       if (emptyConditions.length > 0) {
         problems.push({
           type: "error",
