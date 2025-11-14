@@ -65,6 +65,7 @@ export default function SchemaCanvas({
   autoLayoutTrigger
 }: SchemaCanvasProps) {
   const { zoomIn, zoomOut, fitView, getZoom } = useReactFlow();
+  const hasTables = !!(schema?.tables && schema.tables.length > 0);
   
   // Fit view after auto-layout (only when explicitly triggered via autoLayoutTrigger)
   // Note: Only depends on autoLayoutTrigger, NOT on schema.tables to avoid zooming out when moving tables
@@ -888,6 +889,8 @@ export default function SchemaCanvas({
           </span>
         </div>
       </div>
+      {hasTables && (
+        <>
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -1053,9 +1056,11 @@ export default function SchemaCanvas({
           </div>
         </div>
       </div>
+        </>
+      )}
 
       {/* Simple Empty State Overlay */}
-      {(!schema?.tables || schema.tables.length === 0) && (
+      {!hasTables && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
           <div className="flex flex-col items-center justify-center text-center bg-white/95 dark:bg-[#1a1a1a]/95 backdrop-blur-sm rounded-lg p-8 border border-foreground/10 shadow-lg pointer-events-auto max-w-xl mx-4">
             <div className="mb-6 p-6 bg-foreground/5 rounded-lg" aria-hidden="true">
