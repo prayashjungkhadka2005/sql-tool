@@ -117,7 +117,7 @@ export function applyWhere(data: any[], whereConditions: WhereCondition[]): any[
           if (columnValue == null) {
             conditionMet = false;
           } else {
-            conditionMet = String(columnValue).toLowerCase() === String(condition.value).toLowerCase();
+          conditionMet = String(columnValue).toLowerCase() === String(condition.value).toLowerCase();
           }
           break;
         case '!=':
@@ -125,7 +125,7 @@ export function applyWhere(data: any[], whereConditions: WhereCondition[]): any[
           if (columnValue == null) {
             conditionMet = true;
           } else {
-            conditionMet = String(columnValue).toLowerCase() !== String(condition.value).toLowerCase();
+          conditionMet = String(columnValue).toLowerCase() !== String(condition.value).toLowerCase();
           }
           break;
         case '>':
@@ -145,12 +145,12 @@ export function applyWhere(data: any[], whereConditions: WhereCondition[]): any[
           if (columnValue == null) {
             conditionMet = false;
           } else {
-            // Convert SQL LIKE pattern to regex
-            const pattern = condition.value
-              .replace(/%/g, '.*')
-              .replace(/_/g, '.');
+          // Convert SQL LIKE pattern to regex
+          const pattern = condition.value
+            .replace(/%/g, '.*')
+            .replace(/_/g, '.');
             try {
-              conditionMet = new RegExp(`^${pattern}$`, 'i').test(String(columnValue));
+          conditionMet = new RegExp(`^${pattern}$`, 'i').test(String(columnValue));
             } catch (e) {
               // Invalid regex pattern
               conditionMet = false;
@@ -162,8 +162,8 @@ export function applyWhere(data: any[], whereConditions: WhereCondition[]): any[
           if (columnValue == null) {
             conditionMet = false;
           } else {
-            const values = condition.value.split(',').map(v => v.trim().replace(/['"]/g, ''));
-            conditionMet = values.includes(String(columnValue));
+          const values = condition.value.split(',').map(v => v.trim().replace(/['"]/g, ''));
+          conditionMet = values.includes(String(columnValue));
           }
           break;
         }
@@ -171,8 +171,8 @@ export function applyWhere(data: any[], whereConditions: WhereCondition[]): any[
           if (columnValue == null) {
             conditionMet = true;
           } else {
-            const values = condition.value.split(',').map(v => v.trim().replace(/['"]/g, ''));
-            conditionMet = !values.includes(String(columnValue));
+          const values = condition.value.split(',').map(v => v.trim().replace(/['"]/g, ''));
+          conditionMet = !values.includes(String(columnValue));
           }
           break;
         }

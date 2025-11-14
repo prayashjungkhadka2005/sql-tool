@@ -15,7 +15,6 @@ import ExportModal from '@/features/schema-designer/components/ExportModal';
 import ImportModal from '@/features/schema-designer/components/ImportModal';
 import { MigrationModal } from '@/features/schema-designer/components/MigrationModal';
 import IndexManager from '@/features/schema-designer/components/IndexManager';
-import { ValidationPanel } from '@/features/schema-designer/components/ValidationPanel';
 import CommandPalette, { Command } from '@/features/schema-designer/components/CommandPalette';
 import ContextMenu, { ContextMenuItem } from '@/features/schema-designer/components/ContextMenu';
 import { SCHEMA_TEMPLATES } from '@/features/schema-designer/data/schema-templates';
@@ -25,6 +24,8 @@ import { saveSchema, loadSchema, clearSchema, getLastSaved, formatTimestamp, isS
 import { useSchemaHistory } from '@/features/schema-designer/hooks/useSchemaHistory';
 import ConfirmDialog from '@/features/sql-builder/components/ui/ConfirmDialog';
 import InputDialog from '@/features/sql-builder/components/ui/InputDialog';
+import SchemaDesignerNavbar, { SchemaDesignerNavbarRef } from '@/features/schema-designer/components/SchemaDesignerNavbar';
+import TemplatesDropdown from '@/features/schema-designer/components/TemplatesDropdown';
 
 export default function SchemaDesignerPage() {
   // Schema state with undo/redo support
@@ -62,6 +63,8 @@ export default function SchemaDesignerPage() {
   const [canvasRef, setCanvasRef] = useState<HTMLElement | null>(null);
   const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
+  const navbarRef = useRef<SchemaDesignerNavbarRef>(null);
+  const [autoLayoutTrigger, setAutoLayoutTrigger] = useState(0);
   const [contextMenu, setContextMenu] = useState<{
     isOpen: boolean;
     position: { x: number; y: number };
@@ -956,6 +959,9 @@ export default function SchemaDesignerPage() {
       ...schema,
       tables: layoutedTables,
     }, 'Auto-layout');
+    
+    // Trigger fitView after layout
+    setAutoLayoutTrigger(prev => prev + 1);
   }, [schema, setSchema]);
 
   // Export canvas as image
@@ -1419,307 +1425,54 @@ export default function SchemaDesignerPage() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [schema.tables, isColumnEditorOpen, isIndexManagerOpen, isExportModalOpen, isImportModalOpen, isMigrationModalOpen, confirmDialog.isOpen, inputDialog.isOpen, alertDialog.isOpen, isShortcutsOpen, isCommandPaletteOpen, contextMenu.isOpen, canUndo, canRedo, undo, redo, handleAddTable, handleReset, handleAutoLayout]);
 
+  // Calculate stats
+  const tableCount = schema.tables.length;
+  const columnCount = schema.tables.reduce((sum, t) => sum + t.columns.length, 0);
+  const indexCount = schema.tables.reduce((sum, t) => sum + (t.indexes?.length || 0), 0);
+
   return (
-    <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12 sm:pb-16">
-      {/* Header - Industry Standard Compact */}
-      <div className="mb-6">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-baseline gap-3">
-            <h1 className="text-2xl sm:text-3xl font-bold text-foreground">
-              Schema Designer
-            </h1>
-            {/* Schema stats - integrated with title */}
-            {schema.tables.length > 0 && (
-              <div className="flex items-center gap-2 text-xs text-foreground/50 font-mono">
-                <span className="hidden sm:inline">•</span>
-                <span>{schema.tables.length} {schema.tables.length === 1 ? 'Table' : 'Tables'}</span>
-                <span>•</span>
-                <span>{schema.tables.reduce((sum, t) => sum + t.columns.length, 0)} Cols</span>
-                {(() => {
-                  const totalIndexes = schema.tables.reduce((sum, t) => sum + (t.indexes?.length || 0), 0);
-                  return totalIndexes > 0 ? (
-                    <>
-                      <span>•</span>
-                      <span className="text-purple-500">{totalIndexes} {totalIndexes === 1 ? 'Idx' : 'Idxs'}</span>
-                    </>
-                  ) : null;
-                })()}
-              </div>
-            )}
-            {/* Auto-save status */}
-            {isStorageEnabled && lastSavedTime && (
-              <div className="flex items-center gap-1.5 text-xs text-foreground/40 font-mono">
-                <span className="hidden sm:inline">•</span>
-                <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z" />
-                </svg>
-                <span className="hidden sm:inline">{formatTimestamp(lastSavedTime)}</span>
-              </div>
-            )}
-          </div>
-            
-            <button
-              onClick={() => setIsExportModalOpen(true)}
-              disabled={schema.tables.length === 0}
-            className="px-4 py-2 text-sm font-semibold text-white bg-primary hover:bg-primary/90 rounded-lg transition-all font-mono flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed active:scale-95 shadow-sm"
-            title={schema.tables.length === 0 ? 'Add tables to enable export' : 'Export schema (Cmd+E)'}
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
-              </svg>
-              Export
-            </button>
-          </div>
-            
-        {/* Toolbar - Clean and consistent */}
-        <div className="flex items-center justify-between gap-3 px-3 py-2 bg-foreground/[0.03] border border-foreground/10 rounded-lg">
-          <div className="flex items-center gap-1.5">
-            {/* History group */}
-            <div className="flex items-center gap-0.5">
-            <button
-                onClick={undo}
-                disabled={!canUndo}
-                className="p-2 text-foreground/70 hover:text-foreground hover:bg-foreground/10 rounded transition-all disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent active:scale-95"
-                title={canUndo ? `Undo (Cmd+Z)` : 'Nothing to undo'}
-                aria-label="Undo"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
-              </svg>
-              </button>
-              <button
-                onClick={redo}
-                disabled={!canRedo}
-                className="p-2 text-foreground/70 hover:text-foreground hover:bg-foreground/10 rounded transition-all disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent active:scale-95"
-                title={canRedo ? 'Redo (Cmd+Shift+Z)' : 'Nothing to redo'}
-                aria-label="Redo"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 10h-10a8 8 0 00-8 8v2M21 10l-6 6m6-6l-6-6" />
-                </svg>
-            </button>
-        </div>
-
-            <div className="w-px h-5 bg-foreground/10"></div>
-            
-            {/* Primary action */}
-          <button
-            onClick={handleAddTable}
-              className="px-3 py-1.5 text-sm font-medium bg-primary text-white hover:bg-primary/90 rounded transition-all flex items-center gap-1.5 font-mono active:scale-95"
-              title="Create a new table (Cmd+T)"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-              New Table
-            </button>
-            
-            <div className="w-px h-5 bg-foreground/10"></div>
-            
-            {/* File actions group */}
-            <button
-              onClick={() => setIsImportModalOpen(true)}
-              className="px-2 py-1.5 text-foreground/70 hover:text-foreground hover:bg-foreground/10 rounded transition-all flex items-center gap-1.5 active:scale-95"
-              title="Import schema (Cmd+I)"
-              aria-label="Import schema"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-              </svg>
-              <span className="text-xs font-medium hidden lg:inline">Import</span>
-          </button>
-
-          <button
-            onClick={() => setIsTemplatesOpen(!isTemplatesOpen)}
-              className="px-2 py-1.5 text-foreground/70 hover:text-foreground hover:bg-foreground/10 rounded transition-all flex items-center gap-1.5 active:scale-95"
-              title="Templates"
-              aria-label="Templates"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h4a1 1 0 011 1v7a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM14 5a1 1 0 011-1h4a1 1 0 011 1v7a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 17a1 1 0 011-1h4a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1v-2zM14 17a1 1 0 011-1h4a1 1 0 011 1v2a1 1 0 01-1 1h-4a1 1 0 01-1-1v-2z" />
-            </svg>
-              <span className="text-xs font-medium hidden lg:inline">Templates</span>
-            </button>
-            
-            {schema.tables.length > 1 && (
-              <button
-                onClick={() => handleAutoLayout('hierarchical')}
-                className="px-2 py-1.5 text-foreground/70 hover:text-foreground hover:bg-foreground/10 rounded transition-all flex items-center gap-1.5 active:scale-95"
-                title="Auto-arrange tables (Cmd+L)"
-                aria-label="Auto-layout"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h4a1 1 0 011 1v7a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM14 5a1 1 0 011-1h4a1 1 0 011 1v7a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 17a1 1 0 011-1h4a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1v-2zM14 17a1 1 0 011-1h4a1 1 0 011 1v2a1 1 0 01-1 1h-4a1 1 0 01-1-1v-2z" />
-            </svg>
-                <span className="text-xs font-medium hidden lg:inline">Auto Layout</span>
-          </button>
-            )}
-            
-            <button
-              onClick={() => setIsMigrationModalOpen(true)}
-              className="px-2 py-1.5 text-foreground/70 hover:text-foreground hover:bg-foreground/10 rounded transition-all flex items-center gap-1.5 active:scale-95"
-              title="Version history & migrations (Cmd+M)"
-              aria-label="Migrations"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
-              </svg>
-              <span className="text-xs font-medium hidden lg:inline">Migrations</span>
-            </button>
-            
-            {hasFKsWithoutIndexes && (
-              <>
-                <div className="w-px h-5 bg-foreground/10"></div>
-                <button
-                  onClick={handleAutoIndexForeignKeys}
-                  disabled={isOptimizingFKs}
-                  className="px-2 py-1.5 text-purple-600 dark:text-purple-400 hover:bg-purple-500/10 rounded transition-all flex items-center gap-1.5 disabled:opacity-50 active:scale-95"
-                  title={isOptimizingFKs ? 'Creating indexes...' : 'Auto-create indexes for foreign keys'}
-                  aria-label="Optimize foreign keys"
-                >
-                  {isOptimizingFKs ? (
-                    <svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
-                  ) : (
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                    </svg>
-                  )}
-                  <span className="text-xs font-medium hidden lg:inline">{isOptimizingFKs ? 'Optimizing...' : 'Optimize'}</span>
-                </button>
-              </>
-            )}
-            </div>
+    <div className="h-full flex flex-col overflow-hidden">
+      {/* Professional Navbar with all actions */}
+      <SchemaDesignerNavbar
+        ref={navbarRef}
+        tableCount={tableCount}
+        columnCount={columnCount}
+        indexCount={indexCount}
+        lastSavedTime={lastSavedTime}
+        isStorageEnabled={isStorageEnabled}
+        formatTimestamp={formatTimestamp}
+        onExport={() => setIsExportModalOpen(true)}
+        onNewTable={handleAddTable}
+        onImport={() => setIsImportModalOpen(true)}
+        onTemplates={() => setIsTemplatesOpen(!isTemplatesOpen)}
+        onMigrations={() => setIsMigrationModalOpen(true)}
+        onAutoLayout={() => handleAutoLayout('hierarchical')}
+        onUndo={undo}
+        onRedo={redo}
+        onShortcuts={() => setIsShortcutsOpen(true)}
+        onReset={handleReset}
+        canExport={schema.tables.length > 0}
+        canUndo={canUndo}
+        canRedo={canRedo}
+        hasTables={schema.tables.length > 0}
+        hasMultipleTables={schema.tables.length > 1}
+        isTemplatesOpen={isTemplatesOpen}
+      />
           
-          {/* Right side actions */}
-          <div className="flex items-center gap-1.5">
-            {/* Keyboard Shortcuts Button */}
-            <button
-              onClick={() => setIsShortcutsOpen(true)}
-              className="p-2 text-foreground/60 hover:text-foreground hover:bg-foreground/10 rounded transition-all active:scale-95"
-              title="Keyboard shortcuts (?)"
-              aria-label="Show keyboard shortcuts"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </button>
-            
-            {schema.tables.length > 0 && (
-              <button
-                onClick={handleReset}
-                className="px-2 py-1.5 text-foreground/60 hover:text-red-600 hover:bg-red-500/10 rounded transition-all flex items-center gap-1.5 active:scale-95"
-                title="Reset schema (Cmd+Shift+R)"
-                aria-label="Reset schema"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                </svg>
-                <span className="text-xs font-medium hidden lg:inline">Reset</span>
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
+      {/* Content Area - Full Height Canvas */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Templates Dropdown - Positioned above canvas */}
+        <TemplatesDropdown
+          isOpen={isTemplatesOpen}
+          onClose={() => setIsTemplatesOpen(false)}
+          onSelectTemplate={handleLoadTemplate}
+          buttonRef={navbarRef.current?.templatesButtonRef}
+        />
 
-      {/* Templates Grid */}
-      {isTemplatesOpen && (
-        <section className="mb-6 p-5 sm:p-6 bg-white dark:bg-[#1a1a1a] border border-foreground/10 rounded-lg" role="region" aria-label="Schema templates">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider font-mono">
-            Schema Templates
-          </h3>
-            <button
-              onClick={() => setIsTemplatesOpen(false)}
-              className="p-1.5 hover:bg-foreground/10 rounded-lg transition-all"
-              title="Close templates"
-              aria-label="Close templates panel"
-            >
-              <svg className="w-4 h-4 text-foreground/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3" role="list">
-            {SCHEMA_TEMPLATES.map(template => (
-              <button
-                key={template.id}
-                onClick={() => handleLoadTemplate(template)}
-                className="group p-4 bg-[#fafafa] dark:bg-black/40 border border-foreground/10 hover:border-foreground/20 active:scale-95 active:bg-foreground/10 rounded transition-all text-left"
-                role="listitem"
-                aria-label={`Load ${template.name} template: ${template.description}`}
-              >
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="w-10 h-10 rounded border border-foreground/10 flex items-center justify-center text-foreground/60">
-                    {template.icon}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h4 className="text-sm font-semibold text-foreground font-mono truncate">
-                      {template.name}
-                    </h4>
-                    <p className="text-[10px] text-foreground/40 font-mono">
-                      {template.schema.tables.length} tables • {template.difficulty}
-                    </p>
-                  </div>
-                </div>
-                <p className="text-xs text-foreground/60 font-mono leading-relaxed">
-                  {template.description}
-                </p>
-              </button>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* Validation Panel */}
-      {schema.tables.length > 0 && (
-        <div className="mb-4">
-          <ValidationPanel schema={schema} />
-        </div>
-      )}
-
-      {/* Canvas */}
-      {schema.tables.length === 0 ? (
-        <section className="flex flex-col items-center justify-center py-20 text-center bg-white dark:bg-[#1a1a1a] border border-foreground/10 rounded-lg" role="region" aria-label="Empty schema canvas">
-          <div className="mb-6 p-8 bg-foreground/5 rounded-full" aria-hidden="true">
-            <svg className="w-16 h-16 text-foreground/30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h4a1 1 0 011 1v7a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM14 5a1 1 0 011-1h4a1 1 0 011 1v7a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 17a1 1 0 011-1h4a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1v-2zM14 17a1 1 0 011-1h4a1 1 0 011 1v2a1 1 0 01-1 1h-4a1 1 0 01-1-1v-2z" />
-            </svg>
-          </div>
-          <h3 className="text-xl font-semibold text-foreground mb-2 font-mono">
-            Start Designing Your Database
-          </h3>
-          <p className="text-sm text-foreground/60 font-mono mb-6 max-w-md">
-            Click &quot;Add Table&quot; to create your first table or choose a template to get started quickly.
-          </p>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={handleAddTable}
-              className="px-6 py-3 text-sm font-medium text-white bg-primary hover:bg-primary/90 rounded-lg transition-all flex items-center gap-2 font-mono active:scale-95"
-              aria-label="Add your first table to begin"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-              Add Your First Table
-            </button>
-            <button
-              onClick={() => setIsTemplatesOpen(true)}
-              className="px-6 py-3 text-sm font-medium text-foreground bg-foreground/5 hover:bg-foreground/10 border border-foreground/10 rounded-lg transition-all flex items-center gap-2 font-mono"
-              aria-label="Browse and load pre-built templates"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h4a1 1 0 011 1v7a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM14 5a1 1 0 011-1h4a1 1 0 011 1v7a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 17a1 1 0 011-1h4a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1v-2zM14 17a1 1 0 011-1h4a1 1 0 011 1v2a1 1 0 01-1 1h-4a1 1 0 01-1-1v-2z" />
-              </svg>
-              Use Template
-            </button>
-          </div>
-        </section>
-      ) : (
-        <section role="region" aria-label="Schema design canvas">
+        {/* Canvas - Always Shown, Full Height */}
+        <section className="flex-1 flex flex-col min-h-0" role="region" aria-label="Schema design canvas">
           <ReactFlowProvider>
-        <div ref={(el) => setCanvasRef(el)}>
+            <div ref={(el) => setCanvasRef(el)} className="flex-1 w-full min-h-0">
         <SchemaCanvas
           schema={schema}
           onSchemaChange={setSchema}
@@ -1731,11 +1484,14 @@ export default function SchemaDesignerPage() {
             onTableContextMenu={handleTableContextMenu}
             onCanvasClick={handleCanvasClick}
             onCloseContextMenu={handleCloseContextMenu}
-        />
+            onAddTable={handleAddTable}
+            onOpenTemplates={() => setIsTemplatesOpen(true)}
+            autoLayoutTrigger={autoLayoutTrigger}
+          />
         </div>
           </ReactFlowProvider>
         </section>
-      )}
+      </div>
 
       {/* Keyboard Shortcuts Overlay - Press ? to toggle */}
       {isShortcutsOpen && (
@@ -1954,7 +1710,7 @@ export default function SchemaDesignerPage() {
         onConfirm={() => setAlertDialog(prev => ({ ...prev, isOpen: false }))}
         onCancel={() => setAlertDialog(prev => ({ ...prev, isOpen: false }))}
       />
-    </main>
+    </div>
   );
 }
 

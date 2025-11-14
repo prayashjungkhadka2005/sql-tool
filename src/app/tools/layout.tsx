@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { usePathname } from "next/navigation";
 import Navbar from "@/features/sql-builder/components/Navbar";
 import Footer from "@/features/sql-builder/components/Footer";
 import Sidebar from "@/features/sql-builder/components/Sidebar";
@@ -11,6 +12,8 @@ interface ToolsLayoutProps {
 }
 
 export default function ToolsLayout({ children }: ToolsLayoutProps) {
+  const pathname = usePathname();
+  const isSchemaDesigner = pathname === '/tools/schema-designer';
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
@@ -26,6 +29,11 @@ export default function ToolsLayout({ children }: ToolsLayoutProps) {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
+
+  // For schema-designer, let its own layout handle everything
+  if (isSchemaDesigner) {
+    return <>{children}</>;
+  }
 
   return (
     <div className="min-h-screen bg-[#fafafa] dark:bg-[#0a0a0a]">

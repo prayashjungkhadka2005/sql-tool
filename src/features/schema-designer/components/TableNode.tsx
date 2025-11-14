@@ -5,7 +5,7 @@
 
 "use client";
 
-import { memo } from 'react';
+import { memo, useMemo } from 'react';
 import { Handle, Position, NodeProps } from 'reactflow';
 import { SchemaTable } from '../types';
 

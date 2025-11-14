@@ -128,7 +128,42 @@ function hierarchicalLayout(tables: SchemaTable[], forExport: boolean = false): 
   // Run layout
   dagre.layout(g);
   
-  // Apply new positions
+  // Calculate bounding box of all nodes to center the layout
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  
+  tables.forEach(table => {
+    if (!table.id) return;
+    const node = g.node(table.id);
+    if (!node) return;
+    
+    const nodeLeft = node.x - node.width / 2;
+    const nodeRight = node.x + node.width / 2;
+    const nodeTop = node.y - node.height / 2;
+    const nodeBottom = node.y + node.height / 2;
+    
+    minX = Math.min(minX, nodeLeft);
+    minY = Math.min(minY, nodeTop);
+    maxX = Math.max(maxX, nodeRight);
+    maxY = Math.max(maxY, nodeBottom);
+  });
+  
+  // Calculate center offset to position layout in center of canvas
+  // Assuming canvas viewport is approximately 1200x800 (will be adjusted by fitView)
+  const canvasCenterX = 600; // Approximate center of viewport
+  const canvasCenterY = 400;
+  const layoutWidth = maxX - minX;
+  const layoutHeight = maxY - minY;
+  const layoutCenterX = minX + layoutWidth / 2;
+  const layoutCenterY = minY + layoutHeight / 2;
+  
+  // Calculate offset to center the layout
+  const offsetX = canvasCenterX - layoutCenterX;
+  const offsetY = canvasCenterY - layoutCenterY;
+  
+  // Apply new positions with centering offset
   return tables.map(table => {
     // Skip if table has no ID or wasn't added to graph
     if (!table.id) return table;
@@ -144,8 +179,8 @@ function hierarchicalLayout(tables: SchemaTable[], forExport: boolean = false): 
     return {
       ...table,
       position: {
-        x: Math.max(0, node.x - node.width / 2), // Ensure non-negative
-        y: Math.max(0, node.y - node.height / 2), // Ensure non-negative
+        x: node.x - node.width / 2 + offsetX,
+        y: node.y - node.height / 2 + offsetY,
       },
     };
   });
@@ -159,11 +194,22 @@ function gridLayout(tables: SchemaTable[]): SchemaTable[] {
   const cellWidth = 400;
   const cellHeight = 300;
   
+  // Calculate grid dimensions
+  const rows = Math.ceil(tables.length / columns);
+  const gridWidth = columns * cellWidth;
+  const gridHeight = rows * cellHeight;
+  
+  // Center the grid on canvas
+  const canvasCenterX = 600;
+  const canvasCenterY = 400;
+  const startX = canvasCenterX - gridWidth / 2 + cellWidth / 2;
+  const startY = canvasCenterY - gridHeight / 2 + cellHeight / 2;
+  
   return tables.map((table, index) => ({
     ...table,
     position: {
-      x: 100 + (index % columns) * cellWidth,
-      y: 100 + Math.floor(index / columns) * cellHeight,
+      x: startX + (index % columns) * cellWidth,
+      y: startY + Math.floor(index / columns) * cellHeight,
     },
   }));
 }
@@ -173,9 +219,14 @@ function gridLayout(tables: SchemaTable[]): SchemaTable[] {
  * Good for showing relationships without hierarchy
  */
 function circularLayout(tables: SchemaTable[]): SchemaTable[] {
-  const centerX = 600;
-  const centerY = 400;
+  // Center the circle on canvas
+  const canvasCenterX = 600;
+  const canvasCenterY = 400;
   const radius = Math.max(300, tables.length * 50);
+  
+  // Estimate average table size for centering
+  const avgTableWidth = 280;
+  const avgTableHeight = 200;
   
   return tables.map((table, index) => {
     const angle = (2 * Math.PI * index) / tables.length - Math.PI / 2; // Start from top
@@ -183,8 +234,8 @@ function circularLayout(tables: SchemaTable[]): SchemaTable[] {
     return {
       ...table,
       position: {
-        x: centerX + radius * Math.cos(angle) - 140, // Center node
-        y: centerY + radius * Math.sin(angle) - 100,
+        x: canvasCenterX + radius * Math.cos(angle) - avgTableWidth / 2, // Center node
+        y: canvasCenterY + radius * Math.sin(angle) - avgTableHeight / 2,
       },
     };
   });
