@@ -204,34 +204,27 @@ CREATE INDEX idx_posts_user_id ON posts(user_id);`;
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
               transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-              className="w-full max-w-4xl bg-white dark:bg-[#1a1a1a] border-2 border-foreground/20 rounded-xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col pointer-events-auto"
+              className="w-full max-w-4xl bg-white dark:bg-[#1a1a1a] border border-foreground/20 rounded-lg shadow-lg overflow-hidden max-h-[90vh] flex flex-col pointer-events-auto"
               onClick={(e) => e.stopPropagation()}
               role="dialog"
               aria-modal="true"
               aria-labelledby="import-modal-title"
             >
               {/* Header */}
-              <div className="px-6 py-4 border-b border-foreground/10 bg-gradient-to-r from-blue-500/5 to-purple-500/5">
+              <div className="px-6 py-4 border-b border-foreground/10">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
-                      <svg className="w-5 h-5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-                      </svg>
-                    </div>
-                    <div>
-                      <h3 id="import-modal-title" className="text-lg font-bold text-foreground font-mono">
-                        Import Schema
-                      </h3>
-                      <p className="text-xs text-foreground/60 font-mono">
-                        Paste SQL CREATE TABLE or Prisma schema
-                      </p>
-                    </div>
+                  <div>
+                    <h3 id="import-modal-title" className="text-lg font-semibold text-foreground font-mono">
+                      Import Schema
+                    </h3>
+                    <p className="text-xs text-foreground/60 font-mono mt-0.5">
+                      Paste SQL CREATE TABLE or Prisma schema
+                    </p>
                   </div>
                   <button
                     onClick={onClose}
                     disabled={isProcessing}
-                    className="p-2 hover:bg-foreground/10 rounded-lg transition-all disabled:opacity-50 active:scale-95"
+                    className="p-2 hover:bg-foreground/10 rounded transition-colors disabled:opacity-50 active:scale-95"
                     aria-label="Close"
                   >
                     <svg className="w-5 h-5 text-foreground/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -244,7 +237,7 @@ CREATE INDEX idx_posts_user_id ON posts(user_id);`;
               {/* Format Selector */}
               <div className="px-6 py-3 bg-foreground/5 border-b border-foreground/10">
                 <div className="flex items-center gap-3">
-                  <span className="text-xs font-semibold text-foreground/60 font-mono uppercase tracking-wider">Format:</span>
+                  <span className="text-xs font-medium text-foreground/60 font-mono">Format:</span>
                   <div className="flex gap-2">
                     {[
                       { value: 'auto' as const, label: 'Auto-detect' },
@@ -259,9 +252,9 @@ CREATE INDEX idx_posts_user_id ON posts(user_id);`;
                           setPreviewSchema(null);
                         }}
                         disabled={isProcessing}
-                        className={`px-3 py-1.5 text-xs font-medium font-mono rounded-lg transition-all disabled:opacity-50 active:scale-95 ${
+                        className={`px-3 py-1.5 text-xs font-medium font-mono rounded transition-colors disabled:opacity-50 active:scale-95 ${
                           format === fmt.value
-                            ? 'bg-primary text-white shadow-sm'
+                            ? 'bg-primary text-white'
                             : 'bg-foreground/5 text-foreground/70 hover:bg-foreground/10'
                         }`}
                       >
@@ -272,7 +265,7 @@ CREATE INDEX idx_posts_user_id ON posts(user_id);`;
                   <button
                     onClick={loadExample}
                     disabled={isProcessing}
-                    className="ml-auto text-xs px-3 py-1.5 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 text-blue-600 dark:text-blue-400 rounded-lg transition-all font-mono disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-blue-500/10 active:scale-95"
+                    className="ml-auto text-xs px-3 py-1.5 bg-foreground/5 hover:bg-foreground/10 border border-foreground/20 text-foreground/70 hover:text-foreground rounded transition-colors font-mono disabled:opacity-50 disabled:cursor-not-allowed active:scale-95"
                     title="Load example SQL schema"
                   >
                     Load Example
@@ -286,7 +279,7 @@ CREATE INDEX idx_posts_user_id ON posts(user_id);`;
                   {/* Textarea */}
                   <div>
                     <div className="flex items-center justify-between mb-2">
-                      <label className="text-xs font-semibold text-foreground/60 font-mono uppercase tracking-wider">
+                      <label className="text-xs font-medium text-foreground/60 font-mono">
                         Paste Your Schema
                       </label>
                       {input && (
@@ -314,7 +307,7 @@ CREATE INDEX idx_posts_user_id ON posts(user_id);`;
 
                   {/* Parse Error */}
                   {parseError && (
-                    <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
+                    <div className="p-3 bg-red-500/10 border border-red-500/20 rounded">
                       <div className="flex items-start gap-2">
                         <svg className="w-4 h-4 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -328,14 +321,14 @@ CREATE INDEX idx_posts_user_id ON posts(user_id);`;
 
                   {/* Preview */}
                   {previewSchema && (
-                    <div className="p-4 bg-green-500/10 border border-green-500/20 rounded-lg">
+                    <div className="p-4 bg-foreground/5 border border-foreground/20 rounded">
                       <div className="flex items-start gap-3">
-                        <svg className="w-5 h-5 text-green-600 dark:text-green-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-5 h-5 text-foreground/60 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
                         <div className="flex-1">
                           <div className="flex items-center justify-between mb-2">
-                            <h4 className="text-sm font-semibold text-green-700 dark:text-green-400 font-mono">
+                            <h4 className="text-sm font-medium text-foreground font-mono">
                               Ready to Import
                             </h4>
                             <button
@@ -344,7 +337,7 @@ CREATE INDEX idx_posts_user_id ON posts(user_id);`;
                                 setParseError(null);
                                 textareaRef.current?.focus();
                               }}
-                              className="text-xs px-2 py-1 bg-green-600/10 hover:bg-green-600/20 border border-green-600/20 text-green-700 dark:text-green-400 rounded font-mono transition-all active:scale-95"
+                              className="text-xs px-2 py-1 bg-foreground/5 hover:bg-foreground/10 border border-foreground/20 text-foreground/70 hover:text-foreground rounded font-mono transition-colors active:scale-95"
                               title="Clear preview and modify schema"
                             >
                               Edit & Re-parse
@@ -352,34 +345,34 @@ CREATE INDEX idx_posts_user_id ON posts(user_id);`;
                           </div>
                           <div className="grid grid-cols-2 gap-2 text-xs font-mono">
                             <div className="flex items-center gap-2">
-                              <svg className="w-3.5 h-3.5 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <svg className="w-3.5 h-3.5 text-foreground/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" />
                               </svg>
-                              <span className="text-green-600 dark:text-green-400">
+                              <span className="text-foreground/70">
                                 {previewSchema.tables.length} table{previewSchema.tables.length !== 1 ? 's' : ''}
                               </span>
                             </div>
                             <div className="flex items-center gap-2">
-                              <svg className="w-3.5 h-3.5 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <svg className="w-3.5 h-3.5 text-foreground/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                               </svg>
-                              <span className="text-green-600 dark:text-green-400">
+                              <span className="text-foreground/70">
                                 {previewSchema.tables.reduce((sum, t) => sum + t.columns.length, 0)} columns
                               </span>
                             </div>
                             <div className="flex items-center gap-2">
-                              <svg className="w-3.5 h-3.5 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <svg className="w-3.5 h-3.5 text-foreground/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
                               </svg>
-                              <span className="text-green-600 dark:text-green-400">
+                              <span className="text-foreground/70">
                                 {previewSchema.tables.reduce((sum, t) => sum + t.columns.filter(c => c.references).length, 0)} foreign keys
                               </span>
                             </div>
                             <div className="flex items-center gap-2">
-                              <svg className="w-3.5 h-3.5 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <svg className="w-3.5 h-3.5 text-foreground/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                               </svg>
-                              <span className="text-green-600 dark:text-green-400">
+                              <span className="text-foreground/70">
                                 {previewSchema.tables.reduce((sum, t) => sum + (t.indexes?.length || 0), 0)} indexes
                               </span>
                             </div>
@@ -400,7 +393,7 @@ CREATE INDEX idx_posts_user_id ON posts(user_id);`;
                   <button
                     onClick={onClose}
                     disabled={isProcessing}
-                    className="px-4 py-2 text-sm font-medium text-foreground/70 hover:text-foreground/90 hover:bg-foreground/10 rounded-lg transition-all font-mono disabled:opacity-50 active:scale-95"
+                    className="px-4 py-2 text-sm font-medium text-foreground/70 hover:text-foreground hover:bg-foreground/10 rounded transition-colors font-mono disabled:opacity-50 active:scale-95"
                   >
                     Cancel
                   </button>
@@ -408,7 +401,7 @@ CREATE INDEX idx_posts_user_id ON posts(user_id);`;
                     <button
                       onClick={handleParse}
                       disabled={!input.trim() || isProcessing}
-                      className="px-4 py-2 text-sm font-medium text-white bg-primary hover:bg-primary/90 rounded-lg transition-all font-mono active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-primary flex items-center gap-2"
+                      className="px-4 py-2 text-sm font-medium text-white bg-primary hover:bg-primary/90 rounded transition-colors font-mono disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 active:scale-95"
                     >
                       {isProcessing ? (
                         <>
@@ -429,7 +422,7 @@ CREATE INDEX idx_posts_user_id ON posts(user_id);`;
                   ) : (
                     <button
                       onClick={handleImport}
-                      className="px-4 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-lg transition-all font-mono active:scale-95 flex items-center gap-2"
+                      className="px-4 py-2 text-sm font-medium text-white bg-primary hover:bg-primary/90 rounded transition-colors font-mono flex items-center gap-2 active:scale-95"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />

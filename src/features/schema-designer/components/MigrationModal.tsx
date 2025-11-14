@@ -386,7 +386,7 @@ export function MigrationModal({
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: 400 }}
             transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-            className="fixed top-0 right-0 bottom-0 w-full sm:w-[600px] bg-white dark:bg-[#1a1a1a] border-l border-foreground/10 z-[91] flex flex-col shadow-2xl"
+            className="fixed top-0 right-0 bottom-0 w-full sm:w-[600px] bg-white dark:bg-[#1a1a1a] border-l border-foreground/10 z-[91] flex flex-col shadow-lg"
             role="dialog"
             aria-modal="true"
             aria-labelledby="migration-title"
@@ -410,7 +410,7 @@ export function MigrationModal({
               </div>
               <button
                 onClick={onClose}
-                className="p-1.5 hover:bg-foreground/10 rounded-lg transition-all"
+                className="p-1.5 hover:bg-foreground/10 rounded transition-colors active:scale-95"
                 aria-label="Close"
                 title="Close (Esc)"
               >
@@ -525,7 +525,7 @@ function VersionList({
   return (
     <div className="space-y-4">
       {/* Save Current Schema Button */}
-      <div className="p-4 bg-foreground/5 border border-foreground/10 rounded-lg">
+      <div className="p-4 bg-foreground/5 border border-foreground/10 rounded">
         <div className="flex items-start justify-between gap-4">
           <div className="flex-1">
             <h4 className="text-sm font-semibold text-foreground mb-1 font-mono">Current Schema</h4>
@@ -542,7 +542,7 @@ function VersionList({
           <button
             onClick={onSaveNew}
             disabled={!canSaveVersion}
-            className="px-4 py-2 text-sm bg-primary hover:bg-primary/90 disabled:bg-foreground/20 disabled:text-foreground/40 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-all active:scale-95 flex items-center gap-2 font-mono flex-shrink-0"
+            className="px-4 py-2 text-sm bg-primary hover:bg-primary/90 disabled:bg-foreground/20 disabled:text-foreground/40 disabled:cursor-not-allowed text-white rounded font-medium transition-colors active:scale-95 flex items-center gap-2 font-mono flex-shrink-0"
             title={canSaveVersion ? 'Save current schema as a new version' : 'Add tables to save a version'}
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -562,7 +562,7 @@ function VersionList({
           {versions.length > 0 && (
             <button
               onClick={onClearAll}
-              className="text-xs text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 font-medium font-mono transition-all"
+              className="text-xs text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 font-medium font-mono transition-all active:scale-95"
             >
               Clear All
             </button>
@@ -605,21 +605,21 @@ function VersionList({
                   <div className="flex items-center gap-1.5 flex-shrink-0">
                     <button
                       onClick={() => onCompare(version)}
-                      className="px-2.5 py-1.5 text-xs font-medium text-blue-600 hover:bg-blue-500/10 rounded transition-all active:scale-95 font-mono"
+                      className="px-2.5 py-1.5 text-xs font-medium text-foreground/70 hover:text-foreground hover:bg-foreground/10 rounded transition-colors active:scale-95 font-mono"
                       title="Compare with current schema"
                     >
                       Compare
                     </button>
                     <button
                       onClick={() => onLoad(version.schema)}
-                      className="px-2.5 py-1.5 text-xs font-medium text-foreground/60 hover:bg-foreground/10 rounded transition-all active:scale-95 font-mono"
+                      className="px-2.5 py-1.5 text-xs font-medium text-foreground/70 hover:text-foreground hover:bg-foreground/10 rounded transition-colors active:scale-95 font-mono"
                       title="Load this version (replaces current schema)"
                     >
                       Load
                     </button>
                     <button
                       onClick={() => onDelete(version.id, version.tag)}
-                      className="p-1.5 text-red-600 dark:text-red-400 hover:bg-red-500/10 rounded transition-all active:scale-95"
+                      className="p-1.5 text-red-600 dark:text-red-400 hover:bg-red-500/10 rounded transition-colors active:scale-95"
                       title="Delete version"
                       aria-label="Delete version"
                     >
@@ -719,14 +719,14 @@ function SaveVersionForm({
           onClick={onCancel}
           type="button"
           disabled={isSaving}
-          className="flex-1 px-4 py-2 text-sm font-medium text-foreground/70 hover:text-foreground/90 hover:bg-foreground/10 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-all font-mono active:scale-95"
+          className="flex-1 px-4 py-2 text-sm font-medium text-foreground/70 hover:text-foreground hover:bg-foreground/10 disabled:opacity-50 disabled:cursor-not-allowed rounded transition-colors active:scale-95 font-mono"
         >
           Cancel
         </button>
         <button
           type="submit"
           disabled={!tag.trim() || isSaving}
-          className="flex-1 px-4 py-2 text-sm font-medium text-white bg-primary hover:bg-primary/90 disabled:bg-foreground/20 disabled:text-foreground/40 disabled:cursor-not-allowed rounded-lg transition-all font-mono active:scale-95"
+          className="flex-1 px-4 py-2 text-sm font-medium text-white bg-primary hover:bg-primary/90 disabled:bg-foreground/20 disabled:text-foreground/40 disabled:cursor-not-allowed rounded transition-colors active:scale-95 font-mono"
         >
           {isSaving ? 'Saving...' : 'Save Version'}
         </button>
@@ -755,7 +755,7 @@ function CompareView({
       {/* Back button */}
       <button
         onClick={onBack}
-        className="text-sm text-foreground/60 hover:text-foreground flex items-center gap-1 font-mono active:scale-95 transition-all"
+        className="text-sm text-foreground/60 hover:text-foreground flex items-center gap-1 font-mono transition-colors active:scale-95"
       >
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -764,7 +764,7 @@ function CompareView({
       </button>
 
       {/* Summary info */}
-      <div className="p-4 bg-foreground/5 border border-foreground/10 rounded-lg">
+      <div className="p-4 bg-foreground/5 border border-foreground/10 rounded">
         <div className="flex items-center justify-between gap-4">
           <div>
             <h4 className="text-sm font-semibold text-foreground mb-1 font-mono">
@@ -774,7 +774,7 @@ function CompareView({
               {changeCount} change{changeCount !== 1 ? 's' : ''} detected
             </p>
           </div>
-          <span className="px-2.5 py-1 bg-blue-500/10 text-blue-600 text-sm font-semibold rounded font-mono flex-shrink-0">
+          <span className="px-2.5 py-1 bg-foreground/10 text-foreground/70 text-sm font-semibold rounded font-mono flex-shrink-0">
             {changeCount}
           </span>
         </div>
@@ -882,7 +882,7 @@ function CompareView({
 
           <button
             onClick={onGenerateMigration}
-            className="w-full px-4 py-2 text-sm bg-primary hover:bg-primary/90 text-white rounded-lg font-medium transition-all active:scale-95 flex items-center justify-center gap-2 font-mono"
+            className="w-full px-4 py-2 text-sm bg-primary hover:bg-primary/90 text-white rounded font-medium transition-colors active:scale-95 flex items-center justify-center gap-2 font-mono"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
@@ -917,7 +917,7 @@ function MigrationView({
       {/* Back button */}
       <button
         onClick={onBack}
-        className="text-sm text-foreground/60 hover:text-foreground flex items-center gap-1 font-mono active:scale-95 transition-all"
+        className="text-sm text-foreground/60 hover:text-foreground flex items-center gap-1 font-mono transition-colors active:scale-95"
       >
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -926,16 +926,16 @@ function MigrationView({
       </button>
 
       {/* Info Banner */}
-      <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+      <div className="p-3 bg-foreground/5 border border-foreground/20 rounded">
         <div className="flex items-start gap-2">
-          <svg className="w-4 h-4 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-4 h-4 text-foreground/60 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
           <div className="flex-1">
-            <p className="text-xs font-semibold text-blue-700 dark:text-blue-400 font-mono">
+            <p className="text-xs font-medium text-foreground font-mono">
               Before Applying
             </p>
-            <p className="text-xs text-blue-600 dark:text-blue-500 font-mono mt-1">
+            <p className="text-xs text-foreground/60 font-mono mt-1">
               Backup your database, test in staging, and review all warnings carefully before running migrations.
             </p>
           </div>
@@ -948,20 +948,20 @@ function MigrationView({
         <div className="flex gap-1">
           <button
             onClick={() => onDialectChange('postgresql')}
-            className={`px-3 py-1.5 text-xs font-medium rounded transition-all active:scale-95 font-mono ${
+            className={`px-3 py-1.5 text-xs font-medium rounded transition-colors font-mono active:scale-95 ${
               dialect === 'postgresql'
                 ? 'bg-primary text-white'
-                : 'bg-foreground/5 text-foreground/60 hover:bg-foreground/10'
+                : 'bg-foreground/5 text-foreground/70 hover:bg-foreground/10'
             }`}
           >
             PostgreSQL
           </button>
           <button
             onClick={() => onDialectChange('mysql')}
-            className={`px-3 py-1.5 text-xs font-medium rounded transition-all active:scale-95 font-mono ${
+            className={`px-3 py-1.5 text-xs font-medium rounded transition-colors font-mono active:scale-95 ${
               dialect === 'mysql'
                 ? 'bg-primary text-white'
-                : 'bg-foreground/5 text-foreground/60 hover:bg-foreground/10'
+                : 'bg-foreground/5 text-foreground/70 hover:bg-foreground/10'
             }`}
           >
             MySQL
@@ -998,19 +998,19 @@ function MigrationView({
           <div className="flex gap-1">
             <button
               onClick={() => onCopySQL(migration.up)}
-              className="px-2.5 py-1.5 text-xs font-medium text-blue-600 hover:bg-blue-500/10 rounded transition-all active:scale-95 font-mono"
+              className="px-2.5 py-1.5 text-xs font-medium text-foreground/70 hover:text-foreground hover:bg-foreground/10 rounded transition-colors font-mono"
             >
               Copy
             </button>
             <button
               onClick={() => onDownloadSQL(migration.up, `migration_up_${fromVersion.tag}.sql`)}
-              className="px-2.5 py-1.5 text-xs font-medium text-blue-600 hover:bg-blue-500/10 rounded transition-all active:scale-95 font-mono"
+              className="px-2.5 py-1.5 text-xs font-medium text-foreground/70 hover:text-foreground hover:bg-foreground/10 rounded transition-colors font-mono"
             >
               Download
             </button>
           </div>
         </div>
-        <pre className="migration-code-block bg-[#fafafa] dark:bg-black/40 border border-foreground/10 rounded-lg p-4 text-xs text-foreground font-mono overflow-x-auto max-h-[30vh] overflow-y-scroll break-words whitespace-pre-wrap">
+        <pre className="migration-code-block bg-[#fafafa] dark:bg-black/40 border border-foreground/10 rounded p-4 text-xs text-foreground font-mono overflow-x-auto max-h-[30vh] overflow-y-scroll break-words whitespace-pre-wrap">
           {migration.up.length > 0 ? migration.up.join('\n') : '-- No migration statements needed'}
         </pre>
       </div>
@@ -1026,20 +1026,20 @@ function MigrationView({
             <button
               onClick={() => onCopySQL(migration.down)}
               disabled={migration.down.length === 0}
-              className="px-2.5 py-1.5 text-xs font-medium text-foreground/60 hover:bg-foreground/10 rounded transition-all active:scale-95 font-mono disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-2.5 py-1.5 text-xs font-medium text-foreground/70 hover:text-foreground hover:bg-foreground/10 rounded transition-colors font-mono disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Copy
             </button>
             <button
               onClick={() => onDownloadSQL(migration.down, `migration_down_${fromVersion.tag}.sql`)}
               disabled={migration.down.length === 0}
-              className="px-2.5 py-1.5 text-xs font-medium text-foreground/60 hover:bg-foreground/10 rounded transition-all active:scale-95 font-mono disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-2.5 py-1.5 text-xs font-medium text-foreground/70 hover:text-foreground hover:bg-foreground/10 rounded transition-colors font-mono disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Download
             </button>
           </div>
         </div>
-        <pre className="migration-code-block bg-[#fafafa] dark:bg-black/40 border border-foreground/10 rounded-lg p-4 text-xs text-foreground font-mono overflow-x-auto max-h-[30vh] overflow-y-scroll break-words whitespace-pre-wrap">
+        <pre className="migration-code-block bg-[#fafafa] dark:bg-black/40 border border-foreground/10 rounded p-4 text-xs text-foreground font-mono overflow-x-auto max-h-[30vh] overflow-y-scroll break-words whitespace-pre-wrap">
           {migration.down.length > 0 ? migration.down.join('\n') : '-- No rollback statements needed'}
         </pre>
       </div>

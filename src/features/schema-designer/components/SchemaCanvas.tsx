@@ -204,30 +204,41 @@ export default function SchemaCanvas({
     tableNode: TableNode 
   }), []);
 
-  // Get related table IDs for highlighting
+  // Get related table IDs for highlighting (optimized with Map for O(1) lookups)
   const getRelatedTables = useCallback((tableId: string): Set<string> => {
     const related = new Set<string>();
-    if (!schema?.tables || !tableId) return related;
+    if (!schema?.tables || !tableId || schema.tables.length === 0) return related;
     
-    const table = schema.tables.find(t => t.id === tableId);
-    if (!table) return related;
-    
-    // Add tables that this table references (outgoing FKs)
-    table.columns.forEach(col => {
-      if (col.references) {
-        const refTable = schema.tables.find(t => t.name === col.references?.table);
-        if (refTable) related.add(refTable.id);
+    // Build table name to ID map for O(1) lookups
+    const tableNameToId = new Map<string, string>();
+    schema.tables.forEach(t => {
+      if (t && t.id && t.name) {
+        tableNameToId.set(t.name, t.id);
       }
     });
     
-    // Add tables that reference this table (incoming FKs)
-    schema.tables.forEach(t => {
-      t.columns.forEach(col => {
-        if (col.references && col.references.table === table.name) {
-          related.add(t.id);
-        }
-      });
+    const table = schema.tables.find(t => t.id === tableId);
+    if (!table || !table.columns) return related;
+    
+    // Add tables that this table references (outgoing FKs) - O(n) where n = columns
+    table.columns.forEach(col => {
+      if (col.references?.table) {
+        const refTableId = tableNameToId.get(col.references.table);
+        if (refTableId) related.add(refTableId);
+      }
     });
+    
+    // Add tables that reference this table (incoming FKs) - O(n*m) optimized with Map
+    if (table.name) {
+      schema.tables.forEach(t => {
+        if (!t.columns) return;
+        t.columns.forEach(col => {
+          if (col.references?.table === table.name) {
+            related.add(t.id);
+          }
+        });
+      });
+    }
     
     return related;
   }, [schema.tables]);
@@ -395,19 +406,37 @@ export default function SchemaCanvas({
       if (prevNodes.length !== newNodes.length) {
         return newNodes;
       }
-      // Check if any node changed (position, selection, or data)
-      const hasChanges = prevNodes.some((prevNode, index) => {
-        const newNode = newNodes[index];
-        if (!newNode) return true;
-        return (
-          prevNode.id !== newNode.id ||
-          prevNode.position.x !== newNode.position.x ||
-          prevNode.position.y !== newNode.position.y ||
-          prevNode.selected !== newNode.selected ||
-          prevNode.data?.isSelected !== newNode.data?.isSelected ||
-          prevNode.data?.isRelated !== newNode.data?.isRelated
-        );
-      });
+      // Fast path: check if any node changed (early exit for performance)
+      // Use Map for O(1) lookups to handle reordered tables correctly
+      const newNodeMap = new Map(newNodes.map(n => [n.id, n]));
+      let hasChanges = false;
+      for (let i = 0; i < prevNodes.length; i++) {
+        const prevNode = prevNodes[i];
+        if (!prevNode) {
+          hasChanges = true;
+          break;
+        }
+        // Find corresponding node by ID (handles reordering correctly)
+        const newNode = newNodeMap.get(prevNode.id);
+        if (!newNode) {
+          // Node was removed
+          hasChanges = true;
+          break;
+        }
+        // Quick checks first (most common changes)
+        if (prevNode.position.x !== newNode.position.x ||
+            prevNode.position.y !== newNode.position.y ||
+            prevNode.selected !== newNode.selected ||
+            prevNode.data?.isSelected !== newNode.data?.isSelected ||
+            prevNode.data?.isRelated !== newNode.data?.isRelated) {
+          hasChanges = true;
+          break;
+        }
+      }
+      // Also check if any new nodes were added (not in prevNodes)
+      if (!hasChanges && newNodes.length > prevNodes.length) {
+        hasChanges = true;
+      }
       return hasChanges ? newNodes : prevNodes;
     });
   }, [schema?.tables, convertToNodes, setNodes, isPanning]);
@@ -429,18 +458,24 @@ export default function SchemaCanvas({
       if (prevEdges.length !== newEdges.length) {
         return newEdges;
       }
-      // Check if any edge changed
-      const hasChanges = prevEdges.some((prevEdge, index) => {
-        const newEdge = newEdges[index];
-        if (!newEdge) return true;
-        return (
-          prevEdge.id !== newEdge.id ||
-          prevEdge.source !== newEdge.source ||
-          prevEdge.target !== newEdge.target ||
-          prevEdge.sourceHandle !== newEdge.sourceHandle ||
-          prevEdge.targetHandle !== newEdge.targetHandle
-        );
-      });
+      // Fast path: check if any edge changed (early exit for performance)
+      let hasChanges = false;
+      for (let i = 0; i < prevEdges.length; i++) {
+        const prevEdge = prevEdges[i];
+        const newEdge = newEdges[i];
+        if (!newEdge || !prevEdge) {
+          hasChanges = true;
+          break;
+        }
+        if (prevEdge.id !== newEdge.id ||
+            prevEdge.source !== newEdge.source ||
+            prevEdge.target !== newEdge.target ||
+            prevEdge.sourceHandle !== newEdge.sourceHandle ||
+            prevEdge.targetHandle !== newEdge.targetHandle) {
+          hasChanges = true;
+          break;
+        }
+      }
       return hasChanges ? newEdges : prevEdges;
     });
   }, [schema?.tables, convertToEdges, setEdges, isPanning]);
@@ -512,15 +547,26 @@ export default function SchemaCanvas({
         });
         
         // Only update if tables actually changed (avoid unnecessary updates)
+        // Fast comparison without JSON.stringify for better performance
         const hasChanges = updatedTables.some((updatedTable, index) => {
           const originalTable = schema.tables[index];
           if (!originalTable) return true;
-          // Compare columns and indexes (main things that change when FK is removed)
-          return (
-            updatedTable.columns.length !== originalTable.columns.length ||
-            (updatedTable.indexes?.length || 0) !== (originalTable.indexes?.length || 0) ||
-            JSON.stringify(updatedTable.columns) !== JSON.stringify(originalTable.columns)
-          );
+          
+          // Quick length checks first (fastest)
+          if (updatedTable.columns.length !== originalTable.columns.length) return true;
+          if ((updatedTable.indexes?.length || 0) !== (originalTable.indexes?.length || 0)) return true;
+          
+          // Check if any column lost its references (more efficient than JSON.stringify)
+          const hasColumnChanges = updatedTable.columns.some((updatedCol, colIndex) => {
+            const originalCol = originalTable.columns[colIndex];
+            if (!originalCol) return true;
+            // Check if FK reference was removed (use 'references' property check)
+            const originalHasRef = 'references' in originalCol && !!originalCol.references;
+            const updatedHasRef = 'references' in updatedCol && !!(updatedCol as any).references;
+            return originalHasRef !== updatedHasRef;
+          });
+          
+          return hasColumnChanges;
         });
         
         if (hasChanges) {
@@ -607,7 +653,7 @@ export default function SchemaCanvas({
           cursor: pointer !important;
         }
         
-        /* Pan mode: hand cursors everywhere (tables locked) */
+        /* Pan mode: hand cursors everywhere, but tables can still be dragged */
         .react-flow.pan-mode .react-flow__pane {
           cursor: grab !important;
         }
@@ -615,8 +661,7 @@ export default function SchemaCanvas({
           cursor: grabbing !important;
         }
         .react-flow.pan-mode .react-flow__node {
-          cursor: grab !important;
-          pointer-events: none !important;
+          cursor: move !important;
         }
         
         /* Enable touchpad panning in pan mode */
@@ -793,15 +838,22 @@ export default function SchemaCanvas({
         onEdgesChange={handleEdgesChange}
         onNodeDragStop={handleNodeDragStop}
         onConnect={onConnect}
-        onPaneClick={onCanvasClick}
+        onPaneClick={(e) => {
+          // Clear selection when clicking on canvas
+          setSelectedTableId(null);
+          // Also call the parent handler if provided
+          if (onCanvasClick) {
+            onCanvasClick();
+          }
+        }}
         onEdgeClick={(event, edge) => {
           // Optional: Add edge click handler for future features
           event.stopPropagation();
         }}
         nodeTypes={nodeTypes}
-        nodesDraggable={!isPanMode}
+        nodesDraggable={true}
         nodesConnectable={!isPanMode}
-        elementsSelectable={!isPanMode}
+        elementsSelectable={true}
         edgesFocusable={true}
         edgesUpdatable={false}
         defaultViewport={{ x: 0, y: 0, zoom: 0.8 }}
@@ -862,29 +914,28 @@ export default function SchemaCanvas({
         />
       </ReactFlow>
 
-      {/* Professional Navigation Controls */}
-      <div className="absolute bottom-5 left-5 flex flex-row gap-2.5 z-10">
+      {/* Simple Navigation Controls */}
+      <div className="absolute bottom-5 left-5 flex flex-row gap-2 z-10">
         {/* Control Panel Container */}
-        <div className="bg-white/95 dark:bg-[#1a1a1a]/95 backdrop-blur-md border-2 border-foreground/20 rounded-xl shadow-2xl p-2 flex flex-row gap-2" style={{ borderRadius: '12px' }}>
+        <div className="bg-white dark:bg-[#1a1a1a] border border-foreground/20 rounded-lg shadow-sm p-1.5 flex flex-row gap-1.5">
           {/* Hand Tool (Pan Mode) */}
           <button
             onClick={() => setIsPanMode(!isPanMode)}
-            className={`w-10 h-10 border-2 rounded-xl flex items-center justify-center transition-all duration-200 ${
+            className={`w-8 h-8 border rounded-md flex items-center justify-center transition-colors ${
               isPanMode 
-                ? 'bg-primary text-white border-primary shadow-lg shadow-primary/30 scale-105' 
-                : 'bg-white dark:bg-[#1a1a1a] border-foreground/20 text-foreground hover:bg-foreground/5 hover:border-foreground/30 hover:scale-105 active:scale-95'
+                ? 'bg-primary text-white border-primary' 
+                : 'bg-white dark:bg-[#1a1a1a] border-foreground/20 text-foreground hover:bg-foreground/5 hover:border-foreground/30'
             }`}
-            style={{ borderRadius: '12px' }}
             title={isPanMode ? "Hand Tool Active (Hold Space or Middle Mouse)" : "Hand Tool (Hold Space or Middle Mouse)"}
             aria-label="Hand Tool"
             aria-pressed={isPanMode}
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 11.5V14m0-2.5v-6a1.5 1.5 0 113 0m-3 6a1.5 1.5 0 00-3 0v2a7.5 7.5 0 0015 0v-5a1.5 1.5 0 00-3 0m-6-3V11m0-5.5v-1a1.5 1.5 0 013 0v1m0 0V11m0-5.5a1.5 1.5 0 013 0v3m0 0V11" />
             </svg>
           </button>
           
-          <div className="h-10 w-px bg-foreground/10 mx-0.5"></div>
+          <div className="h-8 w-px bg-foreground/10"></div>
           
           <button
             onClick={() => {
@@ -894,13 +945,12 @@ export default function SchemaCanvas({
                 console.warn('Zoom in failed:', error);
               }
             }}
-            className="w-10 h-10 bg-white dark:bg-[#1a1a1a] border-2 border-foreground/20 rounded-xl flex items-center justify-center hover:bg-foreground/5 hover:border-foreground/30 hover:scale-105 active:scale-95 transition-all duration-200 group"
-            style={{ borderRadius: '12px' }}
+            className="w-8 h-8 bg-white dark:bg-[#1a1a1a] border border-foreground/20 rounded-md flex items-center justify-center hover:bg-foreground/5 hover:border-foreground/30 transition-colors"
             title="Zoom In (Ctrl/Cmd + Scroll or +)"
             aria-label="Zoom In"
           >
-            <svg className="w-5 h-5 text-foreground group-hover:text-primary transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+            <svg className="w-4 h-4 text-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
             </svg>
           </button>
           <button
@@ -911,13 +961,12 @@ export default function SchemaCanvas({
                 console.warn('Zoom out failed:', error);
               }
             }}
-            className="w-10 h-10 bg-white dark:bg-[#1a1a1a] border-2 border-foreground/20 rounded-xl flex items-center justify-center hover:bg-foreground/5 hover:border-foreground/30 hover:scale-105 active:scale-95 transition-all duration-200 group"
-            style={{ borderRadius: '12px' }}
+            className="w-8 h-8 bg-white dark:bg-[#1a1a1a] border border-foreground/20 rounded-md flex items-center justify-center hover:bg-foreground/5 hover:border-foreground/30 transition-colors"
             title="Zoom Out (Ctrl/Cmd + Scroll or -)"
             aria-label="Zoom Out"
           >
-            <svg className="w-5 h-5 text-foreground group-hover:text-primary transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M20 12H4" />
+            <svg className="w-4 h-4 text-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
             </svg>
           </button>
           <button
@@ -928,21 +977,20 @@ export default function SchemaCanvas({
                 console.warn('Fit view failed:', error);
               }
             }}
-            className="w-10 h-10 bg-white dark:bg-[#1a1a1a] border-2 border-foreground/20 rounded-xl flex items-center justify-center hover:bg-foreground/5 hover:border-foreground/30 hover:scale-105 active:scale-95 transition-all duration-200 group"
-            style={{ borderRadius: '12px' }}
+            className="w-8 h-8 bg-white dark:bg-[#1a1a1a] border border-foreground/20 rounded-md flex items-center justify-center hover:bg-foreground/5 hover:border-foreground/30 transition-colors"
             title="Fit View (Ctrl/Cmd + 0)"
             aria-label="Fit View"
           >
-            <svg className="w-5 h-5 text-foreground group-hover:text-primary transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+            <svg className="w-4 h-4 text-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
             </svg>
           </button>
           
-          <div className="h-10 w-px bg-foreground/10 mx-0.5"></div>
+          <div className="h-8 w-px bg-foreground/10"></div>
           
           {/* Zoom Level Indicator */}
-          <div className="w-10 h-10 bg-gradient-to-br from-foreground/5 to-foreground/10 dark:from-foreground/10 dark:to-foreground/20 border-2 border-foreground/20 rounded-xl flex items-center justify-center" style={{ borderRadius: '12px' }}>
-            <span className="text-[10px] font-mono font-semibold text-foreground/80" title="Current zoom level">
+          <div className="w-8 h-8 bg-foreground/5 dark:bg-foreground/10 border border-foreground/20 rounded-md flex items-center justify-center">
+            <span className="text-[9px] font-mono font-medium text-foreground/70" title="Current zoom level">
               {zoomLevel}%
             </span>
           </div>
