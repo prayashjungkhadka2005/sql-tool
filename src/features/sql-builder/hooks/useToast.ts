@@ -24,10 +24,15 @@ export function useToast() {
     setToast((prev) => ({ ...prev, isVisible: false }));
   }, []);
 
+  const resetToast = useCallback(() => {
+    setToast({ message: "", type: "success", isVisible: false });
+  }, []);
+
   return {
     toast,
     showToast,
     hideToast,
+    resetToast,
   };
 }
 

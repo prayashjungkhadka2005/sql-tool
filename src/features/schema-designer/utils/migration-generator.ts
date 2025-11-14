@@ -348,12 +348,21 @@ function generateTableModifications(
     // === UP: Apply changes ===
 
     // 1. Drop foreign key constraints first (if columns are being removed/modified)
+    // Use IF EXISTS to handle cases where constraint names don't match
     for (const column of tableChange.columnsRemoved) {
       if (column.references) {
         const constraintName = `fk_${tableChange.tableName}_${column.name}`;
-        statements.push(
-          `ALTER TABLE ${tableName} DROP CONSTRAINT ${escapeIdentifier(constraintName, dialect)};`
-        );
+        if (dialect === 'postgresql') {
+          statements.push(
+            `ALTER TABLE ${tableName} DROP CONSTRAINT IF EXISTS ${escapeIdentifier(constraintName, dialect)};`
+          );
+        } else {
+          // MySQL doesn't support IF EXISTS for DROP CONSTRAINT, so we'll try to drop it
+          // If it fails, the error will be caught and handled
+          statements.push(
+            `ALTER TABLE ${tableName} DROP CONSTRAINT ${escapeIdentifier(constraintName, dialect)};`
+          );
+        }
       }
     }
 
@@ -361,9 +370,15 @@ function generateTableModifications(
       const refChange = colChange.changes.find(c => c.type === 'references');
       if (refChange && refChange.oldValue !== '(none)') {
         const constraintName = `fk_${tableChange.tableName}_${colChange.old.name}`;
-        statements.push(
-          `ALTER TABLE ${tableName} DROP CONSTRAINT ${escapeIdentifier(constraintName, dialect)};`
-        );
+        if (dialect === 'postgresql') {
+          statements.push(
+            `ALTER TABLE ${tableName} DROP CONSTRAINT IF EXISTS ${escapeIdentifier(constraintName, dialect)};`
+          );
+        } else {
+          statements.push(
+            `ALTER TABLE ${tableName} DROP CONSTRAINT ${escapeIdentifier(constraintName, dialect)};`
+          );
+        }
       }
     }
 
@@ -441,9 +456,15 @@ function generateTableModifications(
     for (const column of tableChange.columnsAdded) {
       if (column.references) {
         const constraintName = `fk_${tableChange.tableName}_${column.name}`;
-        statements.push(
-          `ALTER TABLE ${tableName} DROP CONSTRAINT ${escapeIdentifier(constraintName, dialect)};`
-        );
+        if (dialect === 'postgresql') {
+          statements.push(
+            `ALTER TABLE ${tableName} DROP CONSTRAINT IF EXISTS ${escapeIdentifier(constraintName, dialect)};`
+          );
+        } else {
+          statements.push(
+            `ALTER TABLE ${tableName} DROP CONSTRAINT ${escapeIdentifier(constraintName, dialect)};`
+          );
+        }
       }
     }
 
@@ -451,9 +472,15 @@ function generateTableModifications(
       const refChange = colChange.changes.find(c => c.type === 'references');
       if (refChange && refChange.newValue !== '(none)') {
         const constraintName = `fk_${tableChange.tableName}_${colChange.new.name}`;
-        statements.push(
-          `ALTER TABLE ${tableName} DROP CONSTRAINT ${escapeIdentifier(constraintName, dialect)};`
-        );
+        if (dialect === 'postgresql') {
+          statements.push(
+            `ALTER TABLE ${tableName} DROP CONSTRAINT IF EXISTS ${escapeIdentifier(constraintName, dialect)};`
+          );
+        } else {
+          statements.push(
+            `ALTER TABLE ${tableName} DROP CONSTRAINT ${escapeIdentifier(constraintName, dialect)};`
+          );
+        }
       }
     }
 

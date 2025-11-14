@@ -20,11 +20,15 @@ import { SCHEMA_TEMPLATES } from '@/features/schema-designer/data/schema-templat
 import { autoLayoutTables, LayoutAlgorithm } from '@/features/schema-designer/utils/auto-layout';
 import { exportCanvasAsImage, getSuggestedFilename } from '@/features/schema-designer/utils/image-export';
 import { saveSchema, loadSchema, clearSchema, getLastSaved, formatTimestamp, isStorageAvailable } from '@/features/schema-designer/utils/schema-storage';
+import { compareSchemas, SchemaDiff } from '@/features/schema-designer/utils/schema-comparator';
 import { useSchemaHistory } from '@/features/schema-designer/hooks/useSchemaHistory';
 import ConfirmDialog from '@/features/sql-builder/components/ui/ConfirmDialog';
 import InputDialog from '@/features/sql-builder/components/ui/InputDialog';
 import SchemaDesignerNavbar, { SchemaDesignerNavbarRef } from '@/features/schema-designer/components/SchemaDesignerNavbar';
+import DatabaseRefreshModal from '@/features/schema-designer/components/DatabaseRefreshModal';
 import TemplatesDropdown from '@/features/schema-designer/components/TemplatesDropdown';
+import DatabaseConnectionModal from '@/features/schema-designer/components/DatabaseConnectionModal';
+import DatabaseSyncModal from '@/features/schema-designer/components/DatabaseSyncModal';
 
 export default function SchemaDesignerPage() {
   // Schema state with undo/redo support
@@ -56,8 +60,25 @@ export default function SchemaDesignerPage() {
 
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+const [isDatabaseConnectionOpen, setIsDatabaseConnectionOpen] = useState(false);
   const [isMigrationModalOpen, setIsMigrationModalOpen] = useState(false);
   const [isTemplatesOpen, setIsTemplatesOpen] = useState(false);
+const [isSyncModalOpen, setIsSyncModalOpen] = useState(false);
+const [isRefreshModalOpen, setIsRefreshModalOpen] = useState(false);
+  
+  // Store original database schema and connection info for sync
+  const [databaseConnection, setDatabaseConnection] = useState<{
+    originalSchema: SchemaState;
+    connectionConfig: {
+      type: 'postgresql' | 'mysql' | 'sqlite';
+      host?: string;
+      port?: number;
+      database?: string;
+      username?: string;
+      password?: string;
+      connectionString?: string;
+    };
+  } | null>(null);
   const [isOptimizingFKs, setIsOptimizingFKs] = useState(false);
   const [canvasRef, setCanvasRef] = useState<HTMLElement | null>(null);
   const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
@@ -119,6 +140,10 @@ export default function SchemaDesignerPage() {
     title: '',
     message: '',
   });
+
+const [isRefreshingDatabase, setIsRefreshingDatabase] = useState(false);
+const [refreshDiff, setRefreshDiff] = useState<SchemaDiff | null>(null);
+const [refreshRemoteSchema, setRefreshRemoteSchema] = useState<SchemaState | null>(null);
 
   // LOCALSTORAGE PERSISTENCE
   // Restore schema from localStorage on mount
@@ -321,6 +346,101 @@ export default function SchemaDesignerPage() {
       },
     });
   }, [schema]);
+
+  const handleRefreshDatabase = useCallback(async () => {
+    if (!databaseConnection) {
+      setAlertDialog({
+        isOpen: true,
+        title: 'No Database Connection',
+        message: 'Connect to a database before pulling remote changes.',
+      });
+      return;
+    }
+
+    setIsRefreshingDatabase(true);
+
+    try {
+      const connectionConfig = databaseConnection.connectionConfig;
+      const requestBody: any = {
+        type: connectionConfig.type,
+        host: connectionConfig.host || '',
+        port: connectionConfig.port || (connectionConfig.type === 'postgresql' ? 5432 : 3306),
+        database: connectionConfig.database || '',
+        username: connectionConfig.username || '',
+        password: connectionConfig.password || '',
+      };
+
+      if (connectionConfig.connectionString) {
+        requestBody.connectionString = connectionConfig.connectionString;
+      }
+
+      const response = await fetch('/api/database/connect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || 'Failed to pull schema from database');
+      }
+
+      if (!data.schema) {
+        throw new Error('No schema data returned from database');
+      }
+
+      const remoteSchema: SchemaState = data.schema;
+      const diff = compareSchemas(schema, remoteSchema);
+
+      if (!diff.hasChanges) {
+        setAlertDialog({
+          isOpen: true,
+          title: 'Already Up to Date',
+          message: 'The live database already matches your current design.',
+        });
+        return;
+      }
+
+      setRefreshDiff(diff);
+      setRefreshRemoteSchema(remoteSchema);
+      setIsRefreshModalOpen(true);
+    } catch (error: any) {
+      setAlertDialog({
+        isOpen: true,
+        title: 'Refresh Failed',
+        message: error.message || 'Unable to pull the latest schema. Please try again.',
+      });
+    } finally {
+      setIsRefreshingDatabase(false);
+    }
+  }, [databaseConnection, schema, setAlertDialog]);
+
+  const handleApplyRemoteSchema = useCallback(() => {
+    if (!refreshRemoteSchema) return;
+    replaceSchema(refreshRemoteSchema);
+    setDatabaseConnection((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        originalSchema: JSON.parse(JSON.stringify(refreshRemoteSchema)),
+      };
+    });
+    setIsRefreshModalOpen(false);
+    setRefreshDiff(null);
+    setRefreshRemoteSchema(null);
+    setAlertDialog({
+      isOpen: true,
+      title: 'Schema Updated',
+      message: 'Your canvas now matches the live database schema.',
+    });
+  }, [refreshRemoteSchema, replaceSchema, setAlertDialog, setDatabaseConnection]);
+
+  const handleCloseRefreshModal = useCallback(() => {
+    setIsRefreshModalOpen(false);
+    setRefreshDiff(null);
+    setRefreshRemoteSchema(null);
+  }, []);
 
   // Add column to table
   const handleAddColumn = useCallback((tableId: string) => {
@@ -718,10 +838,15 @@ export default function SchemaDesignerPage() {
       ).length;
     }, 0);
 
+    const isDatabaseConnected = databaseConnection !== null;
+    const syncNote = isDatabaseConnected 
+      ? `\n\nNote: This change is local only. The table will be deleted from the database when you click "Sync DB".`
+      : '';
+
     setConfirmDialog({
       isOpen: true,
       title: 'Delete Table?',
-      message: `Delete table "${table.name}"?${incomingFKCount > 0 ? `\n\nThis table is referenced by ${incomingFKCount} foreign key${incomingFKCount > 1 ? 's' : ''} in other tables. These FK references will be removed.` : ''}\n\nThis action cannot be undone.`,
+      message: `Delete table "${table.name}"?${incomingFKCount > 0 ? `\n\nThis table is referenced by ${incomingFKCount} foreign key${incomingFKCount > 1 ? 's' : ''} in other tables. These FK references will be removed.` : ''}${syncNote}\n\nThis action cannot be undone.`,
       confirmLabel: 'Delete Table',
       cancelLabel: 'Cancel',
       onConfirm: () => {
@@ -800,7 +925,7 @@ export default function SchemaDesignerPage() {
         setConfirmDialog(prev => ({ ...prev, isOpen: false }));
       },
     });
-  }, [schema, editingColumn, managingIndexTable, contextMenu.isOpen, contextMenu.tableId]);
+  }, [schema, editingColumn, managingIndexTable, contextMenu.isOpen, contextMenu.tableId, databaseConnection, setSchema]);
 
   // Memoize button visibility check for performance
   const hasFKsWithoutIndexes = useMemo(() => {
@@ -1272,20 +1397,35 @@ export default function SchemaDesignerPage() {
   const columnCount = schema.tables.reduce((sum, t) => sum + t.columns.length, 0);
   const indexCount = schema.tables.reduce((sum, t) => sum + (t.indexes?.length || 0), 0);
 
+  const lastSavedLabel = lastSavedTime ? formatTimestamp(lastSavedTime) : null;
+
   return (
     <div className="h-full flex flex-col overflow-hidden">
       {/* Professional Navbar with all actions */}
       <SchemaDesignerNavbar
         ref={navbarRef}
-        tableCount={tableCount}
-        columnCount={columnCount}
-        indexCount={indexCount}
-        lastSavedTime={lastSavedTime}
-        isStorageEnabled={isStorageEnabled}
-        formatTimestamp={formatTimestamp}
         onExport={() => setIsExportModalOpen(true)}
         onNewTable={handleAddTable}
         onImport={() => setIsImportModalOpen(true)}
+        onConnectDatabase={() => setIsDatabaseConnectionOpen(true)}
+        onRefreshDatabase={handleRefreshDatabase}
+        onDisconnectDatabase={() => {
+          setConfirmDialog({
+            isOpen: true,
+            title: 'Disconnect Database?',
+            message: 'Disconnecting will clear the database connection. Your local changes will be preserved, but you will need to reconnect to sync changes to the database.',
+            confirmLabel: 'Disconnect',
+            cancelLabel: 'Cancel',
+            confirmVariant: 'danger',
+            onConfirm: () => {
+              setDatabaseConnection(null);
+              setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+            },
+          });
+        }}
+        onSyncDatabase={databaseConnection ? () => {
+          setIsSyncModalOpen(true);
+        } : undefined}
         onTemplates={() => setIsTemplatesOpen(!isTemplatesOpen)}
         onMigrations={() => setIsMigrationModalOpen(true)}
         onAutoLayout={() => handleAutoLayout('hierarchical')}
@@ -1299,6 +1439,8 @@ export default function SchemaDesignerPage() {
         hasTables={schema.tables.length > 0}
         hasMultipleTables={schema.tables.length > 1}
         isTemplatesOpen={isTemplatesOpen}
+        isDatabaseConnected={databaseConnection !== null}
+        isRefreshingDatabase={isRefreshingDatabase}
       />
           
       {/* Content Area - Full Height Canvas */}
@@ -1318,6 +1460,10 @@ export default function SchemaDesignerPage() {
         <SchemaCanvas
           schema={schema}
           onSchemaChange={setSchema}
+          tableCount={tableCount}
+          columnCount={columnCount}
+          indexCount={indexCount}
+          lastSavedLabel={lastSavedLabel}
           onEditTable={handleEditTable}
           onAddColumn={handleAddColumn}
             onEditColumn={handleEditColumn}
@@ -1326,9 +1472,9 @@ export default function SchemaDesignerPage() {
             onTableContextMenu={handleTableContextMenu}
             onCanvasClick={handleCanvasClick}
             onCloseContextMenu={handleCloseContextMenu}
-            onAddTable={handleAddTable}
-                       onOpenTemplates={() => setIsTemplatesOpen(true)}
-                       autoLayoutTrigger={autoLayoutTrigger}
+          onAddTable={handleAddTable}
+          onOpenTemplates={() => setIsTemplatesOpen(true)}
+          autoLayoutTrigger={autoLayoutTrigger}
         />
         </div>
           </ReactFlowProvider>
@@ -1484,6 +1630,41 @@ export default function SchemaDesignerPage() {
         hasExistingTables={schema.tables.length > 0}
       />
 
+      {/* Database Connection Modal */}
+      <DatabaseConnectionModal
+        isOpen={isDatabaseConnectionOpen}
+        onClose={() => setIsDatabaseConnectionOpen(false)}
+        onConnect={(connectedSchema, connectionConfig) => {
+          // Store original schema and connection info for sync
+          if (connectionConfig) {
+            setDatabaseConnection({
+              originalSchema: JSON.parse(JSON.stringify(connectedSchema)), // Deep copy
+              connectionConfig,
+            });
+          }
+          
+          // For now, always replace. Merge functionality can be added later
+          if (schema.tables.length > 0) {
+            setConfirmDialog({
+              isOpen: true,
+              title: 'Replace Existing Schema?',
+              message: `You have ${schema.tables.length} existing table(s). Connecting to the database will replace your current schema. Continue?`,
+              confirmLabel: 'Replace',
+              cancelLabel: 'Cancel',
+              confirmVariant: 'danger',
+              onConfirm: () => {
+                replaceSchema(connectedSchema);
+                setIsDatabaseConnectionOpen(false);
+                setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+              },
+            });
+          } else {
+            replaceSchema(connectedSchema);
+            setIsDatabaseConnectionOpen(false);
+          }
+        }}
+      />
+
       {/* Migration Modal */}
       <MigrationModal
         isOpen={isMigrationModalOpen}
@@ -1491,6 +1672,45 @@ export default function SchemaDesignerPage() {
         currentSchema={schema}
         onLoadVersion={handleLoadVersion}
       />
+
+      {/* Database Sync Modal */}
+      {databaseConnection && (
+        <DatabaseSyncModal
+          isOpen={isSyncModalOpen}
+          onClose={() => setIsSyncModalOpen(false)}
+          currentSchema={schema}
+          originalSchema={databaseConnection.originalSchema}
+          connectionConfig={databaseConnection.connectionConfig}
+          onSyncComplete={() => {
+            // Update original schema to current after successful sync
+            setDatabaseConnection(prev => {
+              if (!prev) return prev;
+              return {
+                ...prev,
+                originalSchema: JSON.parse(JSON.stringify(schema)),
+              };
+            });
+          }}
+        />
+      )}
+
+      {/* Database Refresh Modal */}
+      {databaseConnection && refreshRemoteSchema && isRefreshModalOpen && (
+        <DatabaseRefreshModal
+          isOpen={isRefreshModalOpen}
+          onClose={handleCloseRefreshModal}
+          diff={refreshDiff}
+          connectionLabel={
+            databaseConnection.connectionConfig.username
+              ? `Connected as ${databaseConnection.connectionConfig.username}`
+              : databaseConnection.connectionConfig.database
+                ? `Database: ${databaseConnection.connectionConfig.database}`
+                : 'Connected database'
+          }
+          hostLabel={databaseConnection.connectionConfig.host || 'localhost'}
+          onApply={handleApplyRemoteSchema}
+        />
+      )}
 
       {/* Context Menu */}
       <ContextMenu

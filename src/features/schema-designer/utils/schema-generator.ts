@@ -307,23 +307,41 @@ function formatDefaultValue(value: string, type: SQLDataType): string {
     return 'NULL';
   }
 
-  // Functions (NOW(), CURRENT_TIMESTAMP, UUID(), etc.)
-  if (value.match(/^[A-Z_]+\(\)$/i)) {
-    return value.toUpperCase();
+  // Functions (NOW(), CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, UUID(), etc.)
+  const upperValue = value.toUpperCase();
+  if (upperValue.match(/^[A-Z_]+\(\)$/) || 
+      upperValue === 'CURRENT_TIMESTAMP' || 
+      upperValue === 'NOW()' ||
+      upperValue.startsWith('CURRENT_')) {
+    return upperValue;
   }
 
   // Boolean
   if (type === 'BOOLEAN') {
-    return value.toLowerCase() === 'true' ? 'TRUE' : 'FALSE';
+    const lowerValue = value.toLowerCase();
+    return lowerValue === 'true' ? 'TRUE' : lowerValue === 'false' ? 'FALSE' : value;
   }
 
   // Numeric types (no quotes)
   if (['SMALLINT', 'INTEGER', 'BIGINT', 'FLOAT', 'DOUBLE', 'REAL', 'DECIMAL'].includes(type)) {
+    // Validate it's actually numeric
+    if (value.match(/^-?\d+(\.\d+)?$/)) {
+      return value;
+    }
+    // If not numeric, might be an expression - return as-is
     return value;
   }
 
-  // String types (wrap in single quotes)
-  return `'${value.replace(/'/g, "''")}'`; // Escape single quotes
+  // String types (wrap in single quotes, but check if already quoted)
+  // If value already starts and ends with single quotes, use as-is (but fix escaping)
+  if (value.startsWith("'") && value.endsWith("'") && value.length > 1) {
+    // Already quoted, just ensure proper escaping
+    const innerValue = value.slice(1, -1);
+    return `'${innerValue.replace(/'/g, "''")}'`;
+  }
+
+  // Not quoted, wrap and escape
+  return `'${value.replace(/'/g, "''")}'`;
 }
 
 /**

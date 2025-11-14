@@ -28,6 +28,10 @@ import TableNode from './TableNode';
 interface SchemaCanvasProps {
   schema: SchemaState;
   onSchemaChange: (schema: SchemaState) => void;
+  tableCount: number;
+  columnCount: number;
+  indexCount: number;
+  lastSavedLabel?: string | null;
   onEditTable: (tableId: string) => void;
   onAddColumn: (tableId: string) => void;
   onEditColumn: (tableId: string, columnId: string) => void;
@@ -44,6 +48,10 @@ interface SchemaCanvasProps {
 export default function SchemaCanvas({ 
   schema, 
   onSchemaChange, 
+  tableCount,
+  columnCount,
+  indexCount,
+  lastSavedLabel,
   onEditTable,
   onAddColumn,
   onEditColumn,
@@ -245,6 +253,35 @@ export default function SchemaCanvas({
   }, [schema.tables]);
 
   // Convert schema tables to React Flow nodes
+  const getTableSignature = useCallback((table: SchemaTable) => {
+    if (!table) return '';
+    return JSON.stringify({
+      name: table.name,
+      columns: table.columns?.map(col => ({
+        id: col.id,
+        name: col.name,
+        type: col.type,
+        nullable: col.nullable,
+        defaultValue: col.defaultValue,
+        references: col.references
+          ? {
+              table: col.references.table,
+              column: col.references.column,
+              onDelete: col.references.onDelete,
+              onUpdate: col.references.onUpdate,
+            }
+          : null,
+      })),
+      indexes: table.indexes?.map(idx => ({
+        id: idx.id,
+        name: idx.name,
+        columns: idx.columns,
+        type: idx.type,
+        unique: idx.unique,
+      })),
+    });
+  }, []);
+
   const convertToNodes = useCallback((tables: SchemaTable[]): Node[] => {
     if (!tables || !Array.isArray(tables)) return [];
     
@@ -266,6 +303,7 @@ export default function SchemaCanvas({
           selected: selectedTableId === table.id, // React Flow selection state
         data: {
           table,
+          tableSignature: getTableSignature(table),
           onEdit: onEditTable,
           onDelete: onDeleteTable,
           onAddColumn,
@@ -286,7 +324,7 @@ export default function SchemaCanvas({
         },
         };
       });
-  }, [onEditTable, onDeleteTable, onAddColumn, onEditColumn, onManageIndexes, onTableContextMenu, onCloseContextMenu, selectedTableId, getRelatedTables]);
+  }, [onEditTable, onDeleteTable, onAddColumn, onEditColumn, onManageIndexes, onTableContextMenu, onCloseContextMenu, selectedTableId, getRelatedTables, getTableSignature]);
 
   // Convert FK columns to React Flow edges (auto-generate from schema)
   const convertToEdges = useCallback((tables: SchemaTable[]): Edge[] => {
@@ -430,6 +468,10 @@ export default function SchemaCanvas({
             prevNode.selected !== newNode.selected ||
             prevNode.data?.isSelected !== newNode.data?.isSelected ||
             prevNode.data?.isRelated !== newNode.data?.isRelated) {
+          hasChanges = true;
+          break;
+        }
+        if (prevNode.data?.tableSignature !== newNode.data?.tableSignature) {
           hasChanges = true;
           break;
         }
@@ -832,6 +874,20 @@ export default function SchemaCanvas({
           background: rgba(255, 255, 255, 0.3);
         }
       `}</style>
+      <div className="absolute top-3 right-3 z-20">
+        <div className="px-3 py-2 text-[11px] sm:text-xs font-mono text-foreground/70 bg-white/90 dark:bg-[#0d0d0d]/90 border border-foreground/10 rounded-xl shadow-sm flex flex-col gap-1 text-right">
+          <div className="flex items-center gap-2 justify-end">
+            <span>{tableCount} {tableCount === 1 ? 'Table' : 'Tables'}</span>
+            <span className="text-foreground/30">•</span>
+            <span>{columnCount} Cols</span>
+            <span className="text-foreground/30">•</span>
+            <span>{indexCount} {indexCount === 1 ? 'Idx' : 'Idxs'}</span>
+          </div>
+          <span className="text-[10px] uppercase tracking-wide text-foreground/40">
+            {lastSavedLabel ? `Last saved ${lastSavedLabel}` : 'Not saved yet'}
+          </span>
+        </div>
+      </div>
       <ReactFlow
         nodes={nodes}
         edges={edges}

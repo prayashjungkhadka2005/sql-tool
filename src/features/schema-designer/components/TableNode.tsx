@@ -5,7 +5,7 @@
 
 "use client";
 
-import { memo, useMemo } from 'react';
+import { memo, useMemo, useState } from 'react';
 import { Handle, Position, NodeProps } from 'reactflow';
 import { SchemaTable } from '../types';
 
@@ -25,6 +25,7 @@ interface TableNodeData {
 
 function TableNode({ data, selected }: NodeProps<TableNodeData>) {
   const { table, onEdit, onDelete, onAddColumn, onEditColumn, onManageIndexes, onContextMenu, isSelected, isRelated, onSelect, onCloseContextMenu } = data;
+  const [isExpanded, setIsExpanded] = useState(false);
 
   const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -127,7 +128,13 @@ function TableNode({ data, selected }: NodeProps<TableNodeData>) {
 
       {/* Columns List */}
       <div className="relative">
-        <div className="px-4 py-3 space-y-1.5 max-h-[400px] overflow-y-auto scrollbar-thin scrollbar-thumb-foreground/20 scrollbar-track-transparent">
+        <div
+          className={`px-4 py-3 space-y-1.5 ${
+            isExpanded
+              ? 'max-h-none overflow-visible'
+              : 'max-h-[400px] overflow-y-auto scrollbar-thin scrollbar-thumb-foreground/20 scrollbar-track-transparent'
+          }`}
+        >
           {table.columns.length === 0 ? (
             <div className="text-center py-4">
               <p className="text-xs text-foreground/40 font-mono">
@@ -276,7 +283,20 @@ function TableNode({ data, selected }: NodeProps<TableNodeData>) {
             </span>
           )}
         </button>
-      </div>
+        </div>
+        {table.columns.length > 10 && (
+          <div className="px-4 pb-3">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsExpanded(prev => !prev);
+              }}
+              className="w-full text-[10px] font-mono text-foreground/60 hover:text-foreground hover:bg-foreground/10 rounded-md py-1 transition-all active:scale-95"
+            >
+              {isExpanded ? 'Collapse columns' : `Show all columns (${table.columns.length})`}
+            </button>
+          </div>
+        )}
     </div>
   );
 }
