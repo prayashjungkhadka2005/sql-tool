@@ -15,7 +15,6 @@ import ExportModal from '@/features/schema-designer/components/ExportModal';
 import ImportModal from '@/features/schema-designer/components/ImportModal';
 import { MigrationModal } from '@/features/schema-designer/components/MigrationModal';
 import IndexManager from '@/features/schema-designer/components/IndexManager';
-import CommandPalette, { Command } from '@/features/schema-designer/components/CommandPalette';
 import ContextMenu, { ContextMenuItem } from '@/features/schema-designer/components/ContextMenu';
 import { SCHEMA_TEMPLATES } from '@/features/schema-designer/data/schema-templates';
 import { autoLayoutTables, LayoutAlgorithm } from '@/features/schema-designer/utils/auto-layout';
@@ -62,9 +61,8 @@ export default function SchemaDesignerPage() {
   const [isOptimizingFKs, setIsOptimizingFKs] = useState(false);
   const [canvasRef, setCanvasRef] = useState<HTMLElement | null>(null);
   const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
-  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
-  const navbarRef = useRef<SchemaDesignerNavbarRef>(null);
   const [autoLayoutTrigger, setAutoLayoutTrigger] = useState(0);
+  const navbarRef = useRef<SchemaDesignerNavbarRef>(null);
   const [contextMenu, setContextMenu] = useState<{
     isOpen: boolean;
     position: { x: number; y: number };
@@ -960,7 +958,7 @@ export default function SchemaDesignerPage() {
       tables: layoutedTables,
     }, 'Auto-layout');
     
-    // Trigger fitView after layout
+    // Trigger fitView after layout (only when explicitly clicking auto-layout)
     setAutoLayoutTrigger(prev => prev + 1);
   }, [schema, setSchema]);
 
@@ -1012,18 +1010,13 @@ export default function SchemaDesignerPage() {
 
   // Handle table context menu (right-click)
   const handleTableContextMenu = useCallback((tableId: string, x: number, y: number) => {
-    // Close Command Palette if open (context menu takes priority)
-    if (isCommandPaletteOpen) {
-      setIsCommandPaletteOpen(false);
-    }
-    
     // Close existing context menu and open new one (handles rapid right-clicks)
     setContextMenu({
       isOpen: true,
       position: { x, y },
       tableId,
     });
-  }, [isCommandPaletteOpen]);
+  }, []);
 
   // Handle canvas click (close context menu)
   const handleCanvasClick = useCallback(() => {
@@ -1164,151 +1157,6 @@ export default function SchemaDesignerPage() {
     ];
   }, [contextMenu.tableId, schema.tables, setSchema, handleAddColumn, handleEditTable, handleManageIndexes, handleDeleteTable]);
 
-  // Generate commands for command palette
-  const commands = useMemo<Command[]>(() => {
-    const cmds: Command[] = [];
-
-    // Table commands
-    cmds.push({
-      id: 'add-table',
-      label: 'Add New Table',
-      description: 'Create a new table in your schema',
-      icon: (
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-        </svg>
-      ),
-      category: 'table',
-      keywords: ['create', 'new', 'table', 'add'],
-      action: handleAddTable,
-      shortcut: 'Cmd+T',
-    });
-
-    // Add navigation commands for each table
-    schema.tables.forEach(table => {
-      cmds.push({
-        id: `goto-${table.id}`,
-        label: `Go to ${table.name}`,
-        description: `${table.columns.length} columns`,
-        icon: (
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-          </svg>
-        ),
-        category: 'navigation',
-        keywords: ['table', table.name, 'jump', 'find'],
-        action: () => {
-          // TODO: Focus on table (scroll into view)
-          console.log(`Navigate to table: ${table.name}`);
-        },
-      });
-    });
-
-    // Export commands
-    const exportFormats = [
-      { id: 'export-postgres', label: 'Export as PostgreSQL', format: 'sql-postgres' },
-      { id: 'export-mysql', label: 'Export as MySQL', format: 'sql-mysql' },
-      { id: 'export-prisma', label: 'Export as Prisma', format: 'prisma' },
-      { id: 'export-typescript', label: 'Export as TypeScript', format: 'typescript' },
-      { id: 'export-zod', label: 'Export as Zod Schemas', format: 'zod' },
-      { id: 'export-json', label: 'Export as JSON', format: 'json' },
-    ];
-
-    exportFormats.forEach(fmt => {
-      cmds.push({
-        id: fmt.id,
-        label: fmt.label,
-        description: 'Download code',
-        icon: (
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-          </svg>
-        ),
-        category: 'export',
-        keywords: ['export', 'download', 'code', fmt.format],
-        action: () => setIsExportModalOpen(true),
-      });
-    });
-
-    // Import commands
-    cmds.push({
-      id: 'import-schema',
-      label: 'Import Schema',
-      description: 'Import from SQL or Prisma',
-      icon: (
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L9 8m4-4v12" />
-        </svg>
-      ),
-      category: 'import',
-      keywords: ['import', 'load', 'sql', 'prisma'],
-      action: () => setIsImportModalOpen(true),
-      shortcut: 'Cmd+I',
-    });
-
-    // View commands
-    cmds.push({
-      id: 'auto-layout',
-      label: 'Auto Layout',
-      description: 'Organize tables hierarchically',
-      icon: (
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h4a1 1 0 011 1v7a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM14 5a1 1 0 011-1h4a1 1 0 011 1v7a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 17a1 1 0 011-1h4a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1v-2zM14 17a1 1 0 011-1h4a1 1 0 011 1v2a1 1 0 01-1 1h-4a1 1 0 01-1-1v-2z" />
-        </svg>
-      ),
-      category: 'view',
-      keywords: ['layout', 'organize', 'arrange'],
-      action: () => handleAutoLayout('hierarchical'),
-      shortcut: 'Cmd+L',
-    });
-
-    cmds.push({
-      id: 'reset-schema',
-      label: 'Reset Schema',
-      description: 'Delete all tables',
-      icon: (
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-        </svg>
-      ),
-      category: 'edit',
-      keywords: ['reset', 'clear', 'delete', 'remove'],
-      action: handleReset,
-      shortcut: 'Cmd+Shift+R',
-    });
-
-    cmds.push({
-      id: 'undo',
-      label: 'Undo',
-      description: canUndo ? `Undo: ${lastActionName || 'Last action'}` : 'Nothing to undo',
-      icon: (
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
-        </svg>
-      ),
-      category: 'edit',
-      keywords: ['undo', 'revert'],
-      action: undo,
-      shortcut: 'Cmd+Z',
-    });
-
-    cmds.push({
-      id: 'redo',
-      label: 'Redo',
-      description: canRedo ? 'Redo last undone action' : 'Nothing to redo',
-      icon: (
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 10h-10a8 8 0 00-8 8v2m18-10l-6 6m6-6l-6-6" />
-        </svg>
-      ),
-      category: 'edit',
-      keywords: ['redo', 'repeat'],
-      action: redo,
-      shortcut: 'Cmd+Shift+Z',
-    });
-
-    return cmds;
-  }, [schema.tables, canUndo, canRedo, lastActionName, undo, redo, handleAddTable, handleAutoLayout, handleReset]);
 
   // Keyboard shortcut overlay (? key)
   useEffect(() => {
@@ -1343,8 +1191,8 @@ export default function SchemaDesignerPage() {
         return;
       }
       
-      // Don't trigger when any dialog/drawer is open (except command palette opening with Cmd+K)
-      if (isColumnEditorOpen || isIndexManagerOpen || isExportModalOpen || isImportModalOpen || isMigrationModalOpen || confirmDialog.isOpen || inputDialog.isOpen || alertDialog.isOpen || isShortcutsOpen || isCommandPaletteOpen || contextMenu.isOpen) {
+      // Don't trigger when any dialog/drawer is open
+      if (isColumnEditorOpen || isIndexManagerOpen || isExportModalOpen || isImportModalOpen || isMigrationModalOpen || confirmDialog.isOpen || inputDialog.isOpen || alertDialog.isOpen || isShortcutsOpen || contextMenu.isOpen) {
         return;
       }
 
@@ -1353,12 +1201,6 @@ export default function SchemaDesignerPage() {
 
       if (modifier) {
         switch (e.key.toLowerCase()) {
-          case 'k':
-            // Cmd/Ctrl + K: Open command palette
-            e.preventDefault();
-            setIsCommandPaletteOpen(true);
-            break;
-          
           case 'z':
             // Cmd/Ctrl + Z: Undo
             if (e.shiftKey) {
@@ -1423,7 +1265,7 @@ export default function SchemaDesignerPage() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [schema.tables, isColumnEditorOpen, isIndexManagerOpen, isExportModalOpen, isImportModalOpen, isMigrationModalOpen, confirmDialog.isOpen, inputDialog.isOpen, alertDialog.isOpen, isShortcutsOpen, isCommandPaletteOpen, contextMenu.isOpen, canUndo, canRedo, undo, redo, handleAddTable, handleReset, handleAutoLayout]);
+  }, [schema.tables, isColumnEditorOpen, isIndexManagerOpen, isExportModalOpen, isImportModalOpen, isMigrationModalOpen, confirmDialog.isOpen, inputDialog.isOpen, alertDialog.isOpen, isShortcutsOpen, contextMenu.isOpen, canUndo, canRedo, undo, redo, handleAddTable, handleReset, handleAutoLayout]);
 
   // Calculate stats
   const tableCount = schema.tables.length;
@@ -1485,9 +1327,9 @@ export default function SchemaDesignerPage() {
             onCanvasClick={handleCanvasClick}
             onCloseContextMenu={handleCloseContextMenu}
             onAddTable={handleAddTable}
-            onOpenTemplates={() => setIsTemplatesOpen(true)}
-            autoLayoutTrigger={autoLayoutTrigger}
-          />
+                       onOpenTemplates={() => setIsTemplatesOpen(true)}
+                       autoLayoutTrigger={autoLayoutTrigger}
+        />
         </div>
           </ReactFlowProvider>
         </section>
@@ -1538,10 +1380,6 @@ export default function SchemaDesignerPage() {
                 <div>
                   <h4 className="text-xs font-semibold text-foreground/60 uppercase tracking-wider mb-3 font-mono">General Actions</h4>
                   <div className="space-y-2.5">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-foreground/80 font-mono">Command palette</span>
-                      <kbd className="px-2 py-1 bg-foreground/10 border border-foreground/20 rounded text-xs font-mono">Cmd+K</kbd>
-        </div>
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-foreground/80 font-mono">New table</span>
                       <kbd className="px-2 py-1 bg-foreground/10 border border-foreground/20 rounded text-xs font-mono">Cmd+T</kbd>
@@ -1653,18 +1491,6 @@ export default function SchemaDesignerPage() {
         currentSchema={schema}
         onLoadVersion={handleLoadVersion}
       />
-
-      {/* Command Palette */}
-      <AnimatePresence>
-        {isCommandPaletteOpen && (
-          <CommandPalette
-            isOpen={isCommandPaletteOpen}
-            onClose={() => setIsCommandPaletteOpen(false)}
-            schema={schema}
-            commands={commands}
-          />
-        )}
-      </AnimatePresence>
 
       {/* Context Menu */}
       <ContextMenu

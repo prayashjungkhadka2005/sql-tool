@@ -213,13 +213,13 @@ CREATE INDEX idx_posts_user_id ON posts(user_id);`;
               {/* Header */}
               <div className="px-6 py-4 border-b border-foreground/10">
                 <div className="flex items-center justify-between">
-                  <div>
+                    <div>
                     <h3 id="import-modal-title" className="text-lg font-semibold text-foreground font-mono">
-                      Import Schema
-                    </h3>
+                        Import Schema
+                      </h3>
                     <p className="text-xs text-foreground/60 font-mono mt-0.5">
-                      Paste SQL CREATE TABLE or Prisma schema
-                    </p>
+                        Paste SQL CREATE TABLE or Prisma schema
+                      </p>
                   </div>
                   <button
                     onClick={onClose}
