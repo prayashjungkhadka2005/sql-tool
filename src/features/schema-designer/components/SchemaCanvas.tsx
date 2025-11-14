@@ -42,6 +42,9 @@ interface SchemaCanvasProps {
   onCloseContextMenu?: () => void;
   onAddTable?: () => void;
   onOpenTemplates?: () => void;
+  onAutoIndexFKs?: () => void;
+  hasFKOptimization?: boolean;
+  isOptimizingFKs?: boolean;
   autoLayoutTrigger?: number; // Increment this to trigger fitView after auto-layout
 }
 
@@ -62,6 +65,9 @@ export default function SchemaCanvas({
   onCloseContextMenu,
   onAddTable,
   onOpenTemplates,
+  onAutoIndexFKs,
+  hasFKOptimization,
+  isOptimizingFKs,
   autoLayoutTrigger
 }: SchemaCanvasProps) {
   const { zoomIn, zoomOut, fitView, getZoom } = useReactFlow();
@@ -976,28 +982,26 @@ export default function SchemaCanvas({
 
       {/* Simple Navigation Controls */}
       <div className="absolute bottom-5 left-5 flex flex-row gap-2 z-10">
-        {/* Control Panel Container */}
-        <div className="bg-white dark:bg-[#1a1a1a] border border-foreground/20 rounded-lg shadow-sm p-1.5 flex flex-row gap-1.5">
-        {/* Hand Tool (Pan Mode) */}
-        <button
-          onClick={() => setIsPanMode(!isPanMode)}
+        <div className="bg-white/95 dark:bg-[#1a1a1a]/95 border border-foreground/20 rounded-lg shadow-sm p-1.5 flex flex-row gap-1.5 items-center">
+          <button
+            onClick={() => setIsPanMode(!isPanMode)}
             className={`w-8 h-8 border rounded-md flex items-center justify-center transition-colors ${
-            isPanMode 
+              isPanMode 
                 ? 'bg-primary text-white border-primary' 
                 : 'bg-white dark:bg-[#1a1a1a] border-foreground/20 text-foreground hover:bg-foreground/5 hover:border-foreground/30'
-          }`}
+            }`}
             title={isPanMode ? "Hand Tool Active (Hold Space or Middle Mouse)" : "Hand Tool (Hold Space or Middle Mouse)"}
-          aria-label="Hand Tool"
-          aria-pressed={isPanMode}
-        >
+            aria-label="Hand Tool"
+            aria-pressed={isPanMode}
+          >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 11.5V14m0-2.5v-6a1.5 1.5 0 113 0m-3 6a1.5 1.5 0 00-3 0v2a7.5 7.5 0 0015 0v-5a1.5 1.5 0 00-3 0m-6-3V11m0-5.5v-1a1.5 1.5 0 013 0v1m0 0V11m0-5.5a1.5 1.5 0 013 0v3m0 0V11" />
-          </svg>
-        </button>
-        
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 11.5V14m0-2.5v-6a1.5 1.5 0 113 0m-3 6a1.5 1.5 0 00-3 0v2a7.5 7.5 0 0015 0v-5a1.5 1.5 0 00-3 0m-6-3V11m0-5.5v-1a1.5 1.5 0 013 0v1m0 0V11m0-5.5a1.5 1.5 0 013 0v3m0 0V11" />
+            </svg>
+          </button>
+
           <div className="h-8 w-px bg-foreground/10"></div>
-        
-        <button
+
+          <button
             onClick={() => {
               try {
                 zoomIn({ duration: 200 });
@@ -1007,13 +1011,13 @@ export default function SchemaCanvas({
             }}
             className="w-8 h-8 bg-white dark:bg-[#1a1a1a] border border-foreground/20 rounded-md flex items-center justify-center hover:bg-foreground/5 hover:border-foreground/30 transition-colors"
             title="Zoom In (Ctrl/Cmd + Scroll or +)"
-          aria-label="Zoom In"
-        >
+            aria-label="Zoom In"
+          >
             <svg className="w-4 h-4 text-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-        </button>
-        <button
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+          </button>
+          <button
             onClick={() => {
               try {
                 zoomOut({ duration: 200 });
@@ -1023,13 +1027,13 @@ export default function SchemaCanvas({
             }}
             className="w-8 h-8 bg-white dark:bg-[#1a1a1a] border border-foreground/20 rounded-md flex items-center justify-center hover:bg-foreground/5 hover:border-foreground/30 transition-colors"
             title="Zoom Out (Ctrl/Cmd + Scroll or -)"
-          aria-label="Zoom Out"
-        >
+            aria-label="Zoom Out"
+          >
             <svg className="w-4 h-4 text-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
-          </svg>
-        </button>
-        <button
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
+            </svg>
+          </button>
+          <button
             onClick={() => {
               try {
                 fitView({ duration: 200, padding: 0.2 });
@@ -1039,24 +1043,55 @@ export default function SchemaCanvas({
             }}
             className="w-8 h-8 bg-white dark:bg-[#1a1a1a] border border-foreground/20 rounded-md flex items-center justify-center hover:bg-foreground/5 hover:border-foreground/30 transition-colors"
             title="Fit View (Ctrl/Cmd + 0)"
-          aria-label="Fit View"
-        >
+            aria-label="Fit View"
+          >
             <svg className="w-4 h-4 text-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
-          </svg>
-        </button>
-          
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+            </svg>
+          </button>
+
           <div className="h-8 w-px bg-foreground/10"></div>
-          
-          {/* Zoom Level Indicator */}
+
           <div className="w-8 h-8 bg-foreground/5 dark:bg-foreground/10 border border-foreground/20 rounded-md flex items-center justify-center">
             <span className="text-[9px] font-mono font-medium text-foreground/70" title="Current zoom level">
               {zoomLevel}%
             </span>
           </div>
         </div>
+
+        {(hasFKOptimization || isOptimizingFKs) && onAutoIndexFKs && (
+          <button
+            onClick={onAutoIndexFKs}
+            disabled={isOptimizingFKs}
+            className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-xs font-semibold font-mono transition-colors ${
+              isOptimizingFKs
+                ? 'border-primary/40 bg-primary/10 text-primary cursor-wait'
+                : 'border-primary/40 bg-primary/15 text-primary hover:bg-primary/20'
+            }`}
+            title="Automatically create indexes for foreign key columns"
+          >
+            {isOptimizingFKs ? (
+              <>
+                <svg className="w-3.5 h-3.5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                Indexing…
+              </>
+            ) : (
+              <>
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                Auto-Index FKs
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-primary/80">
+                  Needed
+                </span>
+              </>
+            )}
+          </button>
+        )}
       </div>
-        </>
+      </>
       )}
 
       {/* Simple Empty State Overlay */}

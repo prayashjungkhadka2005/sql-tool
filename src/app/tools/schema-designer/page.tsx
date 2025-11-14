@@ -955,15 +955,21 @@ const [refreshRemoteSchema, setRefreshRemoteSchema] = useState<SchemaState | nul
     const totalColumns = schema.tables.reduce((sum, t) => sum + t.columns.length, 0);
     const totalIndexes = schema.tables.reduce((sum, t) => sum + (t.indexes?.length || 0), 0);
     
-    const connectionNote = databaseConnection
+    const isConnected = !!databaseConnection;
+    const connectionNote = isConnected
       ? '\n\nThis only clears your local design canvas. The connected database stays untouched.'
       : '';
+    const introLine = isConnected
+      ? 'This clears your local canvas only.'
+      : 'This will permanently delete:';
+    const confirmLabel = isConnected ? 'Clear Local Canvas' : 'Delete Everything';
+    const removalLine = isConnected ? 'It will remove:' : '';
 
     setConfirmDialog({
       isOpen: true,
       title: 'Delete All Tables?',
-      message: `This clears your local canvas only.\n\nIt will remove:\n\n• ${schema.tables.length} table${schema.tables.length !== 1 ? 's' : ''}\n• ${totalColumns} column${totalColumns !== 1 ? 's' : ''}\n• ${totalIndexes} index${totalIndexes !== 1 ? 'es' : ''}\n\nYour saved work and undo history will also be cleared.${connectionNote}`,
-      confirmLabel: 'Clear Local Canvas',
+      message: `${introLine}\n\n${removalLine ? `${removalLine}\n\n` : ''}• ${schema.tables.length} table${schema.tables.length !== 1 ? 's' : ''}\n• ${totalColumns} column${totalColumns !== 1 ? 's' : ''}\n• ${totalIndexes} index${totalIndexes !== 1 ? 'es' : ''}\n\nYour saved work and undo history will also be cleared.${connectionNote}`,
+      confirmLabel,
       cancelLabel: 'Cancel',
       onConfirm: () => {
         // Close any open editors to prevent state conflicts
@@ -1478,6 +1484,9 @@ const [refreshRemoteSchema, setRefreshRemoteSchema] = useState<SchemaState | nul
             onCloseContextMenu={handleCloseContextMenu}
           onAddTable={handleAddTable}
           onOpenTemplates={() => setIsTemplatesOpen(true)}
+          onAutoIndexFKs={hasFKsWithoutIndexes || isOptimizingFKs ? handleAutoIndexForeignKeys : undefined}
+          hasFKOptimization={hasFKsWithoutIndexes}
+          isOptimizingFKs={isOptimizingFKs}
           autoLayoutTrigger={autoLayoutTrigger}
         />
         </div>

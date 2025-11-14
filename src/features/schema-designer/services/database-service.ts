@@ -165,8 +165,13 @@ function getSSLConfig(connectionString?: string): boolean | { rejectUnauthorized
  * Reverse engineer PostgreSQL database
  */
 export async function reverseEngineerPostgreSQL(
-  config: DatabaseConnectionConfig
+  config: DatabaseConnectionConfig,
+  onProgress?: (message: string) => void
 ): Promise<SchemaState> {
+  const log = (message: string) => {
+    console.log(message);
+    onProgress?.(message);
+  };
   // Parse connection string if provided, otherwise use individual fields
   let connectionConfig: any = {
     host: config.host,
@@ -196,9 +201,9 @@ export async function reverseEngineerPostgreSQL(
   const client = new Client(connectionConfig);
 
   try {
-    console.log('Connecting to PostgreSQL database...');
+    log('Connecting to PostgreSQL database...');
     await client.connect();
-    console.log('Connected successfully, fetching schema...');
+    log('Connected successfully, fetching schema metadata...');
 
     // Get all tables
     const tablesResult = await client.query(`
@@ -214,14 +219,14 @@ export async function reverseEngineerPostgreSQL(
       ORDER BY t.table_name
     `);
     
-    console.log(`Found ${tablesResult.rows.length} tables`);
+    log(`Found ${tablesResult.rows.length} tables`);
 
     const tables: SchemaTable[] = [];
     let tableIndex = 0;
 
     for (const tableRow of tablesResult.rows) {
       const tableName = tableRow.table_name;
-      console.log(`Processing table ${tableIndex + 1}/${tablesResult.rows.length}: ${tableName}`);
+      log(`Processing table ${tableIndex + 1}/${tablesResult.rows.length}: ${tableName}`);
 
       // Get columns for this table
       const columnsResult = await client.query(`
@@ -411,7 +416,7 @@ export async function reverseEngineerPostgreSQL(
       tableIndex++;
     }
 
-    console.log(`Successfully reverse engineered ${tables.length} tables`);
+    log(`Successfully reverse engineered ${tables.length} tables`);
     return {
       name: config.database,
       description: `Reverse engineered from PostgreSQL database: ${config.database}`,
@@ -423,7 +428,7 @@ export async function reverseEngineerPostgreSQL(
     throw error;
   } finally {
     await client.end();
-    console.log('Database connection closed');
+    log('Database connection closed');
   }
 }
 
@@ -431,8 +436,13 @@ export async function reverseEngineerPostgreSQL(
  * Reverse engineer MySQL database
  */
 export async function reverseEngineerMySQL(
-  config: DatabaseConnectionConfig
+  config: DatabaseConnectionConfig,
+  onProgress?: (message: string) => void
 ): Promise<SchemaState> {
+  const log = (message: string) => {
+    console.log(message);
+    onProgress?.(message);
+  };
   const connection = await mysql.createConnection({
     host: config.host,
     port: config.port,
@@ -454,11 +464,16 @@ export async function reverseEngineerMySQL(
       ORDER BY TABLE_NAME
     `, [config.database]);
 
+    log('Connected to MySQL database, fetching schema metadata...');
     const tables: SchemaTable[] = [];
     let tableIndex = 0;
 
+    const totalTables = tablesResult.length;
+    log(`Found ${totalTables} tables`);
+
     for (const tableRow of tablesResult) {
       const tableName = tableRow.TABLE_NAME;
+      log(`Processing table ${tableIndex + 1}/${totalTables}: ${tableName}`);
 
       // Get columns for this table
       const [columnsResult] = await connection.execute<mysql.RowDataPacket[]>(`
@@ -574,6 +589,8 @@ export async function reverseEngineerMySQL(
       tableIndex++;
     }
 
+    log(`Successfully reverse engineered ${tables.length} tables`);
+
     return {
       name: config.database,
       description: `Reverse engineered from MySQL database: ${config.database}`,
@@ -582,6 +599,7 @@ export async function reverseEngineerMySQL(
     };
   } finally {
     await connection.end();
+    log('Database connection closed');
   }
 }
 
@@ -589,13 +607,14 @@ export async function reverseEngineerMySQL(
  * Main service function to reverse engineer a database
  */
 export async function reverseEngineerDatabase(
-  config: DatabaseConnectionConfig
+  config: DatabaseConnectionConfig,
+  onProgress?: (message: string) => void
 ): Promise<SchemaState> {
   switch (config.type) {
     case 'postgresql':
-      return reverseEngineerPostgreSQL(config);
+      return reverseEngineerPostgreSQL(config, onProgress);
     case 'mysql':
-      return reverseEngineerMySQL(config);
+      return reverseEngineerMySQL(config, onProgress);
     default:
       throw new Error(`Unsupported database type: ${config.type}`);
   }

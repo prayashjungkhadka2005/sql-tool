@@ -5,7 +5,7 @@
 
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { SchemaState } from '../types';
 import { useToast } from '@/features/sql-builder/hooks/useToast';
@@ -54,6 +54,30 @@ export default function DatabaseConnectionModal({
     password: '',
   });
   const [sqliteFile, setSqliteFile] = useState<File | null>(null);
+  const [progressLogs, setProgressLogs] = useState<string[]>([]);
+  const progressSectionRef = useRef<HTMLDivElement | null>(null);
+  const progressListRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (progressLogs.length === 0) return;
+
+    if (progressLogs.length === 1) {
+      progressSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    }
+
+    requestAnimationFrame(() => {
+      if (progressListRef.current) {
+        progressListRef.current.scrollTop = progressListRef.current.scrollHeight;
+      }
+    });
+  }, [progressLogs]);
+
+  useEffect(() => {
+    if (!isConnecting) return;
+    requestAnimationFrame(() => {
+      progressSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    });
+  }, [isConnecting]);
+
 
   // Reset form when modal opens/closes
   useEffect(() => {
@@ -68,6 +92,7 @@ export default function DatabaseConnectionModal({
       });
       setSqliteFile(null);
       setIsConnecting(false);
+      setProgressLogs([]);
     } else {
       setDbType('postgresql');
     }
@@ -89,6 +114,7 @@ export default function DatabaseConnectionModal({
 
   const handleDbTypeChange = (type: DatabaseType) => {
     setDbType(type);
+    setProgressLogs([]);
     setConfig({
       type,
       host: type === 'postgresql' ? 'localhost' : type === 'mysql' ? 'localhost' : undefined,
@@ -135,6 +161,10 @@ export default function DatabaseConnectionModal({
     if (!validateConfig()) return;
 
     setIsConnecting(true);
+    setProgressLogs([]);
+    queueMicrotask(() => {
+      progressSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    });
 
     try {
       // For now, we'll use API routes for PostgreSQL/MySQL
@@ -153,11 +183,16 @@ export default function DatabaseConnectionModal({
 
       if (dbType === 'sqlite') {
         // SQLite: Use sql.js in browser
+        setProgressLogs(['Processing SQLite database file...']);
         schema = await connectSQLite(sqliteFile!);
         connectionConfig = { type: 'sqlite' };
       } else {
         // PostgreSQL/MySQL: Use API route
-        schema = await connectDatabase(dbType, config);
+        schema = await connectDatabase(dbType, config, {
+          onProgress: (message) => {
+            setProgressLogs(prev => [...prev, message]);
+          },
+        });
         connectionConfig = {
           type: dbType,
           host: config.host,
@@ -438,6 +473,34 @@ export default function DatabaseConnectionModal({
                     </p>
                   </div>
                 </div>
+
+                {(isConnecting || progressLogs.length > 0) && (
+                  <div className="mt-6" ref={progressSectionRef}>
+                    <div className="text-xs font-mono font-semibold text-foreground/60 uppercase tracking-wider mb-2">
+                      Connection Progress
+                    </div>
+                    <div
+                      ref={progressListRef}
+                      className="bg-white dark:bg-[#0f0f0f] border border-foreground/10 rounded-lg max-h-48 overflow-y-auto px-4 py-3 text-xs font-mono space-y-1"
+                    >
+                      {progressLogs.length === 0 ? (
+                        <div className="flex items-center gap-2 text-foreground/60">
+                          <svg className="w-3.5 h-3.5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                          </svg>
+                          <span>Preparing connection...</span>
+                        </div>
+                      ) : (
+                        progressLogs.map((log, idx) => (
+                          <div key={`${log}-${idx}`} className="flex gap-2">
+                            <span className="text-foreground/30">{String(idx + 1).padStart(2, '0')}.</span>
+                            <span className="text-foreground/80">{log}</span>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Footer */}
@@ -502,7 +565,8 @@ async function connectSQLite(file: File): Promise<SchemaState> {
  */
 async function connectDatabase(
   type: DatabaseType,
-  config: ConnectionConfig
+  config: ConnectionConfig,
+  options?: { onProgress?: (message: string) => void }
 ): Promise<SchemaState> {
   if (type === 'sqlite') {
     throw new Error('SQLite connections are handled separately');
@@ -523,12 +587,14 @@ async function connectDatabase(
     requestBody.connectionString = config.connectionString;
   }
 
+  const targetEndpoint = options?.onProgress ? '/api/database/connect-stream' : '/api/database/connect';
+
   // Call API route with timeout
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
 
   try {
-    const response = await fetch('/api/database/connect', {
+    const response = await fetch(targetEndpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -537,12 +603,79 @@ async function connectDatabase(
       signal: controller.signal,
     });
 
-    clearTimeout(timeoutId);
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-      throw new Error(errorData.error || `HTTP ${response.status}: Failed to connect to ${type} database`);
+    if (!response.ok || !response.body) {
+      clearTimeout(timeoutId);
+      let errorMessage = `HTTP ${response.status}: Failed to connect to ${type} database`;
+      try {
+        const errorData = await response.json();
+        if (errorData?.error) {
+          errorMessage = errorData.error;
+        }
+      } catch {
+        // Ignore JSON parse errors
+      }
+      throw new Error(errorMessage);
     }
+
+    if (options?.onProgress) {
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let schema: SchemaState | null = null;
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (value) {
+          buffer += decoder.decode(value, { stream: true });
+          let newlineIndex: number;
+          while ((newlineIndex = buffer.indexOf('\n')) >= 0) {
+            const line = buffer.slice(0, newlineIndex).trim();
+            buffer = buffer.slice(newlineIndex + 1);
+            if (!line) continue;
+            try {
+              const event = JSON.parse(line);
+              if (event.type === 'log' && event.message) {
+                options.onProgress?.(event.message);
+              } else if (event.type === 'done' && event.schema) {
+                schema = event.schema;
+              } else if (event.type === 'error') {
+                throw new Error(event.message || 'Failed to connect to database');
+              }
+            } catch (err) {
+              console.warn('Failed to parse progress event:', err);
+            }
+          }
+        }
+
+        if (done) {
+          buffer += decoder.decode();
+          const remaining = buffer.trim();
+          if (remaining) {
+            try {
+              const event = JSON.parse(remaining);
+              if (event.type === 'done' && event.schema) {
+                schema = event.schema;
+              } else if (event.type === 'error') {
+                throw new Error(event.message || 'Failed to connect to database');
+              }
+            } catch {
+              // Ignore trailing parse issues
+            }
+          }
+          break;
+        }
+      }
+
+      clearTimeout(timeoutId);
+
+      if (!schema) {
+        throw new Error('No schema data returned from server');
+      }
+
+      return schema;
+    }
+
+    clearTimeout(timeoutId);
 
     const data = await response.json();
 

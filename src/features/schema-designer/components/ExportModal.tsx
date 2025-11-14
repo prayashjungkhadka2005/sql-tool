@@ -273,12 +273,12 @@ export default function ExportModal({ isOpen, schema, onClose, onExportImage }: 
                   return (
                     <div className="px-6 py-4 bg-yellow-500/5 border-b border-yellow-500/20">
                       <div className="flex items-start gap-3">
-                        <svg className="w-5 h-5 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                        </svg>
                         <div className="flex-1">
-                          <h4 className="text-sm font-semibold text-yellow-700 dark:text-yellow-400 font-mono mb-1">
-                            ⚡ Performance Optimization Available
+                          <h4 className="text-sm font-semibold text-yellow-700 dark:text-yellow-400 font-mono mb-1 flex items-center gap-1.5">
+                            <svg className="w-4 h-4 text-yellow-600 dark:text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                            </svg>
+                            Performance Optimization Available
                           </h4>
                           <p className="text-xs text-yellow-600 dark:text-yellow-500 font-mono leading-relaxed mb-2">
                             Some foreign key columns don&apos;t have indexes, which can significantly slow down JOIN queries in production.
@@ -290,9 +290,6 @@ export default function ExportModal({ isOpen, schema, onClose, onExportImage }: 
                             }}
                             className="text-xs font-mono font-semibold text-yellow-700 dark:text-yellow-400 hover:text-yellow-800 dark:hover:text-yellow-300 hover:bg-yellow-500/10 px-2 py-1 rounded transition-all inline-flex items-center gap-1 active:scale-95"
                           >
-                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                            </svg>
                             Close and use &quot;Auto-Index FKs&quot; button
                           </button>
                         </div>
