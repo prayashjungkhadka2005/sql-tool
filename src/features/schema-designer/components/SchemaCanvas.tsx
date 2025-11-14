@@ -5,7 +5,7 @@
 
 "use client";
 
-import { useCallback, useMemo, useEffect, useState } from 'react';
+import { useCallback, useMemo, useEffect, useState, useRef } from 'react';
 import ReactFlow, {
   Node,
   Edge,
@@ -66,8 +66,8 @@ export default function SchemaCanvas({
   onAddTable,
   onOpenTemplates,
   onAutoIndexFKs,
-  hasFKOptimization,
-  isOptimizingFKs,
+  hasFKOptimization = false,
+  isOptimizingFKs = false,
   autoLayoutTrigger
 }: SchemaCanvasProps) {
   const { zoomIn, zoomOut, fitView, getZoom } = useReactFlow();
@@ -94,6 +94,77 @@ export default function SchemaCanvas({
   
   // Track if actively panning (for performance optimizations)
   const [isPanning, setIsPanning] = useState(false);
+
+  // Movable toolbar state
+  const toolbarRef = useRef<HTMLDivElement | null>(null);
+  const dragOffsetRef = useRef({ x: 0, y: 0 });
+  const [isDraggingToolbar, setIsDraggingToolbar] = useState(false);
+  const [toolbarPosition, setToolbarPosition] = useState<{ x: number; y: number }>({ x: 20, y: 20 });
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const saved = window.localStorage.getItem('schema-designer-toolbar-position');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (parsed && typeof parsed.x === 'number' && typeof parsed.y === 'number') {
+          setToolbarPosition(parsed);
+          return;
+        }
+      } catch {
+        // Ignore parse errors
+      }
+    }
+
+    setToolbarPosition({
+      x: 20,
+      y: Math.max(20, window.innerHeight - 140),
+    });
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem('schema-designer-toolbar-position', JSON.stringify(toolbarPosition));
+  }, [toolbarPosition]);
+
+  useEffect(() => {
+    if (!isDraggingToolbar) return;
+
+    const handleMouseMove = (event: MouseEvent) => {
+      const margin = 12;
+      const toolbarWidth = toolbarRef.current?.offsetWidth || 0;
+      const toolbarHeight = toolbarRef.current?.offsetHeight || 0;
+      const maxX = Math.max(margin, window.innerWidth - toolbarWidth - margin);
+      const maxY = Math.max(margin, window.innerHeight - toolbarHeight - margin);
+
+      const newX = event.clientX - dragOffsetRef.current.x;
+      const newY = event.clientY - dragOffsetRef.current.y;
+
+      setToolbarPosition({
+        x: Math.min(Math.max(margin, newX), maxX),
+        y: Math.min(Math.max(margin, newY), maxY),
+      });
+    };
+
+    const handleMouseUp = () => setIsDraggingToolbar(false);
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDraggingToolbar]);
+
+  const startToolbarDrag = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    dragOffsetRef.current = {
+      x: event.clientX - toolbarPosition.x,
+      y: event.clientY - toolbarPosition.y,
+    };
+    setIsDraggingToolbar(true);
+  }, [toolbarPosition.x, toolbarPosition.y]);
   
   // Selected table for relationship highlighting
   const [selectedTableId, setSelectedTableId] = useState<string | null>(null);
@@ -981,8 +1052,28 @@ export default function SchemaCanvas({
       </ReactFlow>
 
       {/* Simple Navigation Controls */}
-      <div className="absolute bottom-5 left-5 flex flex-row gap-2 z-10">
+      <div
+        ref={toolbarRef}
+        className="fixed z-10 flex flex-row gap-2"
+        style={{ left: toolbarPosition.x, top: toolbarPosition.y }}
+      >
         <div className="bg-white/95 dark:bg-[#1a1a1a]/95 border border-foreground/20 rounded-lg shadow-sm p-1.5 flex flex-row gap-1.5 items-center">
+          <div
+            onMouseDown={startToolbarDrag}
+            className={`w-8 h-8 border rounded-md flex items-center justify-center transition-colors cursor-move ${
+              isDraggingToolbar
+                ? 'bg-foreground/10 border-foreground/30'
+                : 'bg-white dark:bg-[#1a1a1a] border-foreground/20 text-foreground hover:bg-foreground/5 hover:border-foreground/30'
+            }`}
+            title="Drag to reposition toolbar"
+            aria-label="Move toolbar"
+          >
+            <svg className="w-4 h-4 text-foreground/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 10h16M4 14h16" />
+            </svg>
+          </div>
+
+          <div className="h-8 w-px bg-foreground/10"></div>
           <button
             onClick={() => setIsPanMode(!isPanMode)}
             className={`w-8 h-8 border rounded-md flex items-center justify-center transition-colors ${
