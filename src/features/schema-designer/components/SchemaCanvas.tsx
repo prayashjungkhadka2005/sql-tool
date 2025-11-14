@@ -101,6 +101,20 @@ export default function SchemaCanvas({
   const [isDraggingToolbar, setIsDraggingToolbar] = useState(false);
   const [toolbarPosition, setToolbarPosition] = useState<{ x: number; y: number }>({ x: 20, y: 20 });
 
+  const clampToolbarPosition = useCallback((position: { x: number; y: number }) => {
+    if (typeof window === 'undefined') return position;
+    const margin = 12;
+    const toolbarWidth = toolbarRef.current?.offsetWidth ?? 220;
+    const toolbarHeight = toolbarRef.current?.offsetHeight ?? 64;
+    const maxX = Math.max(margin, window.innerWidth - toolbarWidth - margin);
+    const maxY = Math.max(margin, window.innerHeight - toolbarHeight - margin);
+
+    return {
+      x: Math.min(Math.max(margin, position.x), maxX),
+      y: Math.min(Math.max(margin, position.y), maxY),
+    };
+  }, []);
+
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const saved = window.localStorage.getItem('schema-designer-toolbar-position');
@@ -108,7 +122,7 @@ export default function SchemaCanvas({
       try {
         const parsed = JSON.parse(saved);
         if (parsed && typeof parsed.x === 'number' && typeof parsed.y === 'number') {
-          setToolbarPosition(parsed);
+          setToolbarPosition(clampToolbarPosition(parsed));
           return;
         }
       } catch {
@@ -116,11 +130,11 @@ export default function SchemaCanvas({
       }
     }
 
-    setToolbarPosition({
+    setToolbarPosition(clampToolbarPosition({
       x: 20,
-      y: Math.max(20, window.innerHeight - 140),
-    });
-  }, []);
+      y: window.innerHeight - 140,
+    }));
+  }, [clampToolbarPosition]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -131,19 +145,9 @@ export default function SchemaCanvas({
     if (!isDraggingToolbar) return;
 
     const handleMouseMove = (event: MouseEvent) => {
-      const margin = 12;
-      const toolbarWidth = toolbarRef.current?.offsetWidth || 0;
-      const toolbarHeight = toolbarRef.current?.offsetHeight || 0;
-      const maxX = Math.max(margin, window.innerWidth - toolbarWidth - margin);
-      const maxY = Math.max(margin, window.innerHeight - toolbarHeight - margin);
-
       const newX = event.clientX - dragOffsetRef.current.x;
       const newY = event.clientY - dragOffsetRef.current.y;
-
-      setToolbarPosition({
-        x: Math.min(Math.max(margin, newX), maxX),
-        y: Math.min(Math.max(margin, newY), maxY),
-      });
+      setToolbarPosition(clampToolbarPosition({ x: newX, y: newY }));
     };
 
     const handleMouseUp = () => setIsDraggingToolbar(false);
@@ -155,7 +159,17 @@ export default function SchemaCanvas({
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [isDraggingToolbar]);
+  }, [clampToolbarPosition, isDraggingToolbar]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handleResize = () => {
+      setToolbarPosition(prev => clampToolbarPosition(prev));
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [clampToolbarPosition]);
 
   const startToolbarDrag = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
     event.preventDefault();
