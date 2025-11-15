@@ -37,6 +37,8 @@ import DatabaseActivityFeed, { DatabaseActivityEvent } from '@/features/schema-d
 import BranchesDrawer from '@/features/schema-designer/components/BranchesDrawer';
 import LoginModal from '@/features/schema-designer/components/LoginModal';
 import ProjectsDrawer from '@/features/schema-designer/components/ProjectsDrawer';
+import Toast from '@/features/sql-builder/components/ui/Toast';
+import { useToast } from '@/features/sql-builder/hooks/useToast';
 
 const EMPTY_SCHEMA: SchemaState = {
   name: 'My Database',
@@ -81,6 +83,7 @@ export default function SchemaDesignerPage() {
     replaceSchema,
     lastActionName,
   } = useSchemaHistory(EMPTY_SCHEMA);
+  const { toast, showToast, hideToast } = useToast();
 
   const [isColumnEditorOpen, setIsColumnEditorOpen] = useState(false);
   const [editingColumn, setEditingColumn] = useState<{
@@ -112,6 +115,10 @@ const syncActivityIdRef = useRef<string | null>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const lastSavedSnapshotRef = useRef<string | null>(null);
   const lastLoadedProjectVersionRef = useRef<string | null>(null);
+  const [projectMutationState, setProjectMutationState] = useState<{
+    editingId: string | null;
+    deletingId: string | null;
+  }>({ editingId: null, deletingId: null });
   const [inputDialog, setInputDialog] = useState<{
     isOpen: boolean;
     title: string;
@@ -174,6 +181,23 @@ const syncActivityIdRef = useRef<string | null>(null);
     apiFetcher
   );
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+  const hasProjects = Boolean(projectsData?.projects && projectsData.projects.length > 0);
+
+  const ensureProjectContext = useCallback(() => {
+    if (activeProjectId) {
+      return true;
+    }
+    setAlertDialog({
+      isOpen: true,
+      title: hasProjects ? 'Select a project' : 'Create a project',
+      message: hasProjects
+        ? 'Create or select a project to sync your schema.'
+        : 'Create a project to start syncing your schema.',
+    });
+    setIsProjectsDrawerOpen(true);
+    return false;
+  }, [activeProjectId, hasProjects, setAlertDialog, setIsProjectsDrawerOpen]);
+
   const pendingAuthActionRef = useRef<(() => void) | null>(null);
 
   const openLoginModal = useCallback(() => {
@@ -244,6 +268,7 @@ const syncActivityIdRef = useRef<string | null>(null);
         lastLoadedProjectVersionRef.current = null;
         lastSavedSnapshotRef.current = null;
         setHasUnsavedChanges(true);
+        showToast('Project created successfully.', 'success');
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Failed to create project.';
         throw new Error(message);
@@ -252,6 +277,70 @@ const syncActivityIdRef = useRef<string | null>(null);
       }
     },
     [isAuthenticated, mutateProjects]
+  );
+
+  const handleUpdateProjectMetadata = useCallback(
+    async (projectId: string, payload: { name: string; description?: string | null }) => {
+      if (!isAuthenticated) {
+        throw new Error("Sign in to manage projects.");
+      }
+      setProjectMutationState(prev => ({ ...prev, editingId: projectId }));
+      try {
+        const response = await fetch(`/api/projects/${projectId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(result?.error ?? "Failed to update project.");
+        }
+        await mutateProjects();
+        await mutateProjectDetail();
+        if (activeProjectId === projectId) {
+          setActiveProject(prev => (prev ? { ...prev, ...payload } : prev));
+        }
+        showToast('Project updated successfully.', 'success');
+      } catch (error) {
+        throw error instanceof Error ? error : new Error("Failed to update project.");
+      } finally {
+        setProjectMutationState(prev => ({ ...prev, editingId: null }));
+      }
+    },
+    [isAuthenticated, mutateProjects, mutateProjectDetail, activeProjectId]
+  );
+
+  const handleDeleteProject = useCallback(
+    async (projectId: string) => {
+      if (!isAuthenticated) {
+        throw new Error("Sign in to manage projects.");
+      }
+      setProjectMutationState(prev => ({ ...prev, deletingId: projectId }));
+      try {
+        const response = await fetch(`/api/projects/${projectId}`, {
+          method: "DELETE",
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(result?.error ?? "Failed to delete project.");
+        }
+        if (projectId === activeProjectId) {
+          setActiveProjectId(null);
+          setActiveProject(null);
+          lastLoadedProjectVersionRef.current = null;
+          lastSavedSnapshotRef.current = null;
+        }
+        await mutateProjects();
+        await mutateProjectDetail();
+        showToast('Project deleted successfully.', 'success');
+        setIsProjectsDrawerOpen(false);
+      } catch (error) {
+        throw error instanceof Error ? error : new Error("Failed to delete project.");
+      } finally {
+        setProjectMutationState(prev => ({ ...prev, deletingId: null }));
+      }
+    },
+    [isAuthenticated, activeProjectId, mutateProjects, mutateProjectDetail]
   );
 
   const saveProject = useCallback(async () => {
@@ -290,19 +379,13 @@ const syncActivityIdRef = useRef<string | null>(null);
   ]);
 
   const handleSaveProject = useCallback(() => {
-    if (!activeProjectId) {
-      setAlertDialog({
-        isOpen: true,
-        title: 'Select a project',
-        message: 'Create or select a project to sync your schema.',
-      });
-      setIsProjectsDrawerOpen(true);
+    if (!ensureProjectContext()) {
       return;
     }
     requireAuth(() => {
       void saveProject();
     });
-  }, [activeProjectId, requireAuth, saveProject, setAlertDialog]);
+  }, [ensureProjectContext, requireAuth, saveProject]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -557,6 +640,9 @@ const [refreshRemoteSchema, setRefreshRemoteSchema] = useState<SchemaState | nul
 
   // Add new table
   const handleAddTable = useCallback(() => {
+    if (!ensureProjectContext()) {
+      return;
+    }
     // Find unique table name
     let tableName = `table_${schema.tables.length + 1}`;
     let counter = schema.tables.length + 1;
@@ -594,7 +680,7 @@ const [refreshRemoteSchema, setRefreshRemoteSchema] = useState<SchemaState | nul
       ...prev,
       tables: [...prev.tables, newTable],
     }), 'Add table');
-  }, [schema.tables, setSchema]);
+  }, [schema.tables, setSchema, ensureProjectContext]);
 
   // Edit table name
   const handleEditTable = useCallback((tableId: string) => {
@@ -1276,6 +1362,9 @@ const [refreshRemoteSchema, setRefreshRemoteSchema] = useState<SchemaState | nul
 
   // Load template
   const handleLoadTemplate = useCallback((template: SchemaTemplate) => {
+    if (!ensureProjectContext()) {
+      return;
+    }
     setConfirmDialog({
       isOpen: true,
       title: 'Load Template?',
@@ -1307,7 +1396,7 @@ const [refreshRemoteSchema, setRefreshRemoteSchema] = useState<SchemaState | nul
         setConfirmDialog(prev => ({ ...prev, isOpen: false }));
       },
     });
-  }, [replaceSchema]);
+  }, [replaceSchema, ensureProjectContext]);
 
   // Delete table (with confirmation)
   const handleDeleteTable = useCallback((tableId: string) => {
@@ -1436,6 +1525,9 @@ const [refreshRemoteSchema, setRefreshRemoteSchema] = useState<SchemaState | nul
 
   // Reset schema
   const handleReset = useCallback(() => {
+    if (!ensureProjectContext()) {
+      return;
+    }
     const totalColumns = schema.tables.reduce((sum, t) => sum + t.columns.length, 0);
     const totalIndexes = schema.tables.reduce((sum, t) => sum + (t.indexes?.length || 0), 0);
     
@@ -1480,10 +1572,13 @@ const [refreshRemoteSchema, setRefreshRemoteSchema] = useState<SchemaState | nul
         setConfirmDialog(prev => ({ ...prev, isOpen: false }));
       },
     });
-  }, [schema.tables, replaceSchema, clearHistory, databaseConnection]);
+  }, [schema.tables, replaceSchema, clearHistory, databaseConnection, ensureProjectContext]);
 
   // Import schema
   const handleImport = useCallback((importedSchema: SchemaState) => {
+    if (!ensureProjectContext()) {
+      return;
+    }
     // Close any open editors to prevent state conflicts
     setIsColumnEditorOpen(false);
     setEditingColumn(null);
@@ -1526,7 +1621,7 @@ const [refreshRemoteSchema, setRefreshRemoteSchema] = useState<SchemaState | nul
         });
       });
     }
-  }, [replaceSchema, setSchema]);
+  }, [replaceSchema, setSchema, ensureProjectContext]);
 
   /**
    * Load a schema version from migration history
@@ -1568,6 +1663,9 @@ const [refreshRemoteSchema, setRefreshRemoteSchema] = useState<SchemaState | nul
 
   // Auto-layout tables
   const handleAutoLayout = useCallback((algorithm: LayoutAlgorithm = 'hierarchical') => {
+    if (!ensureProjectContext()) {
+      return;
+    }
     if (schema.tables.length === 0) return;
     
     const layoutedTables = autoLayoutTables(schema.tables, algorithm);
@@ -1579,9 +1677,26 @@ const [refreshRemoteSchema, setRefreshRemoteSchema] = useState<SchemaState | nul
     
     // Trigger fitView after layout (only when explicitly clicking auto-layout)
     setAutoLayoutTrigger(prev => prev + 1);
-  }, [schema, setSchema]);
+  }, [schema, setSchema, ensureProjectContext]);
+
+  const handleToggleTemplates = useCallback(() => {
+    if (!ensureProjectContext()) {
+      return;
+    }
+    setIsTemplatesOpen(prev => !prev);
+  }, [ensureProjectContext]);
+
+  const handleOpenTemplatesPanel = useCallback(() => {
+    if (!ensureProjectContext()) {
+      return;
+    }
+    setIsTemplatesOpen(true);
+  }, [ensureProjectContext]);
 
   const requestCreateBranch = useCallback(() => {
+    if (!ensureProjectContext()) {
+      return;
+    }
     setInputDialog({
       isOpen: true,
       title: 'Create Branch',
@@ -1602,13 +1717,19 @@ const [refreshRemoteSchema, setRefreshRemoteSchema] = useState<SchemaState | nul
         }
       },
     });
-  }, [branchNames.length, createBranch]);
+  }, [ensureProjectContext, branchNames.length, createBranch]);
 
   const handleSwitchBranch = useCallback((branchName: string) => {
+    if (!ensureProjectContext()) {
+      return;
+    }
     switchBranch(branchName);
-  }, [switchBranch]);
+  }, [ensureProjectContext, switchBranch]);
 
   const requestDeleteBranch = useCallback((branchName: string) => {
+    if (!ensureProjectContext()) {
+      return;
+    }
     if (branchName === 'main') {
       setAlertDialog({
         isOpen: true,
@@ -1649,7 +1770,7 @@ const [refreshRemoteSchema, setRefreshRemoteSchema] = useState<SchemaState | nul
         }
       },
     });
-  }, [branchList, deleteBranch, setAlertDialog, setConfirmDialog]);
+  }, [ensureProjectContext, branchList, deleteBranch, setAlertDialog, setConfirmDialog]);
 
   // Export canvas as image
   const handleExportImage = useCallback(async (format: 'png' | 'svg') => {
@@ -1983,7 +2104,11 @@ const [refreshRemoteSchema, setRefreshRemoteSchema] = useState<SchemaState | nul
         ref={navbarRef}
         onExport={() => setIsExportModalOpen(true)}
         onNewTable={handleAddTable}
-        onImport={() => setIsImportModalOpen(true)}
+        onImport={() => {
+          if (ensureProjectContext()) {
+            setIsImportModalOpen(true);
+          }
+        }}
         onConnectDatabase={handleConnectDatabaseRequest}
         onRefreshDatabase={handleRefreshDatabaseRequest}
         onDisconnectDatabase={() => {
@@ -2003,8 +2128,12 @@ const [refreshRemoteSchema, setRefreshRemoteSchema] = useState<SchemaState | nul
           });
         }}
         onSyncDatabase={databaseConnection ? handleSyncDatabaseRequest : undefined}
-        onTemplates={() => setIsTemplatesOpen(!isTemplatesOpen)}
-        onMigrations={() => setIsMigrationModalOpen(true)}
+        onTemplates={handleToggleTemplates}
+        onMigrations={() => {
+          if (ensureProjectContext()) {
+            setIsMigrationModalOpen(true);
+          }
+        }}
         onAutoLayout={() => handleAutoLayout('hierarchical')}
         onUndo={undo}
         onRedo={redo}
@@ -2071,7 +2200,7 @@ const [refreshRemoteSchema, setRefreshRemoteSchema] = useState<SchemaState | nul
             onCanvasClick={handleCanvasClick}
             onCloseContextMenu={handleCloseContextMenu}
           onAddTable={handleAddTable}
-          onOpenTemplates={() => setIsTemplatesOpen(true)}
+          onOpenTemplates={handleOpenTemplatesPanel}
           onAutoIndexFKs={hasFKsWithoutIndexes || isOptimizingFKs ? handleAutoIndexForeignKeys : undefined}
           hasFKOptimization={hasFKsWithoutIndexes}
           isOptimizingFKs={isOptimizingFKs}
@@ -2388,6 +2517,17 @@ const [refreshRemoteSchema, setRefreshRemoteSchema] = useState<SchemaState | nul
         onCreate={handleCreateProject}
         isCreating={isCreatingProject}
         onRetry={() => mutateProjects()}
+        onUpdateProject={handleUpdateProjectMetadata}
+        onDeleteProject={handleDeleteProject}
+        mutatingProjectId={projectMutationState.editingId}
+        deletingProjectId={projectMutationState.deletingId}
+      />
+
+      <Toast
+        message={toast.message}
+        type={toast.type}
+        isVisible={toast.isVisible}
+        onClose={hideToast}
       />
     </div>
 

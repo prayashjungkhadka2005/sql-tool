@@ -86,7 +86,7 @@ export default function ConfirmDialog({
             >
               {/* Header */}
               <div className="px-6 py-4 border-b border-foreground/10">
-                <div className="flex items-start gap-3">
+                <div className="flex items-center gap-3">
                   {confirmVariant === "danger" ? (
                     <div className="flex-shrink-0 w-12 h-12 rounded-2xl bg-red-500/10 flex items-center justify-center border border-red-500/20">
                       <svg className="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -108,7 +108,7 @@ export default function ConfirmDialog({
                         {computedBadgeLabel}
                       </span>
                     )}
-                    <h3 className="text-lg font-semibold text-foreground font-mono mt-1">
+                    <h3 className="text-lg font-semibold text-foreground font-mono">
                     {title}
                   </h3>
                   </div>

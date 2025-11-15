@@ -3,6 +3,9 @@
 import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { ProjectSummary } from "@/types/projects";
+import ConfirmDialog from "@/features/sql-builder/components/ui/ConfirmDialog";
+import { ProjectListItem } from "./ProjectListItem";
+import { ProjectEditDialog } from "./ProjectEditDialog";
 
 interface ProjectsDrawerProps {
   isOpen: boolean;
@@ -15,6 +18,10 @@ interface ProjectsDrawerProps {
   onCreate?: (payload: { name: string; description?: string | null }) => Promise<void>;
   isCreating?: boolean;
   onRetry?: () => void;
+  onUpdateProject?: (projectId: string, payload: { name: string; description?: string | null }) => Promise<void>;
+  onDeleteProject?: (projectId: string) => Promise<void>;
+  mutatingProjectId?: string | null;
+  deletingProjectId?: string | null;
 }
 
 export default function ProjectsDrawer({
@@ -28,10 +35,19 @@ export default function ProjectsDrawer({
   onCreate,
   isCreating = false,
   onRetry,
+  onUpdateProject,
+  onDeleteProject,
+  mutatingProjectId,
+  deletingProjectId,
 }: ProjectsDrawerProps) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
+  const [editingProject, setEditingProject] = useState<ProjectSummary | null>(null);
+  const [deleteDialog, setDeleteDialog] = useState<{
+    isOpen: boolean;
+    project: ProjectSummary | null;
+  }>({ isOpen: false, project: null });
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -93,39 +109,29 @@ export default function ProjectsDrawer({
     return (
       <div className="space-y-3">
         {projects.map(project => {
-          const isActive = project.id === activeProjectId;
           return (
-            <button
+            <ProjectListItem
               key={project.id}
-              type="button"
-              onClick={() => onSelect(project.id)}
-              className={`w-full text-left border rounded-2xl p-4 transition-all active:scale-[0.99] ${
-                isActive
-                  ? "border-primary/40 bg-primary/5 shadow-[0_8px_30px_rgba(37,99,235,0.15)]"
-                  : "border-foreground/10 bg-white/90 dark:bg-[#0b0b0b]"
-              }`}
-            >
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <div className="text-sm font-semibold text-foreground">{project.name}</div>
-                  <div className="text-xs text-foreground/50 line-clamp-2">
-                    {project.description || "No description provided."}
-                  </div>
-                </div>
-                {isActive && (
-                  <span className="text-[10px] font-semibold uppercase tracking-[0.3em] text-primary">
-                    Active
-                  </span>
-                )}
-              </div>
-              <div className="flex items-center gap-4 text-[11px] text-foreground/50 font-mono mt-3">
-                <span>Updated {new Date(project.updatedAt).toLocaleDateString()}</span>
-                <span>{project.members.length} member{project.members.length === 1 ? "" : "s"}</span>
-                {project.schemaVersion !== undefined && (
-                  <span>v{project.schemaVersion}</span>
-                )}
-              </div>
-            </button>
+              project={project}
+              isActive={project.id === activeProjectId}
+              onSelect={onSelect}
+              onEdit={
+                onUpdateProject
+                  ? () => {
+                      setEditingProject(project);
+                    }
+                  : undefined
+              }
+              onDelete={
+                onDeleteProject
+                  ? () => {
+                      setDeleteDialog({ isOpen: true, project });
+                    }
+                  : undefined
+              }
+              isMutating={mutatingProjectId === project.id}
+              isDeleting={deletingProjectId === project.id}
+            />
           );
         })}
       </div>
@@ -214,6 +220,37 @@ export default function ProjectsDrawer({
             <div className="flex-1 overflow-y-auto px-5 py-4">
               {renderProjects()}
             </div>
+
+            <ProjectEditDialog
+              isOpen={!!editingProject}
+              project={editingProject}
+              onClose={() => setEditingProject(null)}
+              isSubmitting={editingProject ? mutatingProjectId === editingProject.id : false}
+              onSubmit={async (projectId, payload) => {
+                if (!onUpdateProject) return;
+                await onUpdateProject(projectId, payload);
+                setEditingProject(null);
+              }}
+            />
+
+            <ConfirmDialog
+              isOpen={deleteDialog.isOpen}
+              title="Delete project"
+              message={
+                deleteDialog.project
+                  ? `This will permanently remove “${deleteDialog.project.name}” from the cloud. Your local canvas remains untouched, but collaborators will lose access. This action cannot be undone.`
+                  : "This will permanently remove the project."
+              }
+              confirmLabel="Delete project"
+              confirmVariant="danger"
+              cancelLabel="Cancel"
+              onConfirm={async () => {
+                if (!onDeleteProject || !deleteDialog.project) return;
+                await onDeleteProject(deleteDialog.project.id);
+                setDeleteDialog({ isOpen: false, project: null });
+              }}
+              onCancel={() => setDeleteDialog({ isOpen: false, project: null })}
+            />
           </motion.aside>
         </>
       )}

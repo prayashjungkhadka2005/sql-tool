@@ -40,6 +40,7 @@ interface SchemaDesignerNavbarProps {
   onSaveProject?: () => void;
   isSavingProject?: boolean;
   hasUnsavedChanges?: boolean;
+  hasProjects?: boolean;
   
   // States
   canExport?: boolean;
@@ -92,6 +93,7 @@ const SchemaDesignerNavbar = forwardRef<SchemaDesignerNavbarRef, SchemaDesignerN
   onSaveProject,
   isSavingProject = false,
   hasUnsavedChanges = false,
+  hasProjects = true,
   canExport = false,
   canUndo = false,
   canRedo = false,
@@ -161,6 +163,10 @@ const SchemaDesignerNavbar = forwardRef<SchemaDesignerNavbarRef, SchemaDesignerN
     templatesButtonRef,
   }));
 
+  const projectLabel = hasProjects
+    ? projectName || "Select project"
+    : "Create project";
+
   return (
     <nav className="sticky top-0 z-40 backdrop-blur-xl bg-white/80 dark:bg-[#0a0a0a]/80 border-b border-foreground/10">
       <div className="flex items-center h-12 sm:h-14 gap-2 px-2 sm:px-3">
@@ -193,7 +199,7 @@ const SchemaDesignerNavbar = forwardRef<SchemaDesignerNavbarRef, SchemaDesignerN
               <svg className="w-3.5 h-3.5 text-foreground/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M4 7h16M4 12h16M4 17h16" />
               </svg>
-              <span className="truncate">{projectName || "Select project"}</span>
+              <span className="truncate">{projectLabel}</span>
               {hasUnsavedChanges && (
                 <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" aria-label="Unsaved changes" />
               )}
