@@ -104,14 +104,15 @@ export default function SchemaCanvas({
   const clampToolbarPosition = useCallback((position: { x: number; y: number }) => {
     if (typeof window === 'undefined') return position;
     const margin = 12;
+    const navHeight = 72; // Approximate navbar height to prevent overlap
     const toolbarWidth = toolbarRef.current?.offsetWidth ?? 220;
     const toolbarHeight = toolbarRef.current?.offsetHeight ?? 64;
     const maxX = Math.max(margin, window.innerWidth - toolbarWidth - margin);
-    const maxY = Math.max(margin, window.innerHeight - toolbarHeight - margin);
+    const maxY = Math.max(navHeight + margin, window.innerHeight - toolbarHeight - margin);
 
     return {
       x: Math.min(Math.max(margin, position.x), maxX),
-      y: Math.min(Math.max(margin, position.y), maxY),
+      y: Math.min(Math.max(navHeight + margin, position.y), maxY),
     };
   }, []);
 
@@ -132,7 +133,7 @@ export default function SchemaCanvas({
 
     setToolbarPosition(clampToolbarPosition({
       x: 20,
-      y: window.innerHeight - 140,
+      y: Math.max(84, window.innerHeight - 140),
     }));
   }, [clampToolbarPosition]);
 
@@ -1088,25 +1089,25 @@ export default function SchemaCanvas({
           </div>
 
           <div className="h-8 w-px bg-foreground/10"></div>
-          <button
-            onClick={() => setIsPanMode(!isPanMode)}
+        <button
+          onClick={() => setIsPanMode(!isPanMode)}
             className={`w-8 h-8 border rounded-md flex items-center justify-center transition-colors ${
-              isPanMode 
+            isPanMode 
                 ? 'bg-primary text-white border-primary' 
                 : 'bg-white dark:bg-[#1a1a1a] border-foreground/20 text-foreground hover:bg-foreground/5 hover:border-foreground/30'
-            }`}
+          }`}
             title={isPanMode ? "Hand Tool Active (Hold Space or Middle Mouse)" : "Hand Tool (Hold Space or Middle Mouse)"}
-            aria-label="Hand Tool"
-            aria-pressed={isPanMode}
-          >
+          aria-label="Hand Tool"
+          aria-pressed={isPanMode}
+        >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 11.5V14m0-2.5v-6a1.5 1.5 0 113 0m-3 6a1.5 1.5 0 00-3 0v2a7.5 7.5 0 0015 0v-5a1.5 1.5 0 00-3 0m-6-3V11m0-5.5v-1a1.5 1.5 0 013 0v1m0 0V11m0-5.5a1.5 1.5 0 013 0v3m0 0V11" />
-            </svg>
-          </button>
-
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 11.5V14m0-2.5v-6a1.5 1.5 0 113 0m-3 6a1.5 1.5 0 00-3 0v2a7.5 7.5 0 0015 0v-5a1.5 1.5 0 00-3 0m-6-3V11m0-5.5v-1a1.5 1.5 0 013 0v1m0 0V11m0-5.5a1.5 1.5 0 013 0v3m0 0V11" />
+          </svg>
+        </button>
+        
           <div className="h-8 w-px bg-foreground/10"></div>
-
-          <button
+        
+        <button
             onClick={() => {
               try {
                 zoomIn({ duration: 200 });
@@ -1116,13 +1117,13 @@ export default function SchemaCanvas({
             }}
             className="w-8 h-8 bg-white dark:bg-[#1a1a1a] border border-foreground/20 rounded-md flex items-center justify-center hover:bg-foreground/5 hover:border-foreground/30 transition-colors"
             title="Zoom In (Ctrl/Cmd + Scroll or +)"
-            aria-label="Zoom In"
-          >
+          aria-label="Zoom In"
+        >
             <svg className="w-4 h-4 text-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-          </button>
-          <button
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+          </svg>
+        </button>
+        <button
             onClick={() => {
               try {
                 zoomOut({ duration: 200 });
@@ -1132,13 +1133,13 @@ export default function SchemaCanvas({
             }}
             className="w-8 h-8 bg-white dark:bg-[#1a1a1a] border border-foreground/20 rounded-md flex items-center justify-center hover:bg-foreground/5 hover:border-foreground/30 transition-colors"
             title="Zoom Out (Ctrl/Cmd + Scroll or -)"
-            aria-label="Zoom Out"
-          >
+          aria-label="Zoom Out"
+        >
             <svg className="w-4 h-4 text-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
-            </svg>
-          </button>
-          <button
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
+          </svg>
+        </button>
+        <button
             onClick={() => {
               try {
                 fitView({ duration: 200, padding: 0.2 });
@@ -1148,15 +1149,15 @@ export default function SchemaCanvas({
             }}
             className="w-8 h-8 bg-white dark:bg-[#1a1a1a] border border-foreground/20 rounded-md flex items-center justify-center hover:bg-foreground/5 hover:border-foreground/30 transition-colors"
             title="Fit View (Ctrl/Cmd + 0)"
-            aria-label="Fit View"
-          >
+          aria-label="Fit View"
+        >
             <svg className="w-4 h-4 text-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
-            </svg>
-          </button>
-
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+          </svg>
+        </button>
+          
           <div className="h-8 w-px bg-foreground/10"></div>
-
+          
           <div className="w-8 h-8 bg-foreground/5 dark:bg-foreground/10 border border-foreground/20 rounded-md flex items-center justify-center">
             <span className="text-[9px] font-mono font-medium text-foreground/70" title="Current zoom level">
               {zoomLevel}%

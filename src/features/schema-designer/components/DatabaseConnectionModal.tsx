@@ -24,6 +24,7 @@ interface DatabaseConnectionModalProps {
     username?: string;
     connectionString?: string;
   }) => void;
+  onActivity?: (phase: 'start' | 'progress' | 'success' | 'error', message: string) => void;
 }
 
 interface ConnectionConfig {
@@ -41,6 +42,7 @@ export default function DatabaseConnectionModal({
   isOpen,
   onClose,
   onConnect,
+  onActivity,
 }: DatabaseConnectionModalProps) {
   const { toast, showToast, hideToast } = useToast();
   const [dbType, setDbType] = useState<DatabaseType>('postgresql');
@@ -161,10 +163,12 @@ export default function DatabaseConnectionModal({
     if (!validateConfig()) return;
 
     setIsConnecting(true);
+    onActivity?.('start', `Connecting to ${dbType.toUpperCase()} database…`);
     setProgressLogs([]);
     queueMicrotask(() => {
       progressSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
     });
+    onClose();
 
     try {
       // For now, we'll use API routes for PostgreSQL/MySQL
@@ -183,7 +187,9 @@ export default function DatabaseConnectionModal({
 
       if (dbType === 'sqlite') {
         // SQLite: Use sql.js in browser
-        setProgressLogs(['Processing SQLite database file...']);
+        const initialMessage = 'Processing SQLite database file...';
+        setProgressLogs([initialMessage]);
+        onActivity?.('progress', initialMessage);
         schema = await connectSQLite(sqliteFile!);
         connectionConfig = { type: 'sqlite' };
       } else {
@@ -191,6 +197,7 @@ export default function DatabaseConnectionModal({
         schema = await connectDatabase(dbType, config, {
           onProgress: (message) => {
             setProgressLogs(prev => [...prev, message]);
+            onActivity?.('progress', message);
           },
         });
         connectionConfig = {
@@ -206,13 +213,13 @@ export default function DatabaseConnectionModal({
 
       onConnect(schema, connectionConfig);
       showToast('Database connected successfully!', 'success');
+      onActivity?.('success', 'Connected to database successfully.');
       onClose();
     } catch (error: any) {
       console.error('Connection error:', error);
-      showToast(
-        error.message || 'Failed to connect to database. Please check your credentials.',
-        'error'
-      );
+      const message = error.message || 'Failed to connect to database. Please check your credentials.';
+      showToast(message, 'error');
+      onActivity?.('error', message);
     } finally {
       setIsConnecting(false);
     }
@@ -666,11 +673,11 @@ async function connectDatabase(
         }
       }
 
-      clearTimeout(timeoutId);
+    clearTimeout(timeoutId);
 
       if (!schema) {
         throw new Error('No schema data returned from server');
-      }
+    }
 
       return schema;
     }

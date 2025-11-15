@@ -382,10 +382,10 @@ export function MigrationModal({
         {isOpen && (
           <motion.div
             key="drawer"
-            initial={{ opacity: 0, x: 400 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 400 }}
-            transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+            initial={{ x: '100%' }}
+            animate={{ x: 0 }}
+            exit={{ x: '100%' }}
+            transition={{ type: 'spring', stiffness: 260, damping: 30 }}
             className="fixed top-0 right-0 bottom-0 w-full sm:w-[600px] bg-white dark:bg-[#1a1a1a] border-l border-foreground/10 z-[91] flex flex-col shadow-lg"
             role="dialog"
             aria-modal="true"

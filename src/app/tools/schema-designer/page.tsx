@@ -22,13 +22,16 @@ import { exportCanvasAsImage, getSuggestedFilename } from '@/features/schema-des
 import { saveSchema, loadSchema, clearSchema, getLastSaved, formatTimestamp, isStorageAvailable } from '@/features/schema-designer/utils/schema-storage';
 import { compareSchemas, SchemaDiff } from '@/features/schema-designer/utils/schema-comparator';
 import { useSchemaHistory } from '@/features/schema-designer/hooks/useSchemaHistory';
+import { useBranches } from '@/features/schema-designer/hooks/useBranches';
 import ConfirmDialog from '@/features/sql-builder/components/ui/ConfirmDialog';
 import InputDialog from '@/features/sql-builder/components/ui/InputDialog';
 import SchemaDesignerNavbar, { SchemaDesignerNavbarRef } from '@/features/schema-designer/components/SchemaDesignerNavbar';
 import DatabaseRefreshModal from '@/features/schema-designer/components/DatabaseRefreshModal';
-import TemplatesDropdown from '@/features/schema-designer/components/TemplatesDropdown';
+import TemplatesSidebar from '@/features/schema-designer/components/TemplatesSidebar';
 import DatabaseConnectionModal from '@/features/schema-designer/components/DatabaseConnectionModal';
 import DatabaseSyncModal from '@/features/schema-designer/components/DatabaseSyncModal';
+import DatabaseActivityFeed, { DatabaseActivityEvent } from '@/features/schema-designer/components/DatabaseActivityFeed';
+import BranchesDrawer from '@/features/schema-designer/components/BranchesDrawer';
 
 export default function SchemaDesignerPage() {
   // Schema state with undo/redo support
@@ -65,6 +68,31 @@ const [isDatabaseConnectionOpen, setIsDatabaseConnectionOpen] = useState(false);
   const [isTemplatesOpen, setIsTemplatesOpen] = useState(false);
 const [isSyncModalOpen, setIsSyncModalOpen] = useState(false);
 const [isRefreshModalOpen, setIsRefreshModalOpen] = useState(false);
+const [isActivityFeedOpen, setIsActivityFeedOpen] = useState(false);
+const [dbActivityEvents, setDbActivityEvents] = useState<DatabaseActivityEvent[]>([]);
+const syncActivityIdRef = useRef<string | null>(null);
+  const connectionActivityIdRef = useRef<string | null>(null);
+  const [isBranchesDrawerOpen, setIsBranchesDrawerOpen] = useState(false);
+  
+  const storageAvailable = isStorageAvailable();
+  const {
+    initialized: branchesInitialized,
+    activeBranch,
+    branchNames,
+    branchList,
+    createBranch,
+    switchBranch,
+    deleteBranch,
+  } = useBranches({
+    initialSchema: {
+      name: 'My Database',
+      tables: [],
+      relationships: [],
+    },
+    schema,
+    replaceSchema,
+    storageAvailable,
+  });
   
   // Store original database schema and connection info for sync
   const [databaseConnection, setDatabaseConnection] = useState<{
@@ -144,6 +172,58 @@ const [isRefreshModalOpen, setIsRefreshModalOpen] = useState(false);
 const [isRefreshingDatabase, setIsRefreshingDatabase] = useState(false);
 const [refreshDiff, setRefreshDiff] = useState<SchemaDiff | null>(null);
 const [refreshRemoteSchema, setRefreshRemoteSchema] = useState<SchemaState | null>(null);
+
+  const createActivityId = useCallback(() => {
+    if (typeof crypto !== 'undefined' && 'randomUUID' in crypto && typeof crypto.randomUUID === 'function') {
+      return crypto.randomUUID();
+    }
+    return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  }, []);
+
+  const startDbActivity = useCallback(
+    (type: DatabaseActivityEvent['type'], message: string, options?: { openFeed?: boolean }) => {
+      const event: DatabaseActivityEvent = {
+        id: createActivityId(),
+        type,
+        status: 'in-progress',
+        message,
+        timestamp: Date.now(),
+      };
+      setDbActivityEvents(prev => [...prev, event]);
+      if (options?.openFeed) {
+        setIsActivityFeedOpen(true);
+      }
+      return event.id;
+    },
+    [createActivityId]
+  );
+
+  const updateDbActivity = useCallback(
+    (id: string, status: 'progress' | 'success' | 'error', message?: string) => {
+      setDbActivityEvents(prev =>
+        prev.map(event =>
+          event.id === id
+            ? {
+                ...event,
+                status: status === 'progress' ? event.status : status,
+                message: message ?? event.message,
+                timestamp: Date.now(),
+              }
+            : event
+        )
+      );
+    },
+    []
+  );
+
+  const latestDbActivity = useMemo(() => {
+    for (let i = dbActivityEvents.length - 1; i >= 0; i--) {
+      if (dbActivityEvents[i].status === 'in-progress') {
+        return dbActivityEvents[i];
+      }
+    }
+    return null;
+  }, [dbActivityEvents]);
 
   // LOCALSTORAGE PERSISTENCE
   // Restore schema from localStorage on mount
@@ -358,6 +438,7 @@ const [refreshRemoteSchema, setRefreshRemoteSchema] = useState<SchemaState | nul
     }
 
     setIsRefreshingDatabase(true);
+    const activityId = startDbActivity('pull', 'Pulling latest schema from database…', { openFeed: true });
 
     try {
       const connectionConfig = databaseConnection.connectionConfig;
@@ -399,22 +480,25 @@ const [refreshRemoteSchema, setRefreshRemoteSchema] = useState<SchemaState | nul
           title: 'Already Up to Date',
           message: 'The live database already matches your current design.',
         });
+        updateDbActivity(activityId, 'success', 'Schema already up to date.');
         return;
       }
 
       setRefreshDiff(diff);
       setRefreshRemoteSchema(remoteSchema);
       setIsRefreshModalOpen(true);
+      updateDbActivity(activityId, 'success', 'Pulled latest schema from database.');
     } catch (error: any) {
       setAlertDialog({
         isOpen: true,
         title: 'Refresh Failed',
         message: error.message || 'Unable to pull the latest schema. Please try again.',
       });
+      updateDbActivity(activityId, 'error', error.message || 'Failed to pull latest schema.');
     } finally {
       setIsRefreshingDatabase(false);
     }
-  }, [databaseConnection, schema, setAlertDialog]);
+  }, [databaseConnection, schema, setAlertDialog, startDbActivity, updateDbActivity]);
 
   const handleApplyRemoteSchema = useCallback(() => {
     if (!refreshRemoteSchema) return;
@@ -441,6 +525,48 @@ const [refreshRemoteSchema, setRefreshRemoteSchema] = useState<SchemaState | nul
     setRefreshDiff(null);
     setRefreshRemoteSchema(null);
   }, []);
+
+  const handleSyncStatusChange = useCallback(
+    (status: 'start' | 'success' | 'error', message?: string) => {
+      if (status === 'start') {
+        syncActivityIdRef.current = startDbActivity('push', message ?? 'Pushing local changes to database…', {
+          openFeed: true,
+        });
+        return;
+      }
+
+      if (syncActivityIdRef.current) {
+        updateDbActivity(
+          syncActivityIdRef.current,
+          status === 'success' ? 'success' : 'error',
+          message ?? (status === 'success' ? 'Database synced successfully.' : 'Database sync failed.')
+        );
+        syncActivityIdRef.current = null;
+      }
+    },
+    [startDbActivity, updateDbActivity]
+  );
+
+  const handleConnectionActivity = useCallback(
+    (phase: 'start' | 'progress' | 'success' | 'error', message: string) => {
+      if (phase === 'start') {
+        connectionActivityIdRef.current = startDbActivity('connect', message, { openFeed: true });
+        return;
+      }
+      if (!connectionActivityIdRef.current) return;
+      if (phase === 'progress') {
+        updateDbActivity(connectionActivityIdRef.current, 'progress', message);
+        return;
+      }
+      updateDbActivity(
+        connectionActivityIdRef.current,
+        phase === 'success' ? 'success' : 'error',
+        message
+      );
+      connectionActivityIdRef.current = null;
+    },
+    [startDbActivity, updateDbActivity]
+  );
 
   // Add column to table
   const handleAddColumn = useCallback((tableId: string) => {
@@ -964,7 +1090,7 @@ const [refreshRemoteSchema, setRefreshRemoteSchema] = useState<SchemaState | nul
       : 'This will permanently delete:';
     const confirmLabel = isConnected ? 'Clear Local Canvas' : 'Delete Everything';
     const removalLine = isConnected ? 'It will remove:' : '';
-
+    
     setConfirmDialog({
       isOpen: true,
       title: 'Delete All Tables?',
@@ -1096,6 +1222,65 @@ const [refreshRemoteSchema, setRefreshRemoteSchema] = useState<SchemaState | nul
     // Trigger fitView after layout (only when explicitly clicking auto-layout)
     setAutoLayoutTrigger(prev => prev + 1);
   }, [schema, setSchema]);
+
+  const requestCreateBranch = useCallback(() => {
+    setInputDialog({
+      isOpen: true,
+      title: 'Create Branch',
+      message: 'Enter a name for the new branch.',
+      defaultValue: '',
+      onConfirm: (rawName: string) => {
+        const normalized = rawName.trim().replace(/\s+/g, '-');
+        const candidate = normalized || `branch-${branchNames.length + 1}`;
+        try {
+          createBranch(candidate);
+          setInputDialog(prev => ({ ...prev, isOpen: false }));
+        } catch (error: any) {
+          setAlertDialog({
+            isOpen: true,
+            title: 'Branch Error',
+            message: error?.message || 'Unable to create branch. Please try a different name.',
+          });
+        }
+      },
+    });
+  }, [branchNames.length, createBranch]);
+
+  const handleSwitchBranch = useCallback((branchName: string) => {
+    switchBranch(branchName);
+  }, [switchBranch]);
+
+  const requestDeleteBranch = useCallback((branchName: string) => {
+    if (branchName === 'main') {
+      setAlertDialog({
+        isOpen: true,
+        title: 'Protected Branch',
+        message: 'The main branch cannot be deleted.',
+      });
+      return;
+    }
+
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Delete Branch?',
+      message: `Branch "${branchName}" will be permanently deleted. This action cannot be undone.`,
+      confirmLabel: 'Delete',
+      cancelLabel: 'Cancel',
+      confirmVariant: 'danger',
+      onConfirm: () => {
+        try {
+          deleteBranch(branchName);
+          setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+        } catch (error: any) {
+          setAlertDialog({
+            isOpen: true,
+            title: 'Delete Failed',
+            message: error?.message || 'Unable to delete branch. Please try again.',
+          });
+        }
+      },
+    });
+  }, [deleteBranch, setAlertDialog, setConfirmDialog]);
 
   // Export canvas as image
   const handleExportImage = useCallback(async (format: 'png' | 'svg') => {
@@ -1408,7 +1593,6 @@ const [refreshRemoteSchema, setRefreshRemoteSchema] = useState<SchemaState | nul
   const indexCount = schema.tables.reduce((sum, t) => sum + (t.indexes?.length || 0), 0);
 
   const lastSavedLabel = lastSavedTime ? formatTimestamp(lastSavedTime) : null;
-
   return (
     <div className="h-full flex flex-col overflow-hidden">
       {/* Professional Navbar with all actions */}
@@ -1428,8 +1612,10 @@ const [refreshRemoteSchema, setRefreshRemoteSchema] = useState<SchemaState | nul
             cancelLabel: 'Cancel',
             confirmVariant: 'danger',
             onConfirm: () => {
+              const activityId = startDbActivity('connect', 'Disconnecting from database…');
               setDatabaseConnection(null);
               setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+              updateDbActivity(activityId, 'success', 'Disconnected from database.');
             },
           });
         }}
@@ -1443,6 +1629,13 @@ const [refreshRemoteSchema, setRefreshRemoteSchema] = useState<SchemaState | nul
         onRedo={redo}
         onShortcuts={() => setIsShortcutsOpen(true)}
         onReset={handleReset}
+        onOpenActivityFeed={() => setIsActivityFeedOpen(true)}
+        onOpenBranchesSidebar={() => setIsBranchesDrawerOpen(true)}
+        activeBranch={activeBranch}
+        branchOptions={branchNames}
+        onBranchSelect={handleSwitchBranch}
+        onBranchCreate={requestCreateBranch}
+        onBranchDelete={requestDeleteBranch}
         canExport={schema.tables.length > 0}
         canUndo={canUndo}
         canRedo={canRedo}
@@ -1451,16 +1644,20 @@ const [refreshRemoteSchema, setRefreshRemoteSchema] = useState<SchemaState | nul
         isTemplatesOpen={isTemplatesOpen}
         isDatabaseConnected={databaseConnection !== null}
         isRefreshingDatabase={isRefreshingDatabase}
+        dbStatus={
+          latestDbActivity
+            ? { label: latestDbActivity.message, status: latestDbActivity.status }
+            : null
+        }
       />
           
       {/* Content Area - Full Height Canvas */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Templates Dropdown - Positioned above canvas */}
-        <TemplatesDropdown
+        {/* Templates Sidebar */}
+        <TemplatesSidebar
           isOpen={isTemplatesOpen}
           onClose={() => setIsTemplatesOpen(false)}
           onSelectTemplate={handleLoadTemplate}
-          buttonRef={navbarRef.current?.templatesButtonRef}
         />
 
         {/* Canvas - Always Shown, Full Height */}
@@ -1676,6 +1873,7 @@ const [refreshRemoteSchema, setRefreshRemoteSchema] = useState<SchemaState | nul
             setIsDatabaseConnectionOpen(false);
           }
         }}
+        onActivity={handleConnectionActivity}
       />
 
       {/* Migration Modal */}
@@ -1704,6 +1902,7 @@ const [refreshRemoteSchema, setRefreshRemoteSchema] = useState<SchemaState | nul
               };
             });
           }}
+          onSyncStatusChange={handleSyncStatusChange}
         />
       )}
 
@@ -1769,7 +1968,27 @@ const [refreshRemoteSchema, setRefreshRemoteSchema] = useState<SchemaState | nul
         onConfirm={() => setAlertDialog(prev => ({ ...prev, isOpen: false }))}
         onCancel={() => setAlertDialog(prev => ({ ...prev, isOpen: false }))}
       />
+
+      <DatabaseActivityFeed
+        isOpen={isActivityFeedOpen}
+        events={dbActivityEvents}
+        onClose={() => setIsActivityFeedOpen(false)}
+      />
+
+      <BranchesDrawer
+        isOpen={isBranchesDrawerOpen}
+        branches={branchList}
+        activeBranch={activeBranch}
+        onClose={() => setIsBranchesDrawerOpen(false)}
+        onSwitch={handleSwitchBranch}
+        onCreate={requestCreateBranch}
+        onDelete={requestDeleteBranch}
+      />
     </div>
   );
+}
+
+function cloneSchemaState(state: SchemaState): SchemaState {
+  return JSON.parse(JSON.stringify(state));
 }
 

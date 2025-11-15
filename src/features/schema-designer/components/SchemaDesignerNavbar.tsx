@@ -2,8 +2,12 @@
 
 import { useRef, forwardRef, useImperativeHandle } from "react";
 import Link from "next/link";
+import BranchSwitcher from "./BranchSwitcher";
+import NavbarTemplatesButton from "./NavbarTemplatesButton";
+import NavbarDatabaseMenu from "./NavbarDatabaseMenu";
 
 interface SchemaDesignerNavbarProps {
+  onOpenBranchesSidebar?: () => void;
   onExport?: () => void;
   onNewTable?: () => void;
   onImport?: () => void;
@@ -18,6 +22,12 @@ interface SchemaDesignerNavbarProps {
   onRedo?: () => void;
   onShortcuts?: () => void;
   onReset?: () => void;
+  onOpenActivityFeed?: () => void;
+  activeBranch?: string;
+  branchOptions?: string[];
+  onBranchSelect?: (branch: string) => void;
+  onBranchCreate?: () => void;
+  onBranchDelete?: (branch: string) => void;
   
   // States
   canExport?: boolean;
@@ -28,6 +38,10 @@ interface SchemaDesignerNavbarProps {
   isTemplatesOpen?: boolean;
   isDatabaseConnected?: boolean;
   isRefreshingDatabase?: boolean;
+  dbStatus?: {
+    label: string;
+    status: "in-progress" | "success" | "error";
+  } | null;
 }
 
 export interface SchemaDesignerNavbarRef {
@@ -49,6 +63,13 @@ const SchemaDesignerNavbar = forwardRef<SchemaDesignerNavbarRef, SchemaDesignerN
   onRedo,
   onShortcuts,
   onReset,
+  onOpenActivityFeed,
+  onOpenBranchesSidebar,
+  activeBranch,
+  branchOptions,
+  onBranchSelect,
+  onBranchCreate,
+  onBranchDelete,
   canExport = false,
   canUndo = false,
   canRedo = false,
@@ -57,6 +78,7 @@ const SchemaDesignerNavbar = forwardRef<SchemaDesignerNavbarRef, SchemaDesignerN
   isTemplatesOpen = false,
   isDatabaseConnected = false,
   isRefreshingDatabase = false,
+  dbStatus = null,
 }, ref) => {
   const templatesButtonRef = useRef<HTMLButtonElement>(null);
 
@@ -86,8 +108,17 @@ const SchemaDesignerNavbar = forwardRef<SchemaDesignerNavbarRef, SchemaDesignerN
             </div>
           </Link>
 
+          <BranchSwitcher
+            activeBranch={activeBranch}
+            branchOptions={branchOptions}
+            onSelect={onBranchSelect}
+            onCreate={onBranchCreate}
+            onDelete={onBranchDelete}
+          onOpenBranchesSidebar={onOpenBranchesSidebar}
+          />
+
           {/* Toolbar Actions - Left Aligned */}
-          <div className="flex items-center gap-1 overflow-x-auto flex-shrink-0">
+          <div className="flex items-center gap-1 flex-shrink-0 overflow-visible">
             {/* History */}
             <div className="flex items-center gap-0">
               <button
@@ -130,7 +161,6 @@ const SchemaDesignerNavbar = forwardRef<SchemaDesignerNavbarRef, SchemaDesignerN
 
             <div className="w-px h-4 bg-foreground/10"></div>
 
-            {/* File Actions */}
             <button
               onClick={onExport}
               disabled={!canExport}
@@ -154,89 +184,48 @@ const SchemaDesignerNavbar = forwardRef<SchemaDesignerNavbarRef, SchemaDesignerN
               <span className="hidden sm:inline">Import</span>
             </button>
 
-            {!isDatabaseConnected && onConnectDatabase && (
-              <button
-                onClick={onConnectDatabase}
-                className="px-2 py-1 text-xs sm:text-sm font-medium text-foreground/70 hover:text-foreground hover:bg-foreground/10 rounded transition-all flex items-center gap-1 active:scale-95"
-                title="Connect to live database (Cmd+D)"
-              >
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
-                <span className="hidden sm:inline">Connect DB</span>
-              </button>
-            )}
+            <NavbarDatabaseMenu
+              isDatabaseConnected={isDatabaseConnected}
+              isRefreshingDatabase={isRefreshingDatabase}
+              onConnectDatabase={onConnectDatabase}
+              onRefreshDatabase={onRefreshDatabase}
+              onSyncDatabase={onSyncDatabase}
+              onDisconnectDatabase={onDisconnectDatabase}
+              onOpenActivity={onOpenActivityFeed}
+            />
 
-            {isDatabaseConnected && onRefreshDatabase && (
+            {dbStatus && (
               <button
-                onClick={onRefreshDatabase}
-                disabled={isRefreshingDatabase}
-                className="px-2 py-1 text-xs sm:text-sm font-medium text-foreground/70 hover:text-foreground hover:bg-foreground/10 rounded transition-all flex items-center gap-1 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
-                title="Pull the latest schema from the database"
+                onClick={onOpenActivityFeed}
+                className="px-2 py-1 text-[11px] font-medium rounded-full border border-foreground/10 bg-foreground/5 text-foreground/70 flex items-center gap-2 active:scale-95 transition-all hover:border-foreground/20"
+                type="button"
               >
-                {isRefreshingDatabase ? (
-                  <svg className="w-3.5 h-3.5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                {dbStatus.status === 'in-progress' ? (
+                  <svg className="w-3.5 h-3.5 text-foreground/60 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v4m0 8v4m8-8h4M4 12H0m15.535-6.535l2.828 2.828M5.636 18.364l-2.828 2.828M18.364 18.364l2.828 2.828M5.636 5.636L2.808 2.808" />
+                  </svg>
+                ) : dbStatus.status === 'success' ? (
+                  <svg className="w-3.5 h-3.5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                   </svg>
                 ) : (
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  <svg className="w-3.5 h-3.5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                   </svg>
                 )}
-                <span className="hidden sm:inline">Pull Latest</span>
+                <span className="font-mono truncate max-w-[150px]">
+                  {dbStatus.label}
+                </span>
               </button>
             )}
 
-            {onSyncDatabase && isDatabaseConnected && (
-              <button
-                onClick={onSyncDatabase}
-                className="px-2 py-1 text-xs sm:text-sm font-medium text-foreground/70 hover:text-foreground hover:bg-foreground/10 rounded transition-all flex items-center gap-1 active:scale-95"
-                title="Push local changes to database"
-              >
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                </svg>
-                <span className="hidden sm:inline">Push Changes</span>
-              </button>
-            )}
-
-            {onDisconnectDatabase && isDatabaseConnected && (
-              <button
-                onClick={onDisconnectDatabase}
-                className="px-2 py-1 text-xs sm:text-sm font-medium text-foreground/70 hover:text-red-600 hover:bg-red-500/10 rounded transition-all flex items-center gap-1 active:scale-95"
-                title="Disconnect from database"
-              >
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-                <span className="hidden sm:inline">Disconnect</span>
-              </button>
-            )}
-
-            <button
+            <NavbarTemplatesButton
               ref={templatesButtonRef}
-              onClick={onTemplates}
-              className={`px-2 py-1 text-xs sm:text-sm font-medium rounded transition-all flex items-center gap-1 active:scale-95 ${
-                isTemplatesOpen 
-                  ? 'bg-foreground/10 text-foreground' 
-                  : 'text-foreground/70 hover:text-foreground hover:bg-foreground/10'
-              }`}
-              title="Templates"
-            >
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h4a1 1 0 011 1v7a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM14 5a1 1 0 011-1h4a1 1 0 011 1v7a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 17a1 1 0 011-1h4a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1v-2zM14 17a1 1 0 011-1h4a1 1 0 011 1v2a1 1 0 01-1 1h-4a1 1 0 01-1-1v-2z" />
-              </svg>
-              <span className="hidden sm:inline">Templates</span>
-              <svg 
-                className={`w-3 h-3 transition-transform ${isTemplatesOpen ? 'rotate-180' : ''}`} 
-                fill="none" 
-                stroke="currentColor" 
-                viewBox="0 0 24 24"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
-            </button>
+              isOpen={isTemplatesOpen}
+              onToggle={onTemplates}
+            />
 
+            {onMigrations && (
             <button
               onClick={onMigrations}
               className="px-2 py-1 text-xs sm:text-sm font-medium text-foreground/70 hover:text-foreground hover:bg-foreground/10 rounded transition-all flex items-center gap-1 active:scale-95"
@@ -247,6 +236,7 @@ const SchemaDesignerNavbar = forwardRef<SchemaDesignerNavbarRef, SchemaDesignerN
               </svg>
               <span className="hidden sm:inline">Migrations</span>
             </button>
+            )}
 
             {hasMultipleTables && onAutoLayout && (
               <button

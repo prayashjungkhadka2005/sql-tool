@@ -27,6 +27,7 @@ interface DatabaseSyncModalProps {
     connectionString?: string;
   };
   onSyncComplete?: () => void;
+  onSyncStatusChange?: (status: 'start' | 'success' | 'error', message?: string) => void;
 }
 
 export default function DatabaseSyncModal(props: DatabaseSyncModalProps) {
@@ -40,6 +41,7 @@ function DatabaseSyncModalContent({
   originalSchema,
   connectionConfig,
   onSyncComplete,
+  onSyncStatusChange,
 }: DatabaseSyncModalProps) {
   const { toast, showToast, hideToast, resetToast } = useToast();
   const [isSyncing, setIsSyncing] = useState(false);
@@ -92,6 +94,7 @@ function DatabaseSyncModalContent({
     }
 
     setIsSyncing(true);
+    onSyncStatusChange?.('start', 'Pushing local changes to database…');
 
     try {
       // Filter out comments and empty lines for execution
@@ -127,6 +130,7 @@ function DatabaseSyncModalContent({
 
       showToast('Database synced successfully!', 'success');
       onSyncComplete?.();
+      onSyncStatusChange?.('success', 'Database synced successfully.');
       onClose();
     } catch (error: any) {
       console.error('Sync error:', error);
@@ -134,6 +138,7 @@ function DatabaseSyncModalContent({
         error.message || 'Failed to sync database. Please check your connection and try again.',
         'error'
       );
+      onSyncStatusChange?.('error', error.message || 'Failed to sync database.');
     } finally {
       setIsSyncing(false);
     }

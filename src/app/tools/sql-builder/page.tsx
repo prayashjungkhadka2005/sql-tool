@@ -25,7 +25,9 @@ import DistinctToggle from "@/features/sql-builder/components/DistinctToggle";
 import WelcomeTutorial from "@/features/sql-builder/components/WelcomeTutorial";
 import { useQueryBuilder } from "@/features/sql-builder/hooks/useQueryBuilder";
 import { useKeyboardShortcuts } from "@/features/sql-builder/hooks/useKeyboardShortcuts";
-import { useState, useCallback, useEffect, useRef } from "react";
+import Toast from "@/features/sql-builder/components/ui/Toast";
+import { useToast } from "@/features/sql-builder/hooks/useToast";
+import { useState, useCallback, useEffect } from "react";
 import { decodeQueryFromURL, copyShareableURL } from "@/features/sql-builder/utils/url-sharing";
 import { isCSVTable } from "@/features/sql-builder/utils/csv-data-manager";
 import { saveToHistory } from "@/features/sql-builder/utils/query-history";
@@ -58,10 +60,6 @@ export default function Home() {
   // State for collapsible sections (default: open for better UX)
   const [isAdvancedFiltersOpen, setIsAdvancedFiltersOpen] = useState(true);
   const [isSortingOpen, setIsSortingOpen] = useState(true);
-
-  // State for share functionality
-  const [shareToast, setShareToast] = useState(false);
-  const [saveToast, setSaveToast] = useState(false);
 
   // State for welcome tutorial
   const [showTutorial, setShowTutorial] = useState(false);
@@ -115,58 +113,32 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Only run once on mount
 
-  // State for error toast
-  const [errorToast, setErrorToast] = useState<string | null>(null);
-
-  // Refs for toast timers to prevent memory leaks
-  const saveToastTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const shareToastTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const errorToastTimerRef = useRef<NodeJS.Timeout | null>(null);
-
-  // Cleanup toast timers on unmount
-  useEffect(() => {
-    return () => {
-      if (saveToastTimerRef.current) clearTimeout(saveToastTimerRef.current);
-      if (shareToastTimerRef.current) clearTimeout(shareToastTimerRef.current);
-      if (errorToastTimerRef.current) clearTimeout(errorToastTimerRef.current);
-    };
-  }, []);
+  const { toast, showToast, hideToast } = useToast();
 
   // Manual save to history
   const handleSaveToHistory = useCallback(() => {
     if (!queryState.table) {
-      setErrorToast("No query to save");
-      if (errorToastTimerRef.current) clearTimeout(errorToastTimerRef.current);
-      errorToastTimerRef.current = setTimeout(() => setErrorToast(null), 3000);
+      showToast("No query to save", "error");
       return;
     }
-    
+
     const sql = generateSQL(queryState);
-    if (!sql || sql.trim() === ';') {
-      setErrorToast("Build a query first");
-      if (errorToastTimerRef.current) clearTimeout(errorToastTimerRef.current);
-      errorToastTimerRef.current = setTimeout(() => setErrorToast(null), 3000);
+    if (!sql || sql.trim() === ";") {
+      showToast("Build a query first", "error");
       return;
     }
-    
+
     saveToHistory(queryState, sql);
-    setSaveToast(true);
-    if (saveToastTimerRef.current) clearTimeout(saveToastTimerRef.current);
-    saveToastTimerRef.current = setTimeout(() => setSaveToast(false), 2000);
-  }, [queryState]);
+    showToast("Query saved to history", "success");
+  }, [queryState, showToast]);
 
   // Share query handler
   const handleShareQuery = async () => {
     const result = await copyShareableURL(queryState);
     if (result.success) {
-      setShareToast(true);
-      if (shareToastTimerRef.current) clearTimeout(shareToastTimerRef.current);
-      shareToastTimerRef.current = setTimeout(() => setShareToast(false), 3000);
+      showToast("Shareable link copied to clipboard", "success");
     } else {
-      // Show error toast
-      setErrorToast(result.error || "Failed to share query");
-      if (errorToastTimerRef.current) clearTimeout(errorToastTimerRef.current);
-      errorToastTimerRef.current = setTimeout(() => setErrorToast(null), 5000);
+      showToast(result.error || "Failed to share query", "error");
     }
   };
 
@@ -747,68 +719,18 @@ export default function Home() {
           )}
         </main>
 
-        {/* Toast Notifications Stack */}
-        <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-3 pointer-events-none">
-          {/* Share Success Toast */}
-          {shareToast && (
-            <div className="animate-in fade-in slide-in-from-right-4 duration-300 pointer-events-auto">
-              <div className="px-4 py-3 bg-green-500 text-white rounded-lg shadow-lg flex items-center gap-3">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <div>
-                  <p className="text-sm font-semibold">URL Copied!</p>
-                  <p className="text-xs opacity-90">Share this link to load your query</p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Save Success Toast */}
-          {saveToast && (
-            <div className="animate-in fade-in slide-in-from-right-4 duration-300 pointer-events-auto">
-              <div className="px-4 py-3 bg-green-500 text-white rounded-lg shadow-lg flex items-center gap-3">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
-                </svg>
-                <div>
-                  <p className="text-sm font-semibold">Query Saved!</p>
-                  <p className="text-xs opacity-90">Added to your query history</p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Error Toast */}
-          {errorToast && (
-            <div className="animate-in fade-in slide-in-from-right-4 duration-300 pointer-events-auto">
-              <div className="px-4 py-3 bg-red-500 text-white rounded-lg shadow-lg flex items-center gap-3 max-w-md">
-                <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <div className="flex-1">
-                  <p className="text-sm font-semibold">Error</p>
-                  <p className="text-xs opacity-90">{errorToast}</p>
-                </div>
-                <button
-                  onClick={() => setErrorToast(null)}
-                  className="p-1 hover:bg-red-600 rounded transition-colors"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-
       {/* Welcome Tutorial */}
       {showTutorial && (
         <WelcomeTutorial onComplete={() => setShowTutorial(false)} />
       )}
 
-      
+      <Toast
+        message={toast.message}
+        type={toast.type}
+        isVisible={toast.isVisible}
+        onClose={hideToast}
+      />
+
     </>
   );
 }
