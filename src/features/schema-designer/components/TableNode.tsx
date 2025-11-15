@@ -46,7 +46,7 @@ function TableNode({ data, selected }: NodeProps<TableNodeData>) {
     <div
       onClick={handleClick}
       onContextMenu={handleContextMenu}
-      className={`relative bg-white dark:bg-[#1a1a1a] border-2 rounded-lg shadow-lg min-w-[280px] transition-all cursor-pointer ${
+      className={`relative bg-white dark:bg-[#1a1a1a] border-2 rounded-lg shadow-lg min-w-[280px] transition-colors duration-100 cursor-pointer ${
         isSelected || selected
           ? 'border-primary shadow-xl ring-2 ring-primary/20' 
           : 'border-foreground/10 hover:border-foreground/20'

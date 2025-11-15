@@ -102,7 +102,7 @@ const SchemaDesignerNavbar = forwardRef<SchemaDesignerNavbarRef, SchemaDesignerN
                   Schema Designer
                 </h1>
                 <p className="text-[10px] text-foreground/40 font-mono hidden sm:block">
-                  Visual Database Design Tool
+                  Collaborative ERD Workspace
                 </p>
               </div>
             </div>

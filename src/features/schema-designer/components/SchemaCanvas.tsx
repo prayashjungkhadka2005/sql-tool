@@ -46,6 +46,7 @@ interface SchemaCanvasProps {
   hasFKOptimization?: boolean;
   isOptimizingFKs?: boolean;
   autoLayoutTrigger?: number; // Increment this to trigger fitView after auto-layout
+  onManualConnect?: (sourceTableId: string, targetTableId: string) => void;
 }
 
 export default function SchemaCanvas({ 
@@ -68,7 +69,8 @@ export default function SchemaCanvas({
   onAutoIndexFKs,
   hasFKOptimization = false,
   isOptimizingFKs = false,
-  autoLayoutTrigger
+  autoLayoutTrigger,
+  onManualConnect,
 }: SchemaCanvasProps) {
   const { zoomIn, zoomOut, fitView, getZoom } = useReactFlow();
   const hasTables = !!(schema?.tables && schema.tables.length > 0);
@@ -232,8 +234,8 @@ export default function SchemaCanvas({
         const target = e.target as HTMLElement;
         // Allow Space if not in input/textarea/contentEditable
         if (!target || (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA' && !target.isContentEditable)) {
-        e.preventDefault();
-        setIsPanMode(true);
+          e.preventDefault();
+          setIsPanMode(true);
           return;
         }
       }
@@ -257,6 +259,15 @@ export default function SchemaCanvas({
         } catch (error) {
           console.debug('Zoom shortcut failed:', error);
         }
+        return;
+      }
+
+      // Delete selected table
+      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedTableId) {
+        e.preventDefault();
+        onDeleteTable(selectedTableId);
+        setSelectedTableId(null);
+        return;
       }
     };
     
@@ -274,7 +285,7 @@ export default function SchemaCanvas({
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [zoomIn, zoomOut, fitView]);
+  }, [zoomIn, zoomOut, fitView, selectedTableId, onDeleteTable]);
 
   // Middle mouse button pan support
   useEffect(() => {
@@ -510,6 +521,38 @@ export default function SchemaCanvas({
 
   const [nodes, setNodes, onNodesChange] = useNodesState(convertToNodes(schema?.tables || []));
   const [edges, setEdges, onEdgesChange] = useEdgesState(convertToEdges(schema?.tables || []));
+
+  // Keep node selection state in sync with selectedTableId without waiting for schema updates
+  useEffect(() => {
+    setNodes(prevNodes => {
+      if (!prevNodes || prevNodes.length === 0) return prevNodes;
+
+      const related = selectedTableId ? getRelatedTables(selectedTableId) : null;
+      let hasChanges = false;
+
+      const nextNodes = prevNodes.map(node => {
+        const isSelected = node.id === selectedTableId;
+        const isRelated = !!related && related.has(node.id);
+
+        if (node.selected === isSelected && node.data?.isSelected === isSelected && node.data?.isRelated === isRelated) {
+          return node;
+        }
+
+        hasChanges = true;
+        return {
+          ...node,
+          selected: isSelected,
+          data: {
+            ...node.data,
+            isSelected,
+            isRelated,
+          },
+        };
+      });
+
+      return hasChanges ? nextNodes : prevNodes;
+    });
+  }, [selectedTableId, setNodes, getRelatedTables]);
 
   // Clear selection if selected table no longer exists
   useEffect(() => {
@@ -760,11 +803,11 @@ export default function SchemaCanvas({
 
   // Drag connections are disabled - users must use Column Editor
   // This ensures proper FK validation and data integrity
-  const onConnect = useCallback(() => {
-    // Do nothing - connections are created via Column Editor
-    // Edges are auto-generated from FK columns
-    // Visual feedback handled by temporary animated edge (if needed in future)
-  }, []);
+  const onConnect = useCallback((connection: Connection) => {
+    if (!connection.source || !connection.target) return;
+    if (connection.source === connection.target) return;
+    onManualConnect?.(connection.source, connection.target);
+  }, [onManualConnect]);
 
   return (
     <div className="w-full h-full min-h-[500px] border border-foreground/10 rounded-lg overflow-hidden bg-gradient-to-br from-[#f8f9fa] via-[#ffffff] to-[#f8f9fa] dark:from-[#0a0a0a] dark:via-[#111111] dark:to-[#0a0a0a] relative shadow-inner">

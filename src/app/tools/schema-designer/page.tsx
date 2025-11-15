@@ -56,6 +56,7 @@ export default function SchemaDesignerPage() {
   const [editingColumn, setEditingColumn] = useState<{
     table: SchemaTable;
     column: SchemaColumn | null;
+    initialValues?: Partial<SchemaColumn>;
   } | null>(null);
 
   const [isIndexManagerOpen, setIsIndexManagerOpen] = useState(false);
@@ -603,6 +604,94 @@ const [refreshRemoteSchema, setRefreshRemoteSchema] = useState<SchemaState | nul
     setManagingIndexTable(table);
     setIsIndexManagerOpen(true);
   }, [schema.tables]);
+
+  const handleManualConnection = useCallback(
+    (sourceTableId: string, targetTableId: string) => {
+      if (sourceTableId === targetTableId) {
+        setAlertDialog({
+          isOpen: true,
+          title: 'Select Different Tables',
+          message: 'Connect two different tables to define a relationship.',
+        });
+        return;
+      }
+
+      const sourceTable = schema.tables.find(t => t.id === sourceTableId);
+      const targetTable = schema.tables.find(t => t.id === targetTableId);
+
+      if (!sourceTable || !targetTable) return;
+
+      if (!sourceTable.columns.length) {
+        setAlertDialog({
+          isOpen: true,
+          title: 'No Columns to Reference',
+          message: `Table "${sourceTable.name}" has no columns yet. Add a primary key column before creating relationships.`,
+        });
+        return;
+      }
+
+      const sourcePk =
+        sourceTable.columns.find(col => col.primaryKey) ?? sourceTable.columns[0];
+
+      if (!sourcePk) {
+        setAlertDialog({
+          isOpen: true,
+          title: 'Missing Primary Key',
+          message: `Table "${sourceTable.name}" needs a primary key column before creating relationships.`,
+        });
+        return;
+      }
+
+      const slugBase = sourceTable.name
+        ? sourceTable.name
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '_')
+            .replace(/^_+|_+$/g, '')
+        : 'ref';
+      const baseColumnName = `${slugBase || 'ref'}_id`;
+
+      const existingNames = new Set(
+        targetTable.columns.map(col => col.name.toLowerCase())
+      );
+      let candidateName = baseColumnName;
+      let attempt = 1;
+      while (existingNames.has(candidateName.toLowerCase())) {
+        candidateName = `${baseColumnName}_${attempt}`;
+        attempt += 1;
+      }
+
+      const defaultType = sourcePk.type || 'INTEGER';
+      const newColumnId = `col-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+      const initialValues: SchemaColumn = {
+        id: newColumnId,
+        name: candidateName,
+        type: defaultType,
+        length: sourcePk.length,
+        precision: sourcePk.precision,
+        scale: sourcePk.scale,
+        nullable: true,
+        unique: false,
+        primaryKey: false,
+        autoIncrement: false,
+        defaultValue: '',
+        references: {
+          table: sourceTable.name,
+          column: sourcePk.name,
+          onDelete: 'NO ACTION',
+          onUpdate: 'NO ACTION',
+        },
+      };
+
+      setEditingColumn({
+        table: targetTable,
+        column: null,
+        initialValues,
+      });
+      setIsColumnEditorOpen(true);
+    },
+    [schema.tables, setAlertDialog]
+  );
 
   // Save indexes for a table
   const handleSaveIndexes = useCallback((indexes: SchemaIndex[]) => {
@@ -1260,12 +1349,23 @@ const [refreshRemoteSchema, setRefreshRemoteSchema] = useState<SchemaState | nul
       return;
     }
 
+    const branchDetails = branchList.find(branch => branch.name === branchName);
+    const detailLines = branchDetails
+      ? [
+          `• Created ${formatTimestamp(branchDetails.createdAt)}`,
+          `• Last updated ${formatTimestamp(branchDetails.updatedAt)}`,
+          branchDetails.parent ? `• Derived from "${branchDetails.parent}"` : null,
+        ].filter(Boolean).join('\n')
+      : '';
+
+    const detailBlock = detailLines ? `\n\nBranch details:\n${detailLines}` : '';
+
     setConfirmDialog({
       isOpen: true,
-      title: 'Delete Branch?',
-      message: `Branch "${branchName}" will be permanently deleted. This action cannot be undone.`,
-      confirmLabel: 'Delete',
-      cancelLabel: 'Cancel',
+      title: `Delete branch "${branchName}"?`,
+      message: `This will permanently remove the "${branchName}" snapshot and its history.${detailBlock}\n\nThis action cannot be undone.`,
+      confirmLabel: 'Delete Branch',
+      cancelLabel: 'Keep Branch',
       confirmVariant: 'danger',
       onConfirm: () => {
         try {
@@ -1280,7 +1380,7 @@ const [refreshRemoteSchema, setRefreshRemoteSchema] = useState<SchemaState | nul
         }
       },
     });
-  }, [deleteBranch, setAlertDialog, setConfirmDialog]);
+  }, [branchList, deleteBranch, setAlertDialog, setConfirmDialog]);
 
   // Export canvas as image
   const handleExportImage = useCallback(async (format: 'png' | 'svg') => {
@@ -1685,6 +1785,7 @@ const [refreshRemoteSchema, setRefreshRemoteSchema] = useState<SchemaState | nul
           hasFKOptimization={hasFKsWithoutIndexes}
           isOptimizingFKs={isOptimizingFKs}
           autoLayoutTrigger={autoLayoutTrigger}
+          onManualConnect={handleManualConnection}
         />
         </div>
           </ReactFlowProvider>
@@ -1807,6 +1908,7 @@ const [refreshRemoteSchema, setRefreshRemoteSchema] = useState<SchemaState | nul
             setEditingColumn(null);
           }}
           onDelete={editingColumn.column ? handleDeleteColumn : undefined}
+          initialValues={editingColumn.initialValues}
         />
       )}
 

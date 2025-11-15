@@ -18,6 +18,7 @@ interface ColumnEditorProps {
   onSave: (column: SchemaColumn) => void;
   onClose: () => void;
   onDelete?: (columnId: string) => void;
+  initialValues?: Partial<SchemaColumn>;
 }
 
 const DATA_TYPES: SQLDataType[] = [
@@ -70,6 +71,7 @@ export default function ColumnEditor({
   onSave,
   onClose,
   onDelete,
+  initialValues,
 }: ColumnEditorProps) {
   const isEditing = column !== null;
 
@@ -110,13 +112,10 @@ export default function ColumnEditor({
 
   // Initialize form when column changes
   useEffect(() => {
-    if (column) {
-      setFormData(column);
-    } else {
-      // Reset for new column - generate unique ID
+    const buildDefaultColumn = (): SchemaColumn => {
       const timestamp = Date.now();
       const random = Math.random().toString(36).substring(2, 9);
-      setFormData({
+      return {
         id: `col-${timestamp}-${random}`,
         name: '',
         type: 'VARCHAR',
@@ -126,11 +125,27 @@ export default function ColumnEditor({
         primaryKey: false,
         autoIncrement: false,
         defaultValue: '',
-      });
+      };
+    };
+
+    if (column) {
+      setFormData(column);
+    } else {
+      const base = buildDefaultColumn();
+      const merged = initialValues
+        ? {
+            ...base,
+            ...initialValues,
+            references: initialValues.references
+              ? { ...base.references, ...initialValues.references }
+              : base.references,
+          }
+        : base;
+      setFormData(merged);
     }
     // Clear validation error when column changes
     setValidationError(null);
-  }, [column, isOpen]); // Reset when drawer opens/closes
+  }, [column, isOpen, initialValues]); // Reset when drawer opens/closes
 
   // Clear validation error when form data changes (real-time feedback)
   useEffect(() => {

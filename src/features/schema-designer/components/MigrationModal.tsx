@@ -269,8 +269,17 @@ export function MigrationModal({
       return;
     }
 
-    setSelectedVersion(version);
     const schemaDiff = compareSchemas(version.schema, currentSchema);
+
+    if (!schemaDiff.hasChanges) {
+      showToast('Schemas already match. No differences to review.', 'info');
+      setSelectedVersion(null);
+      setDiff(null);
+      setMigration(null);
+      return;
+    }
+
+    setSelectedVersion(version);
     setDiff(schemaDiff);
     setView('compare');
   };
@@ -310,7 +319,7 @@ export function MigrationModal({
 
       // If no changes anymore, show message and return to list
       if (!updatedDiff.hasChanges && view === 'compare') {
-        showToast('Schemas are now identical', 'success');
+        showToast('Schemas already match. Returning to versions list.', 'info');
         setView('list');
       }
     }

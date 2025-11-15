@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
 interface ToastProps {
@@ -18,18 +18,25 @@ export default function Toast({
   onClose,
   duration = 3000,
 }: ToastProps) {
-  if (!message) {
-    return null;
-  }
+  const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
+    setIsClient(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isClient) return;
     if (isVisible && duration > 0) {
       const timer = setTimeout(() => {
         onClose();
       }, duration);
       return () => clearTimeout(timer);
     }
-  }, [isVisible, duration, onClose]);
+  }, [isClient, isVisible, duration, onClose]);
+
+  if (!isClient || !message) {
+    return null;
+  }
 
   const icons = {
     success: (
