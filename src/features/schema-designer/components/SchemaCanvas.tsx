@@ -25,6 +25,10 @@ import 'reactflow/dist/style.css';
 import { SchemaState, SchemaTable } from '../types';
 import TableNode from './TableNode';
 
+const NODE_TYPES = {
+  tableNode: TableNode,
+};
+
 interface SchemaCanvasProps {
   schema: SchemaState;
   onSchemaChange: (schema: SchemaState) => void;
@@ -234,8 +238,8 @@ export default function SchemaCanvas({
         const target = e.target as HTMLElement;
         // Allow Space if not in input/textarea/contentEditable
         if (!target || (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA' && !target.isContentEditable)) {
-          e.preventDefault();
-          setIsPanMode(true);
+        e.preventDefault();
+        setIsPanMode(true);
           return;
         }
       }
@@ -312,11 +316,6 @@ export default function SchemaCanvas({
     };
   }, []);
   
-  // Custom node types
-  const nodeTypes = useMemo(() => ({ 
-    tableNode: TableNode 
-  }), []);
-
   // Get related table IDs for highlighting (optimized with Map for O(1) lookups)
   const getRelatedTables = useCallback((tableId: string): Set<string> => {
     const related = new Set<string>();
@@ -1045,7 +1044,7 @@ export default function SchemaCanvas({
           // Optional: Add edge click handler for future features
           event.stopPropagation();
         }}
-        nodeTypes={nodeTypes}
+        nodeTypes={NODE_TYPES}
         nodesDraggable={true}
         nodesConnectable={!isPanMode}
         elementsSelectable={true}

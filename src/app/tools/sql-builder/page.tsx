@@ -121,13 +121,13 @@ export default function Home() {
       showToast("No query to save", "error");
       return;
     }
-
+    
     const sql = generateSQL(queryState);
     if (!sql || sql.trim() === ";") {
       showToast("Build a query first", "error");
       return;
     }
-
+    
     saveToHistory(queryState, sql);
     showToast("Query saved to history", "success");
   }, [queryState, showToast]);
@@ -730,7 +730,7 @@ export default function Home() {
         isVisible={toast.isVisible}
         onClose={hideToast}
       />
-
+      
     </>
   );
 }

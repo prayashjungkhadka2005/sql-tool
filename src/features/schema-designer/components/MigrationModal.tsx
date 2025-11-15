@@ -323,7 +323,7 @@ export function MigrationModal({
         setView('list');
       }
     }
-  }, [currentSchema, selectedVersion, view]); // Recalculate when currentSchema changes
+  }, [currentSchema, selectedVersion, view, showToast]); // Recalculate when currentSchema changes
 
   const handleCopySQL = async (sql: string[]) => {
     try {

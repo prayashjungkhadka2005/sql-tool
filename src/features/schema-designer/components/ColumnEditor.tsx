@@ -152,7 +152,7 @@ export default function ColumnEditor({
     if (validationError) {
       setValidationError(null);
     }
-  }, [formData.primaryKey, formData.autoIncrement, formData.type, formData.name]);
+  }, [formData.primaryKey, formData.autoIncrement, formData.type, formData.name, validationError]);
 
   // Auto-disable AUTO_INCREMENT when composite PK is detected
   useEffect(() => {
@@ -167,7 +167,7 @@ export default function ColumnEditor({
     if (otherPKColumns.length > 0) {
       setFormData(prev => ({ ...prev, autoIncrement: false }));
     }
-  }, [formData.primaryKey, allTables, tableName, column, formData.id]);
+  }, [formData.primaryKey, formData.autoIncrement, allTables, tableName, column, formData.id]);
 
   // Handle Escape key
   useEffect(() => {

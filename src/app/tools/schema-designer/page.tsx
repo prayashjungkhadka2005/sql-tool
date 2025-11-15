@@ -6,6 +6,7 @@
 "use client";
 
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
+import { useSession, signOut } from 'next-auth/react';
 import { ReactFlowProvider } from 'reactflow';
 import { AnimatePresence } from 'framer-motion';
 import { SchemaState, SchemaTable, SchemaColumn, SchemaTemplate, SchemaIndex } from '@/features/schema-designer/types';
@@ -32,6 +33,7 @@ import DatabaseConnectionModal from '@/features/schema-designer/components/Datab
 import DatabaseSyncModal from '@/features/schema-designer/components/DatabaseSyncModal';
 import DatabaseActivityFeed, { DatabaseActivityEvent } from '@/features/schema-designer/components/DatabaseActivityFeed';
 import BranchesDrawer from '@/features/schema-designer/components/BranchesDrawer';
+import LoginModal from '@/features/schema-designer/components/LoginModal';
 
 export default function SchemaDesignerPage() {
   // Schema state with undo/redo support
@@ -94,6 +96,46 @@ const syncActivityIdRef = useRef<string | null>(null);
     replaceSchema,
     storageAvailable,
   });
+
+  const { data: session, status: sessionStatus } = useSession();
+  const isSessionLoading = sessionStatus === 'loading';
+  const isAuthenticated = sessionStatus === 'authenticated';
+  const sessionUserLabel = session?.user?.email ?? session?.user?.name ?? null;
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+  const pendingAuthActionRef = useRef<(() => void) | null>(null);
+
+  const openLoginModal = useCallback(() => {
+    pendingAuthActionRef.current = null;
+    setIsLoginModalOpen(true);
+  }, []);
+
+  const closeLoginModal = useCallback(() => {
+    pendingAuthActionRef.current = null;
+    setIsLoginModalOpen(false);
+  }, []);
+
+  const requireAuth = useCallback(
+    (action?: () => void) => {
+      if (!action) return;
+      if (isAuthenticated) {
+        action();
+      } else {
+        pendingAuthActionRef.current = action;
+        setIsLoginModalOpen(true);
+      }
+    },
+    [isAuthenticated]
+  );
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      if (pendingAuthActionRef.current) {
+        pendingAuthActionRef.current();
+        pendingAuthActionRef.current = null;
+      }
+      setIsLoginModalOpen(false);
+    }
+  }, [isAuthenticated]);
   
   // Store original database schema and connection info for sync
   const [databaseConnection, setDatabaseConnection] = useState<{
@@ -426,7 +468,7 @@ const [refreshRemoteSchema, setRefreshRemoteSchema] = useState<SchemaState | nul
         setInputDialog(prev => ({ ...prev, isOpen: false }));
       },
     });
-  }, [schema]);
+  }, [schema, setSchema]);
 
   const handleRefreshDatabase = useCallback(async () => {
     if (!databaseConnection) {
@@ -713,7 +755,7 @@ const [refreshRemoteSchema, setRefreshRemoteSchema] = useState<SchemaState | nul
 
     setIsIndexManagerOpen(false);
     setManagingIndexTable(null);
-  }, [managingIndexTable]);
+  }, [managingIndexTable, setSchema]);
 
   // Auto-create indexes for all foreign key columns
   const handleAutoIndexForeignKeys = useCallback(() => {
@@ -844,7 +886,7 @@ const [refreshRemoteSchema, setRefreshRemoteSchema] = useState<SchemaState | nul
         });
       }
     });
-  }, [isOptimizingFKs, isIndexManagerOpen, isColumnEditorOpen]);
+  }, [isOptimizingFKs, isIndexManagerOpen, isColumnEditorOpen, setSchema, setAlertDialog]);
 
   // Save column (add or update)
   const handleSaveColumn = useCallback((column: SchemaColumn) => {
@@ -913,7 +955,7 @@ const [refreshRemoteSchema, setRefreshRemoteSchema] = useState<SchemaState | nul
 
     setIsColumnEditorOpen(false);
     setEditingColumn(null);
-  }, [editingColumn]);
+  }, [editingColumn, setSchema]);
 
   // Delete column
   const handleDeleteColumn = useCallback((columnId: string) => {
@@ -1003,7 +1045,7 @@ const [refreshRemoteSchema, setRefreshRemoteSchema] = useState<SchemaState | nul
 
     setIsColumnEditorOpen(false);
     setEditingColumn(null);
-  }, [editingColumn]);
+  }, [editingColumn, setSchema]);
 
   // Load template
   const handleLoadTemplate = useCallback((template: SchemaTemplate) => {
@@ -1163,7 +1205,7 @@ const [refreshRemoteSchema, setRefreshRemoteSchema] = useState<SchemaState | nul
         return !hasSingleIndex && !hasCompositeIndex;
       })
     );
-  }, [schema.tables]);
+  }, [schema]);
 
   // Reset schema
   const handleReset = useCallback(() => {
@@ -1257,7 +1299,7 @@ const [refreshRemoteSchema, setRefreshRemoteSchema] = useState<SchemaState | nul
         });
       });
     }
-  }, [replaceSchema]);
+  }, [replaceSchema, setSchema]);
 
   /**
    * Load a schema version from migration history
@@ -1575,7 +1617,7 @@ const [refreshRemoteSchema, setRefreshRemoteSchema] = useState<SchemaState | nul
         action: () => handleDeleteTable(table.id),
       },
     ];
-  }, [contextMenu.tableId, schema.tables, setSchema, handleAddColumn, handleEditTable, handleManageIndexes, handleDeleteTable]);
+  }, [contextMenu.tableId, schema, setSchema, handleAddColumn, handleEditTable, handleManageIndexes, handleDeleteTable]);
 
 
   // Keyboard shortcut overlay (? key)
@@ -1693,7 +1735,21 @@ const [refreshRemoteSchema, setRefreshRemoteSchema] = useState<SchemaState | nul
   const indexCount = schema.tables.reduce((sum, t) => sum + (t.indexes?.length || 0), 0);
 
   const lastSavedLabel = lastSavedTime ? formatTimestamp(lastSavedTime) : null;
+  const handleRequestSignOut = useCallback(() => {
+    signOut();
+  }, []);
+  const handleConnectDatabaseRequest = useCallback(() => {
+    requireAuth(() => setIsDatabaseConnectionOpen(true));
+  }, [requireAuth]);
+  const handleRefreshDatabaseRequest = useCallback(() => {
+    requireAuth(handleRefreshDatabase);
+  }, [requireAuth, handleRefreshDatabase]);
+  const handleSyncDatabaseRequest = useCallback(() => {
+    requireAuth(() => setIsSyncModalOpen(true));
+  }, [requireAuth]);
+
   return (
+    <>
     <div className="h-full flex flex-col overflow-hidden">
       {/* Professional Navbar with all actions */}
       <SchemaDesignerNavbar
@@ -1701,8 +1757,8 @@ const [refreshRemoteSchema, setRefreshRemoteSchema] = useState<SchemaState | nul
         onExport={() => setIsExportModalOpen(true)}
         onNewTable={handleAddTable}
         onImport={() => setIsImportModalOpen(true)}
-        onConnectDatabase={() => setIsDatabaseConnectionOpen(true)}
-        onRefreshDatabase={handleRefreshDatabase}
+        onConnectDatabase={handleConnectDatabaseRequest}
+        onRefreshDatabase={handleRefreshDatabaseRequest}
         onDisconnectDatabase={() => {
           setConfirmDialog({
             isOpen: true,
@@ -1712,16 +1768,14 @@ const [refreshRemoteSchema, setRefreshRemoteSchema] = useState<SchemaState | nul
             cancelLabel: 'Cancel',
             confirmVariant: 'danger',
             onConfirm: () => {
-              const activityId = startDbActivity('connect', 'Disconnecting from database…');
+                const activityId = startDbActivity('connect', 'Disconnecting from database…');
               setDatabaseConnection(null);
               setConfirmDialog(prev => ({ ...prev, isOpen: false }));
-              updateDbActivity(activityId, 'success', 'Disconnected from database.');
+                updateDbActivity(activityId, 'success', 'Disconnected from database.');
             },
           });
         }}
-        onSyncDatabase={databaseConnection ? () => {
-          setIsSyncModalOpen(true);
-        } : undefined}
+        onSyncDatabase={databaseConnection ? handleSyncDatabaseRequest : undefined}
         onTemplates={() => setIsTemplatesOpen(!isTemplatesOpen)}
         onMigrations={() => setIsMigrationModalOpen(true)}
         onAutoLayout={() => handleAutoLayout('hierarchical')}
@@ -1729,13 +1783,13 @@ const [refreshRemoteSchema, setRefreshRemoteSchema] = useState<SchemaState | nul
         onRedo={redo}
         onShortcuts={() => setIsShortcutsOpen(true)}
         onReset={handleReset}
-        onOpenActivityFeed={() => setIsActivityFeedOpen(true)}
-        onOpenBranchesSidebar={() => setIsBranchesDrawerOpen(true)}
-        activeBranch={activeBranch}
-        branchOptions={branchNames}
-        onBranchSelect={handleSwitchBranch}
-        onBranchCreate={requestCreateBranch}
-        onBranchDelete={requestDeleteBranch}
+          onOpenActivityFeed={() => setIsActivityFeedOpen(true)}
+          onOpenBranchesSidebar={() => setIsBranchesDrawerOpen(true)}
+          activeBranch={activeBranch}
+          branchOptions={branchNames}
+          onBranchSelect={handleSwitchBranch}
+          onBranchCreate={requestCreateBranch}
+          onBranchDelete={requestDeleteBranch}
         canExport={schema.tables.length > 0}
         canUndo={canUndo}
         canRedo={canRedo}
@@ -1744,13 +1798,18 @@ const [refreshRemoteSchema, setRefreshRemoteSchema] = useState<SchemaState | nul
         isTemplatesOpen={isTemplatesOpen}
         isDatabaseConnected={databaseConnection !== null}
         isRefreshingDatabase={isRefreshingDatabase}
-        dbStatus={
-          latestDbActivity
-            ? { label: latestDbActivity.message, status: latestDbActivity.status }
-            : null
-        }
+          dbStatus={
+            latestDbActivity
+              ? { label: latestDbActivity.message, status: latestDbActivity.status }
+              : null
+          }
+        isAuthenticated={isAuthenticated}
+        isSessionLoading={isSessionLoading}
+        userLabel={sessionUserLabel}
+        onRequestSignIn={openLoginModal}
+        onRequestSignOut={handleRequestSignOut}
       />
-          
+      
       {/* Content Area - Full Height Canvas */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Templates Sidebar */}
@@ -1894,7 +1953,6 @@ const [refreshRemoteSchema, setRefreshRemoteSchema] = useState<SchemaState | nul
           </div>
         </>
       )}
-
       {/* Column Editor Drawer */}
       {editingColumn && (
         <ColumnEditor
@@ -2087,6 +2145,13 @@ const [refreshRemoteSchema, setRefreshRemoteSchema] = useState<SchemaState | nul
         onDelete={requestDeleteBranch}
       />
     </div>
+
+    <LoginModal
+      isOpen={isLoginModalOpen}
+      isCheckingSession={isLoginModalOpen && isSessionLoading}
+      onClose={closeLoginModal}
+    />
+    </>
   );
 }
 

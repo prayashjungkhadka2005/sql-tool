@@ -1,6 +1,8 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
+import type { ReactNode } from "react";
 import { DM_Sans } from "next/font/google";
 import "./globals.css";
+import { Providers } from "./providers";
 
 const dmSans = DM_Sans({ 
   subsets: ["latin"],
@@ -17,12 +19,6 @@ export const metadata: Metadata = {
   authors: [{ name: "Prayash Jung Khadka" }],
   creator: "Prayash Jung Khadka",
   publisher: "Prayash Jung Khadka",
-  viewport: {
-    width: 'device-width',
-    initialScale: 1,
-    maximumScale: 5,
-    viewportFit: 'cover',
-  },
   verification: {
     google: 'BHNtNhPfKfSpVEQ2gy1_NlDDTnbS8_ovvO24PXpou4Q',
   },
@@ -75,14 +71,23 @@ export const metadata: Metadata = {
   },
 };
 
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 5,
+  viewportFit: 'cover',
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{
-  children: React.ReactNode;
+  children: ReactNode;
 }>) {
   return (
     <html lang="en" className="scroll-smooth transition-colors duration-200">
-      <body className={`${dmSans.className} antialiased`}>{children}</body>
+      <body className={`${dmSans.className} antialiased`}>
+        <Providers>{children}</Providers>
+      </body>
     </html>
   );
 }

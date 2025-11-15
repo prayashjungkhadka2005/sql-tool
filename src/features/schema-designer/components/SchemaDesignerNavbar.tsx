@@ -1,6 +1,13 @@
 "use client";
 
-import { useRef, forwardRef, useImperativeHandle } from "react";
+import {
+  useRef,
+  forwardRef,
+  useImperativeHandle,
+  useState,
+  useEffect,
+  useCallback,
+} from "react";
 import Link from "next/link";
 import BranchSwitcher from "./BranchSwitcher";
 import NavbarTemplatesButton from "./NavbarTemplatesButton";
@@ -42,6 +49,11 @@ interface SchemaDesignerNavbarProps {
     label: string;
     status: "in-progress" | "success" | "error";
   } | null;
+  isAuthenticated?: boolean;
+  isSessionLoading?: boolean;
+  userLabel?: string | null;
+  onRequestSignIn?: () => void;
+  onRequestSignOut?: () => void;
 }
 
 export interface SchemaDesignerNavbarRef {
@@ -79,8 +91,61 @@ const SchemaDesignerNavbar = forwardRef<SchemaDesignerNavbarRef, SchemaDesignerN
   isDatabaseConnected = false,
   isRefreshingDatabase = false,
   dbStatus = null,
+  isAuthenticated = false,
+  isSessionLoading = false,
+  userLabel = null,
+  onRequestSignIn,
+  onRequestSignOut,
 }, ref) => {
   const templatesButtonRef = useRef<HTMLButtonElement>(null);
+  const userInitial = userLabel?.trim().charAt(0).toUpperCase() ?? "U";
+  const [showLoadingBadge, setShowLoadingBadge] = useState(false);
+  const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
+  const accountButtonRef = useRef<HTMLButtonElement | null>(null);
+  const accountMenuRef = useRef<HTMLDivElement | null>(null);
+  const [menuPlacement, setMenuPlacement] = useState<"right" | "left">("right");
+
+  useEffect(() => {
+    if (isSessionLoading) {
+      const timer = setTimeout(() => setShowLoadingBadge(true), 250);
+      return () => clearTimeout(timer);
+    }
+    setShowLoadingBadge(false);
+    return undefined;
+  }, [isSessionLoading]);
+
+  const closeAccountMenu = useCallback(() => {
+    setIsAccountMenuOpen(false);
+  }, []);
+
+  useEffect(() => {
+    if (!isAccountMenuOpen) return;
+
+    const handleClick = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (
+        accountMenuRef.current &&
+        !accountMenuRef.current.contains(target) &&
+        accountButtonRef.current &&
+        !accountButtonRef.current.contains(target)
+      ) {
+        closeAccountMenu();
+      }
+    };
+
+    const handleKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        closeAccountMenu();
+      }
+    };
+
+    window.addEventListener("mousedown", handleClick, true);
+    window.addEventListener("keydown", handleKey);
+    return () => {
+      window.removeEventListener("mousedown", handleClick, true);
+      window.removeEventListener("keydown", handleKey);
+    };
+  }, [isAccountMenuOpen, closeAccountMenu]);
 
   useImperativeHandle(ref, () => ({
     templatesButtonRef,
@@ -203,7 +268,7 @@ const SchemaDesignerNavbar = forwardRef<SchemaDesignerNavbarRef, SchemaDesignerN
                 {dbStatus.status === 'in-progress' ? (
                   <svg className="w-3.5 h-3.5 text-foreground/60 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v4m0 8v4m8-8h4M4 12H0m15.535-6.535l2.828 2.828M5.636 18.364l-2.828 2.828M18.364 18.364l2.828 2.828M5.636 5.636L2.808 2.808" />
-                  </svg>
+                </svg>
                 ) : dbStatus.status === 'success' ? (
                   <svg className="w-3.5 h-3.5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -254,16 +319,6 @@ const SchemaDesignerNavbar = forwardRef<SchemaDesignerNavbarRef, SchemaDesignerN
 
           {/* Right Actions */}
           <div className="flex items-center gap-1 flex-shrink-0 ml-auto">
-            <button
-              onClick={onShortcuts}
-              className="p-1.5 text-foreground/60 hover:text-foreground hover:bg-foreground/10 rounded transition-all active:scale-95"
-              title="Keyboard shortcuts (?)"
-              aria-label="Show keyboard shortcuts"
-            >
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </button>
             {hasTables && onReset && (
               <button
                 onClick={onReset}
@@ -274,6 +329,100 @@ const SchemaDesignerNavbar = forwardRef<SchemaDesignerNavbarRef, SchemaDesignerN
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                 </svg>
+              </button>
+            )}
+
+            <div className="w-px h-4 bg-foreground/10"></div>
+
+            {showLoadingBadge ? (
+              <div
+                className="w-8 h-8 rounded-full border border-foreground/15 bg-foreground/5 flex items-center justify-center"
+                title="Verifying session…"
+              >
+                <svg className="w-3.5 h-3.5 animate-spin text-foreground/50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v4m0 8v4m8-8h4M4 12H0m15.535-6.535l2.828 2.828M5.636 18.364l-2.828 2.828M18.364 18.364l2.828 2.828M5.636 5.636L2.808 2.808" />
+                </svg>
+                <span className="sr-only">Verifying session…</span>
+              </div>
+            ) : isAuthenticated ? (
+              <div className="relative">
+                <button
+                  type="button"
+                  ref={accountButtonRef}
+                  onClick={() => setIsAccountMenuOpen(prev => !prev)}
+                  className="w-9 h-9 rounded-full border border-foreground/15 bg-foreground/5 text-xs font-semibold text-foreground/80 flex items-center justify-center hover:border-foreground/30 transition-all active:scale-95 focus:outline-none focus:ring-2 focus:ring-foreground/30"
+                  aria-haspopup="menu"
+                  aria-expanded={isAccountMenuOpen}
+                >
+                  <span className="w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-sm">
+                    {userInitial}
+                  </span>
+                </button>
+
+                {isAccountMenuOpen && (
+                  <div
+                    ref={accountMenuRef}
+                    className={`absolute mt-2 w-72 rounded-2xl border border-foreground/10 bg-white dark:bg-[#0f0f0f] shadow-2xl py-3 z-50 ${
+                      menuPlacement === "right" ? "right-0" : "left-0"
+                    }`}
+                    role="menu"
+                  >
+                    <div className="flex items-center gap-3 px-4 pb-3">
+                      <div className="w-10 h-10 rounded-full bg-primary/10 text-primary font-bold flex items-center justify-center text-lg">
+                        {userInitial}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs uppercase tracking-[0.2em] text-foreground/40 font-semibold">
+                          Signed in
+                        </p>
+                        <p className="text-sm font-medium text-foreground truncate">{userLabel}</p>
+                      </div>
+                    </div>
+                    <div className="my-2 h-px bg-foreground/10" />
+                    <div className="px-4 text-[10px] font-semibold uppercase tracking-[0.4em] text-foreground/35 mb-1.5">
+                      Account
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        closeAccountMenu();
+                        onShortcuts?.();
+                      }}
+                      className="w-full text-left px-4 py-2 text-sm text-foreground/70 hover:bg-foreground/5 rounded-xl transition flex items-center gap-2"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      Keyboard shortcuts
+                    </button>
+                    <div className="my-2 h-px bg-foreground/10" />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        closeAccountMenu();
+                        onRequestSignOut?.();
+                      }}
+                      className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-500/10 active:scale-[0.99] transition-all flex items-center gap-2 rounded-xl"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6A2.25 2.25 0 005.25 5.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h12m0 0l-3-3m3 3l-3 3" />
+                      </svg>
+                      Sign out
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={onRequestSignIn}
+                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-primary/50 text-primary text-xs font-semibold hover:bg-primary/10 transition-all active:scale-95 focus:outline-none focus:ring-2 focus:ring-primary/40"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 11c1.657 0 3-1.343 3-3S13.657 5 12 5 9 6.343 9 8s1.343 3 3 3zm0 2c-2.21 0-4 1.343-4 3v2h8v-2c0-1.657-1.79-3-4-3zm6-9h2a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h2" />
+                </svg>
+                <span>Sign in</span>
               </button>
             )}
           </div>

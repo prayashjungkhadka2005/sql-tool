@@ -5,7 +5,7 @@
 
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { SchemaTable, SchemaIndex, IndexType } from '../types';
 import ConfirmDialog from '@/features/sql-builder/components/ui/ConfirmDialog';
@@ -55,7 +55,7 @@ export default function IndexManager({ isOpen, table, allTables, onClose, onSave
     setIsAddingNew(false);
     setValidationError(null);
     setValidationWarning(null);
-  }, [table.id, table.columns]);
+  }, [table.id, table.columns, table.indexes]);
 
   const handleAddNew = () => {
     const timestamp = Date.now();
@@ -258,7 +258,7 @@ export default function IndexManager({ isOpen, table, allTables, onClose, onSave
     onClose();
   };
 
-  const handleClose = () => {
+  const handleClose = useCallback(() => {
     // If editing, just cancel the edit
     if (isAddingNew || editingIndex) {
       handleCancelEdit();
@@ -275,12 +275,12 @@ export default function IndexManager({ isOpen, table, allTables, onClose, onSave
     }
     
     onClose();
-  };
+  }, [isAddingNew, editingIndex, indexes, table.indexes, onClose]);
 
-  const handleConfirmClose = () => {
+  const handleConfirmClose = useCallback(() => {
     setShowUnsavedWarning(false);
     onClose();
-  };
+  }, [onClose]);
 
   const suggestIndexForFK = () => {
     const fkColumns = table.columns.filter(col => col.references);
@@ -312,7 +312,7 @@ export default function IndexManager({ isOpen, table, allTables, onClose, onSave
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, isAddingNew, editingIndex, indexes, table.indexes]);
+  }, [isOpen, handleClose]);
 
   return (
     <>

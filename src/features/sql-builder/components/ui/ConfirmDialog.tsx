@@ -109,8 +109,8 @@ export default function ConfirmDialog({
                       </span>
                     )}
                     <h3 className="text-lg font-semibold text-foreground font-mono mt-1">
-                      {title}
-                    </h3>
+                    {title}
+                  </h3>
                   </div>
                 </div>
               </div>
@@ -119,8 +119,8 @@ export default function ConfirmDialog({
               <div className="px-6 py-5 space-y-4">
                 <div className="bg-foreground/5 border border-foreground/10 rounded-xl px-4 py-3">
                   <p className="text-sm text-foreground/80 font-mono leading-relaxed whitespace-pre-line break-words">
-                    {message}
-                  </p>
+                  {message}
+                </p>
                 </div>
 
                 {detailItems && detailItems.length > 0 && (
