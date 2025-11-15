@@ -6,6 +6,7 @@
 "use client";
 
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
+import useSWR from 'swr';
 import { useSession, signOut } from 'next-auth/react';
 import { ReactFlowProvider } from 'reactflow';
 import { AnimatePresence } from 'framer-motion';
@@ -24,6 +25,7 @@ import { saveSchema, loadSchema, clearSchema, getLastSaved, formatTimestamp, isS
 import { compareSchemas, SchemaDiff } from '@/features/schema-designer/utils/schema-comparator';
 import { useSchemaHistory } from '@/features/schema-designer/hooks/useSchemaHistory';
 import { useBranches } from '@/features/schema-designer/hooks/useBranches';
+import { ProjectSummary } from '@/types/projects';
 import ConfirmDialog from '@/features/sql-builder/components/ui/ConfirmDialog';
 import InputDialog from '@/features/sql-builder/components/ui/InputDialog';
 import SchemaDesignerNavbar, { SchemaDesignerNavbarRef } from '@/features/schema-designer/components/SchemaDesignerNavbar';
@@ -34,6 +36,36 @@ import DatabaseSyncModal from '@/features/schema-designer/components/DatabaseSyn
 import DatabaseActivityFeed, { DatabaseActivityEvent } from '@/features/schema-designer/components/DatabaseActivityFeed';
 import BranchesDrawer from '@/features/schema-designer/components/BranchesDrawer';
 import LoginModal from '@/features/schema-designer/components/LoginModal';
+import ProjectsDrawer from '@/features/schema-designer/components/ProjectsDrawer';
+
+const EMPTY_SCHEMA: SchemaState = {
+  name: 'My Database',
+  tables: [],
+  relationships: [],
+};
+
+interface ProjectsResponse {
+  projects: ProjectSummary[];
+}
+
+interface ProjectDetailResponse {
+  project: ProjectSummary;
+}
+
+const apiFetcher = async (url: string) => {
+  const response = await fetch(url);
+  if (!response.ok) {
+    let message = 'Request failed';
+    try {
+      const errorData = await response.json();
+      message = errorData.error ?? message;
+    } catch (error) {
+      // ignore
+    }
+    throw new Error(message);
+  }
+  return response.json();
+};
 
 export default function SchemaDesignerPage() {
   // Schema state with undo/redo support
@@ -48,11 +80,7 @@ export default function SchemaDesignerPage() {
     clearHistory,
     replaceSchema,
     lastActionName,
-  } = useSchemaHistory({
-    name: 'My Database',
-    tables: [],
-    relationships: [],
-  });
+  } = useSchemaHistory(EMPTY_SCHEMA);
 
   const [isColumnEditorOpen, setIsColumnEditorOpen] = useState(false);
   const [editingColumn, setEditingColumn] = useState<{
@@ -76,6 +104,37 @@ const [dbActivityEvents, setDbActivityEvents] = useState<DatabaseActivityEvent[]
 const syncActivityIdRef = useRef<string | null>(null);
   const connectionActivityIdRef = useRef<string | null>(null);
   const [isBranchesDrawerOpen, setIsBranchesDrawerOpen] = useState(false);
+  const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
+  const [activeProject, setActiveProject] = useState<ProjectSummary | null>(null);
+  const [isProjectsDrawerOpen, setIsProjectsDrawerOpen] = useState(false);
+  const [isSavingProject, setIsSavingProject] = useState(false);
+  const [isCreatingProject, setIsCreatingProject] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const lastSavedSnapshotRef = useRef<string | null>(null);
+  const lastLoadedProjectVersionRef = useRef<string | null>(null);
+  const [inputDialog, setInputDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    defaultValue: string;
+    onConfirm: (value: string) => void;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    defaultValue: '',
+    onConfirm: () => {},
+  });
+
+  const [alertDialog, setAlertDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+  });
   
   const storageAvailable = isStorageAvailable();
   const {
@@ -87,20 +146,33 @@ const syncActivityIdRef = useRef<string | null>(null);
     switchBranch,
     deleteBranch,
   } = useBranches({
-    initialSchema: {
-      name: 'My Database',
-      tables: [],
-      relationships: [],
-    },
+    initialSchema: EMPTY_SCHEMA,
     schema,
     replaceSchema,
     storageAvailable,
+    storageKey: activeProjectId ?? null,
   });
 
   const { data: session, status: sessionStatus } = useSession();
   const isSessionLoading = sessionStatus === 'loading';
   const isAuthenticated = sessionStatus === 'authenticated';
   const sessionUserLabel = session?.user?.email ?? session?.user?.name ?? null;
+  const {
+    data: projectsData,
+    error: projectsError,
+    isLoading: isProjectsLoading,
+    mutate: mutateProjects,
+  } = useSWR<ProjectsResponse>(isAuthenticated ? '/api/projects' : null, apiFetcher);
+
+  const {
+    data: projectDetailData,
+    error: projectDetailError,
+    isLoading: isProjectDetailLoading,
+    mutate: mutateProjectDetail,
+  } = useSWR<ProjectDetailResponse>(
+    isAuthenticated && activeProjectId ? `/api/projects/${activeProjectId}` : null,
+    apiFetcher
+  );
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const pendingAuthActionRef = useRef<(() => void) | null>(null);
 
@@ -136,6 +208,125 @@ const syncActivityIdRef = useRef<string | null>(null);
       setIsLoginModalOpen(false);
     }
   }, [isAuthenticated]);
+
+  const handleOpenProjectPanel = useCallback(() => {
+    requireAuth(() => setIsProjectsDrawerOpen(true));
+  }, [requireAuth]);
+
+  const handleSelectProject = useCallback((projectId: string) => {
+    setActiveProjectId(projectId);
+    setIsProjectsDrawerOpen(false);
+    setActiveProject(null);
+    lastLoadedProjectVersionRef.current = null;
+    lastSavedSnapshotRef.current = null;
+    setHasUnsavedChanges(true);
+  }, []);
+
+  const handleCreateProject = useCallback(
+    async ({ name, description }: { name: string; description?: string | null }) => {
+      if (!isAuthenticated) {
+        throw new Error('Sign in to create projects.');
+      }
+      setIsCreatingProject(true);
+      try {
+        const response = await fetch('/api/projects', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, description }),
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok || !payload?.project) {
+          throw new Error(payload?.error ?? 'Failed to create project');
+        }
+        await mutateProjects();
+        setActiveProjectId(payload.project.id);
+        setIsProjectsDrawerOpen(false);
+        lastLoadedProjectVersionRef.current = null;
+        lastSavedSnapshotRef.current = null;
+        setHasUnsavedChanges(true);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Failed to create project.';
+        throw new Error(message);
+      } finally {
+        setIsCreatingProject(false);
+      }
+    },
+    [isAuthenticated, mutateProjects]
+  );
+
+  const saveProject = useCallback(async () => {
+    if (!activeProjectId) return;
+    setIsSavingProject(true);
+    try {
+      const response = await fetch(`/api/projects/${activeProjectId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ currentSchema: schema }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(payload?.error ?? 'Failed to save project');
+      }
+      lastSavedSnapshotRef.current = JSON.stringify(schema);
+      setHasUnsavedChanges(false);
+      setLastSavedTime(Date.now());
+      mutateProjectDetail();
+      mutateProjects();
+    } catch (error) {
+      setAlertDialog({
+        isOpen: true,
+        title: 'Save failed',
+        message: error instanceof Error ? error.message : 'Failed to save project.',
+      });
+    } finally {
+      setIsSavingProject(false);
+    }
+  }, [
+    activeProjectId,
+    schema,
+    mutateProjectDetail,
+    mutateProjects,
+    setAlertDialog,
+  ]);
+
+  const handleSaveProject = useCallback(() => {
+    if (!activeProjectId) {
+      setAlertDialog({
+        isOpen: true,
+        title: 'Select a project',
+        message: 'Create or select a project to sync your schema.',
+      });
+      setIsProjectsDrawerOpen(true);
+      return;
+    }
+    requireAuth(() => {
+      void saveProject();
+    });
+  }, [activeProjectId, requireAuth, saveProject, setAlertDialog]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const storedId = window.localStorage.getItem('schemaDesigner:activeProjectId');
+    if (storedId) {
+      setActiveProjectId(storedId);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (activeProjectId) {
+      window.localStorage.setItem('schemaDesigner:activeProjectId', activeProjectId);
+    } else {
+      window.localStorage.removeItem('schemaDesigner:activeProjectId');
+    }
+  }, [activeProjectId]);
+
+  useEffect(() => {
+    if (sessionStatus === 'unauthenticated') {
+      setActiveProjectId(null);
+      setActiveProject(null);
+    }
+  }, [sessionStatus]);
   
   // Store original database schema and connection info for sync
   const [databaseConnection, setDatabaseConnection] = useState<{
@@ -152,6 +343,9 @@ const syncActivityIdRef = useRef<string | null>(null);
   } | null>(null);
   const [isOptimizingFKs, setIsOptimizingFKs] = useState(false);
   const [canvasRef, setCanvasRef] = useState<HTMLElement | null>(null);
+  const handleCanvasRef = useCallback((node: HTMLElement | null) => {
+    setCanvasRef(prev => (prev === node ? prev : node));
+  }, []);
   const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
   const [autoLayoutTrigger, setAutoLayoutTrigger] = useState(0);
   const navbarRef = useRef<SchemaDesignerNavbarRef>(null);
@@ -186,30 +380,6 @@ const syncActivityIdRef = useRef<string | null>(null);
     cancelLabel: 'Cancel',
     confirmVariant: 'danger',
     onConfirm: () => {},
-  });
-
-  const [inputDialog, setInputDialog] = useState<{
-    isOpen: boolean;
-    title: string;
-    message: string;
-    defaultValue: string;
-    onConfirm: (value: string) => void;
-  }>({
-    isOpen: false,
-    title: '',
-    message: '',
-    defaultValue: '',
-    onConfirm: () => {},
-  });
-
-  const [alertDialog, setAlertDialog] = useState<{
-    isOpen: boolean;
-    title: string;
-    message: string;
-  }>({
-    isOpen: false,
-    title: '',
-    message: '',
   });
 
 const [isRefreshingDatabase, setIsRefreshingDatabase] = useState(false);
@@ -327,6 +497,63 @@ const [refreshRemoteSchema, setRefreshRemoteSchema] = useState<SchemaState | nul
     
     return () => clearInterval(interval);
   }, [lastSavedTime]);
+
+  useEffect(() => {
+    const project = projectDetailData?.project;
+    if (!project) return;
+    setActiveProject(project);
+    const versionKey = `${project.id}:${project.schemaVersion ?? project.updatedAt}`;
+    if (lastLoadedProjectVersionRef.current === versionKey) {
+      return;
+    }
+    if (project.currentSchema) {
+      replaceSchema(project.currentSchema);
+      setSchemaDebounced(project.currentSchema);
+      clearHistory();
+      lastSavedSnapshotRef.current = JSON.stringify(project.currentSchema);
+      setHasUnsavedChanges(false);
+    } else {
+      lastSavedSnapshotRef.current = null;
+      setHasUnsavedChanges(true);
+    }
+    if (project.updatedAt) {
+      setLastSavedTime(new Date(project.updatedAt).getTime());
+    }
+    lastLoadedProjectVersionRef.current = versionKey;
+  }, [
+    projectDetailData,
+    replaceSchema,
+    setSchemaDebounced,
+    clearHistory,
+    setLastSavedTime,
+  ]);
+
+  useEffect(() => {
+    if (!activeProjectId) {
+      setHasUnsavedChanges(false);
+      return;
+    }
+    if (!lastSavedSnapshotRef.current) {
+      setHasUnsavedChanges(true);
+      return;
+    }
+    const snapshot = JSON.stringify(schema);
+    setHasUnsavedChanges(snapshot !== lastSavedSnapshotRef.current);
+  }, [schema, activeProjectId, setHasUnsavedChanges]);
+
+  useEffect(() => {
+    if (!projectDetailError || !activeProjectId) return;
+    setAlertDialog({
+      isOpen: true,
+      title: 'Unable to load project',
+      message:
+        projectDetailError instanceof Error
+          ? projectDetailError.message
+          : 'Failed to load project details.',
+    });
+    setActiveProjectId(null);
+    setActiveProject(null);
+  }, [projectDetailError, activeProjectId, setAlertDialog]);
 
   // Add new table
   const handleAddTable = useCallback(() => {
@@ -1803,6 +2030,11 @@ const [refreshRemoteSchema, setRefreshRemoteSchema] = useState<SchemaState | nul
               ? { label: latestDbActivity.message, status: latestDbActivity.status }
               : null
           }
+        projectName={activeProject?.name ?? null}
+        onOpenProjectPanel={handleOpenProjectPanel}
+        onSaveProject={handleSaveProject}
+        isSavingProject={isSavingProject}
+        hasUnsavedChanges={hasUnsavedChanges}
         isAuthenticated={isAuthenticated}
         isSessionLoading={isSessionLoading}
         userLabel={sessionUserLabel}
@@ -1822,7 +2054,7 @@ const [refreshRemoteSchema, setRefreshRemoteSchema] = useState<SchemaState | nul
         {/* Canvas - Always Shown, Full Height */}
         <section className="flex-1 flex flex-col min-h-0" role="region" aria-label="Schema design canvas">
           <ReactFlowProvider>
-            <div ref={(el) => setCanvasRef(el)} className="flex-1 w-full min-h-0">
+            <div ref={handleCanvasRef} className="flex-1 w-full min-h-0">
         <SchemaCanvas
           schema={schema}
           onSchemaChange={setSchema}
@@ -2143,6 +2375,19 @@ const [refreshRemoteSchema, setRefreshRemoteSchema] = useState<SchemaState | nul
         onSwitch={handleSwitchBranch}
         onCreate={requestCreateBranch}
         onDelete={requestDeleteBranch}
+      />
+
+      <ProjectsDrawer
+        isOpen={isProjectsDrawerOpen}
+        projects={projectsData?.projects}
+        isLoading={isProjectsLoading || isProjectDetailLoading}
+        error={projectsError instanceof Error ? projectsError.message : undefined}
+        activeProjectId={activeProjectId}
+        onClose={() => setIsProjectsDrawerOpen(false)}
+        onSelect={handleSelectProject}
+        onCreate={handleCreateProject}
+        isCreating={isCreatingProject}
+        onRetry={() => mutateProjects()}
       />
     </div>
 

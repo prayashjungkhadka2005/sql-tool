@@ -2,8 +2,10 @@ import NextAuth from "next-auth";
 import type { AuthOptions } from "next-auth";
 import EmailProvider from "next-auth/providers/email";
 import { PrismaAdapter } from "@auth/prisma-adapter";
+import nodemailer from "nodemailer";
 
 import { prisma } from "@/server/db/client";
+import { buildMagicLinkEmail } from "@/server/auth/templates/magicLinkEmail";
 
 export const authOptions: AuthOptions = {
   adapter: PrismaAdapter(prisma),
@@ -19,6 +21,20 @@ export const authOptions: AuthOptions = {
         },
       },
       from: process.env.EMAIL_FROM,
+      maxAge: 10 * 60, // 10 minutes
+      async sendVerificationRequest({ identifier, url, provider }) {
+        const transport = nodemailer.createTransport(provider.server);
+
+        const { text, html } = buildMagicLinkEmail({ url });
+
+        await transport.sendMail({
+          to: identifier,
+          from: provider.from,
+          subject: "Your Schema Designer magic link",
+          text,
+          html,
+        });
+      },
     }),
   ],
   pages: {
@@ -35,5 +51,6 @@ export const authOptions: AuthOptions = {
   secret: process.env.NEXTAUTH_SECRET,
 };
 
-export const { handlers, auth, signIn, signOut } = NextAuth(authOptions);
+const authInstance = NextAuth(authOptions);
+export const { handlers, signIn, signOut } = authInstance;
 

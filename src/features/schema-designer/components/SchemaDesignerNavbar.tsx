@@ -35,6 +35,11 @@ interface SchemaDesignerNavbarProps {
   onBranchSelect?: (branch: string) => void;
   onBranchCreate?: () => void;
   onBranchDelete?: (branch: string) => void;
+  projectName?: string | null;
+  onOpenProjectPanel?: () => void;
+  onSaveProject?: () => void;
+  isSavingProject?: boolean;
+  hasUnsavedChanges?: boolean;
   
   // States
   canExport?: boolean;
@@ -82,6 +87,11 @@ const SchemaDesignerNavbar = forwardRef<SchemaDesignerNavbarRef, SchemaDesignerN
   onBranchSelect,
   onBranchCreate,
   onBranchDelete,
+  projectName,
+  onOpenProjectPanel,
+  onSaveProject,
+  isSavingProject = false,
+  hasUnsavedChanges = false,
   canExport = false,
   canUndo = false,
   canRedo = false,
@@ -173,6 +183,23 @@ const SchemaDesignerNavbar = forwardRef<SchemaDesignerNavbarRef, SchemaDesignerN
             </div>
           </Link>
 
+          {onOpenProjectPanel && (
+            <button
+              type="button"
+              onClick={onOpenProjectPanel}
+              className="hidden sm:inline-flex items-center gap-1.5 px-2 py-1.5 rounded-lg border border-foreground/15 bg-white/80 dark:bg-black/20 text-[11px] font-semibold text-foreground/80 hover:border-foreground/40 transition-all active:scale-95 max-w-[200px]"
+              title="Open project panel"
+            >
+              <svg className="w-3.5 h-3.5 text-foreground/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M4 7h16M4 12h16M4 17h16" />
+              </svg>
+              <span className="truncate">{projectName || "Select project"}</span>
+              {hasUnsavedChanges && (
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" aria-label="Unsaved changes" />
+              )}
+            </button>
+          )}
+
           <BranchSwitcher
             activeBranch={activeBranch}
             branchOptions={branchOptions}
@@ -258,6 +285,34 @@ const SchemaDesignerNavbar = forwardRef<SchemaDesignerNavbarRef, SchemaDesignerN
               onDisconnectDatabase={onDisconnectDatabase}
               onOpenActivity={onOpenActivityFeed}
             />
+
+            {onSaveProject && (
+              <button
+                onClick={onSaveProject}
+                disabled={
+                  !isAuthenticated ||
+                  !projectName ||
+                  isSavingProject ||
+                  !hasUnsavedChanges
+                }
+                className="px-2 py-1 text-xs sm:text-sm font-medium rounded transition-all flex items-center gap-1 border border-foreground/10 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed text-foreground/70 hover:text-foreground hover:border-foreground/30"
+                title="Save project to cloud (Cmd+S)"
+                type="button"
+              >
+                {isSavingProject ? (
+                  <svg className="w-3.5 h-3.5 animate-spin text-foreground/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6l2.5 2.5" />
+                  </svg>
+                ) : (
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a2 2 0 01-2 2H6a2 2 0 01-2-2V7a2 2 0 012-2h5a2 2 0 012 2v1" />
+                  </svg>
+                )}
+                <span className="hidden sm:inline">
+                  {isSavingProject ? "Saving…" : "Save"}
+                </span>
+              </button>
+            )}
 
             {dbStatus && (
               <button

@@ -11,14 +11,12 @@ import ReactFlow, {
   Edge,
   Background,
   BackgroundVariant,
-  useNodesState,
-  useEdgesState,
-  addEdge,
   Connection,
   MarkerType,
   useReactFlow,
   MiniMap,
-  Controls,
+  useNodesState,
+  useEdgesState,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 
@@ -192,21 +190,28 @@ export default function SchemaCanvas({
   
   // Zoom level for display
   const [zoomLevel, setZoomLevel] = useState(80);
+  const lastZoomRef = useRef(-1);
+  const getZoomRef = useRef(getZoom);
+
+  useEffect(() => {
+    getZoomRef.current = getZoom;
+  }, [getZoom]);
   
   // Update zoom level display (optimized - pause during panning for performance)
   useEffect(() => {
-    let lastZoom = -1;
     const updateZoom = () => {
       // Skip updates during active panning to avoid lag
       if (isPanning) return;
       
       try {
-        const zoom = getZoom();
+        const currentGetZoom = getZoomRef.current;
+        if (!currentGetZoom) return;
+        const zoom = currentGetZoom();
         if (typeof zoom === 'number' && !isNaN(zoom)) {
           const roundedZoom = Math.round(zoom * 100);
           // Only update state if zoom actually changed (avoid unnecessary re-renders)
-          if (roundedZoom !== lastZoom) {
-            lastZoom = roundedZoom;
+          if (roundedZoom !== lastZoomRef.current) {
+            lastZoomRef.current = roundedZoom;
             setZoomLevel(roundedZoom);
           }
         }
@@ -222,7 +227,7 @@ export default function SchemaCanvas({
     const interval = setInterval(updateZoom, isPanning ? 500 : 150);
     
     return () => clearInterval(interval);
-  }, [getZoom, isPanning]);
+  }, [isPanning]);
   
   // Keyboard shortcuts: Space for pan, Ctrl/Cmd + Plus/Minus/0 for zoom
   useEffect(() => {
@@ -518,40 +523,30 @@ export default function SchemaCanvas({
     return edges;
   }, []);
 
-  const [nodes, setNodes, onNodesChange] = useNodesState(convertToNodes(schema?.tables || []));
-  const [edges, setEdges, onEdgesChange] = useEdgesState(convertToEdges(schema?.tables || []));
+  const [nodes, setNodes, onNodesChange] = useNodesState(
+    convertToNodes(schema?.tables || [])
+  );
+  const [edges, setEdges, onEdgesChange] = useEdgesState(
+    convertToEdges(schema?.tables || [])
+  );
 
-  // Keep node selection state in sync with selectedTableId without waiting for schema updates
+  // Keep nodes in sync with schema/selection changes
   useEffect(() => {
-    setNodes(prevNodes => {
-      if (!prevNodes || prevNodes.length === 0) return prevNodes;
+    if (!schema?.tables) {
+      setNodes([]);
+      return;
+    }
+    setNodes(convertToNodes(schema.tables));
+  }, [schema?.tables, convertToNodes, setNodes]);
 
-      const related = selectedTableId ? getRelatedTables(selectedTableId) : null;
-      let hasChanges = false;
-
-      const nextNodes = prevNodes.map(node => {
-        const isSelected = node.id === selectedTableId;
-        const isRelated = !!related && related.has(node.id);
-
-        if (node.selected === isSelected && node.data?.isSelected === isSelected && node.data?.isRelated === isRelated) {
-          return node;
-        }
-
-        hasChanges = true;
-        return {
-          ...node,
-          selected: isSelected,
-          data: {
-            ...node.data,
-            isSelected,
-            isRelated,
-          },
-        };
-      });
-
-      return hasChanges ? nextNodes : prevNodes;
-    });
-  }, [selectedTableId, setNodes, getRelatedTables]);
+  // Keep edges in sync with schema changes
+  useEffect(() => {
+    if (!schema?.tables) {
+      setEdges([]);
+      return;
+    }
+    setEdges(convertToEdges(schema.tables));
+  }, [schema?.tables, convertToEdges, setEdges]);
 
   // Clear selection if selected table no longer exists
   useEffect(() => {
@@ -563,109 +558,13 @@ export default function SchemaCanvas({
     }
   }, [schema?.tables, selectedTableId]);
 
-  // Sync nodes when schema.tables changes (optimized with deep comparison)
-  // Skip updates during active panning to avoid lag
-  useEffect(() => {
-    // Defer updates during panning - they'll happen when panning stops
-    if (isPanning) return;
-    
-    if (!schema?.tables) {
-      setNodes([]);
-      return;
-    }
-    
-    const newNodes = convertToNodes(schema.tables);
-    // Only update if nodes actually changed (prevent unnecessary re-renders)
-    setNodes((prevNodes) => {
-      if (prevNodes.length !== newNodes.length) {
-        return newNodes;
-      }
-      // Fast path: check if any node changed (early exit for performance)
-      // Use Map for O(1) lookups to handle reordered tables correctly
-      const newNodeMap = new Map(newNodes.map(n => [n.id, n]));
-      let hasChanges = false;
-      for (let i = 0; i < prevNodes.length; i++) {
-        const prevNode = prevNodes[i];
-        if (!prevNode) {
-          hasChanges = true;
-          break;
-        }
-        // Find corresponding node by ID (handles reordering correctly)
-        const newNode = newNodeMap.get(prevNode.id);
-        if (!newNode) {
-          // Node was removed
-          hasChanges = true;
-          break;
-        }
-        // Quick checks first (most common changes)
-        if (prevNode.position.x !== newNode.position.x ||
-            prevNode.position.y !== newNode.position.y ||
-            prevNode.selected !== newNode.selected ||
-            prevNode.data?.isSelected !== newNode.data?.isSelected ||
-            prevNode.data?.isRelated !== newNode.data?.isRelated) {
-          hasChanges = true;
-          break;
-        }
-        if (prevNode.data?.tableSignature !== newNode.data?.tableSignature) {
-          hasChanges = true;
-          break;
-        }
-      }
-      // Also check if any new nodes were added (not in prevNodes)
-      if (!hasChanges && newNodes.length > prevNodes.length) {
-        hasChanges = true;
-      }
-      return hasChanges ? newNodes : prevNodes;
-    });
-  }, [schema?.tables, convertToNodes, setNodes, isPanning]);
-
-  // Sync edges when tables change (edges are auto-generated from FK columns)
-  // Skip updates during active panning to avoid lag
-  useEffect(() => {
-    // Defer updates during panning - they'll happen when panning stops
-    if (isPanning) return;
-    
-    if (!schema?.tables) {
-      setEdges([]);
-      return;
-    }
-    
-    const newEdges = convertToEdges(schema.tables);
-    // Only update if edges actually changed
-    setEdges((prevEdges) => {
-      if (prevEdges.length !== newEdges.length) {
-        return newEdges;
-      }
-      // Fast path: check if any edge changed (early exit for performance)
-      let hasChanges = false;
-      for (let i = 0; i < prevEdges.length; i++) {
-        const prevEdge = prevEdges[i];
-        const newEdge = newEdges[i];
-        if (!newEdge || !prevEdge) {
-          hasChanges = true;
-          break;
-        }
-        if (prevEdge.id !== newEdge.id ||
-            prevEdge.source !== newEdge.source ||
-            prevEdge.target !== newEdge.target ||
-            prevEdge.sourceHandle !== newEdge.sourceHandle ||
-            prevEdge.targetHandle !== newEdge.targetHandle) {
-          hasChanges = true;
-          break;
-        }
-      }
-      return hasChanges ? newEdges : prevEdges;
-    });
-  }, [schema?.tables, convertToEdges, setEdges, isPanning]);
-
   // Handle edge deletion - remove FK from column
   const handleEdgesChange = useCallback(
     (changes: any[]) => {
       if (!changes || !Array.isArray(changes)) {
-        onEdgesChange(changes);
         return;
       }
-      
+
       onEdgesChange(changes);
       
       // Check if any edge was removed (user clicked X on edge)

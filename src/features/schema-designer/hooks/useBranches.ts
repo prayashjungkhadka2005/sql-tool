@@ -1,7 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { SchemaState } from "../types";
 
-const BRANCH_STORAGE_KEY = "schema-designer-branches-v1";
+const BRANCH_STORAGE_ROOT_KEY = "schema-designer-branches-v2";
+const DEFAULT_BRANCH_NAMESPACE = "local";
+
+type BranchNamespaceState = {
+  branches: SchemaBranchMap;
+  activeBranch: string;
+};
+
+type PersistedBranchStore = Record<string, BranchNamespaceState>;
 
 export interface SchemaBranchEntry {
   name: string;
@@ -18,6 +26,30 @@ interface UseBranchesOptions {
   schema: SchemaState;
   replaceSchema: (schema: SchemaState) => void;
   storageAvailable: boolean;
+  storageKey?: string | null;
+}
+
+function readStore(): PersistedBranchStore {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = window.localStorage.getItem(BRANCH_STORAGE_ROOT_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === "object" && "branches" in parsed) {
+      return {
+        [DEFAULT_BRANCH_NAMESPACE]: parsed as BranchNamespaceState,
+      };
+    }
+    return parsed ?? {};
+  } catch (error) {
+    console.warn("Failed to read branch storage:", error);
+    return {};
+  }
+}
+
+function writeStore(store: PersistedBranchStore) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(BRANCH_STORAGE_ROOT_KEY, JSON.stringify(store));
 }
 
 export function useBranches({
@@ -25,19 +57,17 @@ export function useBranches({
   schema,
   replaceSchema,
   storageAvailable,
+  storageKey,
 }: UseBranchesOptions) {
   const [branches, setBranches] = useState<SchemaBranchMap>({});
   const [activeBranch, setActiveBranch] = useState("main");
   const [initialized, setInitialized] = useState(false);
   const branchSyncRef = useRef<string>("");
-  const hasLoadedRef = useRef(false);
+  const namespace = storageKey || DEFAULT_BRANCH_NAMESPACE;
 
   const clampClone = useCallback((state: SchemaState) => JSON.parse(JSON.stringify(state)), []);
 
   useEffect(() => {
-    if (hasLoadedRef.current) return;
-    hasLoadedRef.current = true;
-
     const initializeDefault = () => {
       const now = Date.now();
       const entry: SchemaBranchEntry = {
@@ -49,6 +79,7 @@ export function useBranches({
       setBranches({ main: entry });
       setActiveBranch("main");
       branchSyncRef.current = JSON.stringify(initialSchema);
+      replaceSchema(clampClone(initialSchema));
       setInitialized(true);
     };
 
@@ -58,28 +89,26 @@ export function useBranches({
     }
 
     try {
-      const stored = window.localStorage.getItem(BRANCH_STORAGE_KEY);
-      if (stored) {
-        const parsed = JSON.parse(stored) as { branches?: SchemaBranchMap; activeBranch?: string };
-        if (parsed?.branches && Object.keys(parsed.branches).length > 0) {
-          setBranches(parsed.branches);
-          const fallback =
-            parsed.activeBranch && parsed.branches[parsed.activeBranch]
-              ? parsed.activeBranch
-              : Object.keys(parsed.branches)[0];
-          setActiveBranch(fallback);
-          branchSyncRef.current = JSON.stringify(parsed.branches[fallback].schema);
-          replaceSchema(clampClone(parsed.branches[fallback].schema));
-          setInitialized(true);
-          return;
-        }
+      const store = readStore();
+      const state = store[namespace];
+      if (state && state.branches && Object.keys(state.branches).length > 0) {
+        const fallback =
+          state.activeBranch && state.branches[state.activeBranch]
+            ? state.activeBranch
+            : Object.keys(state.branches)[0];
+        setBranches(state.branches);
+        setActiveBranch(fallback);
+        branchSyncRef.current = JSON.stringify(state.branches[fallback].schema);
+        replaceSchema(clampClone(state.branches[fallback].schema));
+        setInitialized(true);
+        return;
       }
     } catch (error) {
       console.warn("Failed to load branch data:", error);
     }
 
     initializeDefault();
-  }, [initialSchema, replaceSchema, storageAvailable, clampClone]);
+  }, [initialSchema, replaceSchema, storageAvailable, clampClone, namespace]);
 
   useEffect(() => {
     if (!initialized) return;
@@ -116,14 +145,13 @@ export function useBranches({
   useEffect(() => {
     if (!initialized || !storageAvailable) return;
     try {
-      window.localStorage.setItem(
-        BRANCH_STORAGE_KEY,
-        JSON.stringify({ branches, activeBranch })
-      );
+      const store = readStore();
+      store[namespace] = { branches, activeBranch };
+      writeStore(store);
     } catch (error) {
       console.warn("Failed to persist branch data:", error);
     }
-  }, [branches, activeBranch, initialized, storageAvailable]);
+  }, [branches, activeBranch, initialized, storageAvailable, namespace]);
 
   const branchNames = useMemo(() => {
     return Object.values(branches)
